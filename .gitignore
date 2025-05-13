@@ -1,0 +1,7 @@
+node_modules
+_old/
+out/
+.vscode/
+dist/
+Modpack-Maker/
+.DS_Store

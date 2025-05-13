@@ -1,0 +1,49 @@
+{
+  "name": "modpack-maker",
+  "version": "0.0.1",
+  "description": "Lightweight app to create and launch modpack. Easy debuging that let you combine hundred of mods together while keeping the game fluid.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "build": "electron-builder"
+  },
+  "author": "Coconuts XXS",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.1.5",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
+    "@electron-forge/plugin-fuses": "^7.8.1",
+    "@ghostery/adblocker-electron": "^2.5.1",
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "chokidar": "^4.0.3",
+    "cross-fetch": "^4.1.0",
+    "grape-electron-dl": "^1.0.1-3.0.0",
+    "minecraft-data": "^3.85.0",
+    "minecraft-launcher-core": "^3.18.2",
+    "node-window-manager": "^2.2.4",
+    "prismarine-nbt": "^2.7.0",
+    "toml": "^3.0.0",
+    "unzipit": "^1.4.3",
+    "zlib": "^1.0.5"
+  },
+  "build": {
+    "appId": "fr.coconuts.modpackmaker",
+    "productName": "Modpack Maker",
+    "files": [
+      "**/*",
+      "!node_modules/.cache"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

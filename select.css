@@ -1,0 +1,25 @@
+#main > div:first-of-type
+{
+    display: flex;
+    height: 32px; width: 100vw;
+    border-bottom: var(--window-border) solid var(--border-width);
+}
+#main > div:first-of-type > button { height: 100%; }
+#main > div:last-of-type
+{
+    display: block;
+    height: 100%; width: 100vw;
+}
+#main > div:last-of-type > div { display: flex; padding: 8px; width: 320px; }
+#main > div:last-of-type > div > img { width: 64px; height: fit-content; padding-right: 8px; cursor: pointer; transition: all 100ms; }
+#main > div:last-of-type > div > img:hover { filter: brightness(0.9); }
+#main > div:last-of-type > div > div > h4 { margin: 0; font-weight: bolder; font-size: x-large; }
+#main > div:last-of-type > div > div > p:first-of-type
+{
+    opacity: 0.8;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+#main > div:last-of-type > div > div > p { opacity: 0.5; }
