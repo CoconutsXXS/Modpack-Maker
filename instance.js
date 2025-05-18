@@ -341,10 +341,9 @@ class Instance
         }
     
         // Virtual Path
-        if(data.virtualPath != undefined && data.virtualPath != "" && this.virtualDirectories.find(d => d.path == data.virtualPath) == undefined)
+        if(data.virtualPath != undefined && data.virtualPath != ""
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
         {
-            console.log(data.virtualPath)
-            console.log(data.virtualPath.split('/'))
             this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'mods', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
             console.log(this.virtualDirectories)
         }

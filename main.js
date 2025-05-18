@@ -33,7 +33,32 @@ app.on('web-contents-created', function (webContentsCreatedEvent, contents)
 });
 
 async function mainWindow()
-{    
+{
+    const load = new BrowserWindow
+    ({
+        width: 128,
+        height: 128,
+        frame: false,
+        transparent: true,
+        movable: false,
+        minimizable: false,
+        resizable: false,
+        hasShadow: false
+    }); load.loadFile('load.html');
+    let finishedLoading = false;
+    (async () =>
+    {
+        await setTimeout(1500/2);
+        finishedLoading = true
+    })()
+
+    // Blocker
+    try
+    {
+        let blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+        blocker.enableBlockingInSession(session.defaultSession);
+    }catch{}
+
     const win = new BrowserWindow
     ({
         width: screen.getAllDisplays()[0].bounds.width-64,
@@ -66,12 +91,16 @@ async function mainWindow()
         minimizable: true,
         maximizable: true,
         closable: true,
+        show: false
     });
     win.loadFile('index.html')
 
-    // Blocker
-    // let blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
-    // blocker.enableBlockingInSession(session.defaultSession);    
+    win.webContents.on('did-finish-load', async () =>
+    {
+        while(!finishedLoading){await setTimeout(100)}
+        win.show();
+        load.close();
+    });
 
     return win;
 }
@@ -96,10 +125,6 @@ async function selectWindow()
       }
     });
     win.loadFile('select.html')
-
-    // Blocker
-    let blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
-    blocker.enableBlockingInSession(session.defaultSession);
 }
 
 // Listing
@@ -175,6 +200,7 @@ ipcMain.on('ephemeralLaunch', async (event, loader, version, mods) =>
 
 // Data
 const reader = require('./jar-reader.js');
+const { setTimeout } = require('node:timers/promises');
 ipcMain.handle('jarData', async (event, p, dataPath) => { return await reader.jar(p, dataPath) })
 ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('readFile', (event, p) => { return reader.autoData(path.join(app.getPath('appData'), p)); })

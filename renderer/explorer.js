@@ -35,22 +35,22 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
         }
 
         let propPath = '';
-        for(let f of e.path)
-        {
-            let location = propPath;
-            propPath += f;
-            propPath += '/';
-            let currentPropPath = propPath;
-            hierarchy[propPath] =
-            {
-                name: f,
-                folder: true,
-                children: () => { return Object.filter(hierarchy, c => c.key.startsWith(currentPropPath) && c.key != currentPropPath) },
-                path: location.split('/').filter(l => l!=''),
-                filename: f,
-                disabled: e.disabled
-            }
-        }
+        // for(let f of e.path)
+        // {
+        //     let location = propPath;
+        //     propPath += f;
+        //     propPath += '/';
+        //     let currentPropPath = propPath;
+        //     hierarchy[propPath] =
+        //     {
+        //         name: f,
+        //         folder: true,
+        //         children: () => { return Object.filter(hierarchy, c => c.key.startsWith(currentPropPath) && c.key != currentPropPath) },
+        //         path: location.split('/').filter(l => l!=''),
+        //         filename: f,
+        //         disabled: e.disabled
+        //     }
+        // }
         if(propPath == '') { hierarchy[e.name] = {name: e.name, folder: e.folder, path: e.path, icon: e.icon, filename: e.filename, disabled: e.disabled}; }
         else { hierarchy[propPath+e.name] = {name: e.name, folder: e.folder, path: e.path, icon: e.icon, filename: e.filename, disabled: e.disabled}; }
     }
@@ -62,6 +62,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
     }
 
 
+    console.log(hierarchy)
     // Element building
     let selected = null;
     container.addEventListener('mouseleave', () => { if(selected){selected.onmouseenter()} })
