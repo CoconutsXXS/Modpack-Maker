@@ -32,6 +32,13 @@ class Instance
         }
 
         // Mods Files
+        // Delete data if do not exist
+        for(let m of this.mods)
+        {
+            if(fs.existsSync(path.join(this.path, 'mods', m.filename)) || fs.existsSync(path.join(this.path, 'mods', m.filename+'.disabled')) || fs.existsSync(path.join(this.path, 'mods', m.filename+'.jar'))){continue}
+            this.setModData({filename: m.filename, missing: true}, true)
+        }
+        // Create data if exist
         if(fs.existsSync(path.join(this.path, 'mods')))
         {
             let files = fs.readdirSync(path.join(this.path, 'mods'));

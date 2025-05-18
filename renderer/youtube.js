@@ -43,6 +43,7 @@ webview.addEventListener('dom-ready', async () =>
         }
         #secondary#secondary {
             min-height: calc(100% - 48px) !important;
+            width: calc(100% - 48px); !important;
         }
         #primary#primary {
             min-width: calc(100% - 48px) !important;
@@ -58,7 +59,7 @@ webview.addEventListener('dom-ready', async () =>
             display: block;
         }
         ytd-watch-flexy[cinematics-enabled] #secondary.ytd-watch-flexy#secondary.ytd-watch-flexy {
-            width: 100%;
+            width: calc(100% - 48px);
             padding: 24px;
         }
         #guide { display: none; }
@@ -222,4 +223,4 @@ webview.addEventListener('ipc-message', async (event) =>
 // no parenthese
 function np(s) { return s.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim(); }
 
-document.addEventListener('keypress', e => {if(e.key == 'd'){webview.openDevTools()}})
+// document.addEventListener('keypress', e => {if(e.key == 'd'){webview.openDevTools()}})

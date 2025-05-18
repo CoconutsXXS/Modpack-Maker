@@ -394,6 +394,7 @@ label:has(> input[type="checkbox"]) > span:hover
     color: var(--primary-color);
     font-weight: normal;
 }
+button:hover:not([current="true"]){opacity: 0.5;}
 /* .tab > button:hover{border-color: #00000000;} */
 
 /* Center Tab Content */
@@ -670,7 +671,7 @@ label:has(> input[type="checkbox"]) > span:hover
 .openable-image { cursor: pointer; }
 
 /* Youtube */
-#youtube-window { width: 100%; height: 100%; }
+#youtube-window { width: 100%; height: calc(100% - 26px); }
 #youtube-integration
 {
     width: 100%; height: 100%;

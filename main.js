@@ -111,18 +111,24 @@ async function selectWindow()
 
     const win = selectorWindow = new BrowserWindow
     ({
-      width: screen.getAllDisplays()[0].bounds.width/2,
-      height: screen.getAllDisplays()[0].bounds.height/2,
-      frame: false,
-      roundedCorners: false,
-      thickFrame: false,
-      backgroundColor: '#000000',
-      webPreferences:
-      {
-        preload: path.join(__dirname, 'preload.js'),
-        webviewTag: true,
-        contextIsolation: true
-      }
+        width: screen.getAllDisplays()[0].bounds.width/2,
+        height: screen.getAllDisplays()[0].bounds.height/2,
+        frame: false,
+        roundedCorners: false,
+        thickFrame: false,
+        webPreferences:
+        {
+            preload: path.join(__dirname, 'preload.js'),
+            webviewTag: true,
+            contextIsolation: true
+        },
+        
+        backgroundColor: '#00000000',
+        transparent: true,
+        vibrancy: 'fullscreen-ui',
+        backgroundMaterial: 'acrylic',
+        darkTheme: true,
+        hasShadow: false
     });
     win.loadFile('select.html')
 }

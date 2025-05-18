@@ -4,10 +4,13 @@ window.web =
 {
     loadModrinth: async function(webview, link)
     {
-        // document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
+        document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
 
         // webview.src = `https://modrinth.com/mod/${slug}`;
         webview.src = link;
+        let url = new URL(link);
+        let type = url.pathname.split('/')[1];
+        let cleanType = type; if(cleanType=='resourcepack'){cleanType = 'resourcepacks'}
 
         const sourceCode = await (await fetch('renderer/modrinth-webview.js')).text();
 
@@ -26,39 +29,44 @@ window.web =
                 {
                     case 'download':
                     {                  
-                        for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1]))
+                        for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod'))
                         {
                             if(!f.primary){continue}
 
                             // Metadata
                             let meta = await (await fetch("https://api.modrinth.com/v2/project/"+f.url.split('/')[4])).json();
-                            if(meta.project_type != 'mod'){continue}
+                            if(meta.project_type != type){continue}
 
                             let images = []; for(let i of meta.gallery){images.push(i.raw_url)}
-                            let dependencies = []; for(let d of f.dependencies)
+
+                            // Mods
+                            if(type=='mod')
                             {
-                                let meta = await (await fetch("https://api.modrinth.com/v2/project/"+d.project_id)).json();
-                                dependencies.push({id: d.project_id, title: meta.title, slug: meta.slug})
+                                let dependencies = []; for(let d of f.dependencies)
+                                {
+                                    let meta = await (await fetch("https://api.modrinth.com/v2/project/"+d.project_id)).json();
+                                    dependencies.push({id: d.project_id, title: meta.title, slug: meta.slug})
+                                }
+
+                                await window.instance.setModData
+                                ({
+                                    filename: f.filename,
+                                    title: meta.title,
+                                    categories	: meta.categories,
+                                    id: meta.id,
+                                    clientRequired: meta.client_side=='required',
+                                    serverRequired: meta.server_side=='required',
+                                    serverSupport: meta.server_side!='unsupported',
+                                    description: meta.description,
+                                    longDescription: meta.body,
+                                    slug: meta.slug,
+                                    images,
+                                    icon: meta.icon_url,
+                                    dependencies
+                                })
                             }
 
-                            await window.instance.setModData
-                            ({
-                                filename: f.filename,
-                                title: meta.title,
-                                categories	: meta.categories,
-                                id: meta.id,
-                                clientRequired: meta.client_side=='required',
-                                serverRequired: meta.server_side=='required',
-                                serverSupport: meta.server_side!='unsupported',
-                                description: meta.description,
-                                longDescription: meta.body,
-                                slug: meta.slug,
-                                images,
-                                icon: meta.icon_url,
-                                dependencies
-                            })
-
-                            await download(f.url, window.instance.path+'/mods', f.filename);
+                            await download(f.url, window.instance.path+'/'+cleanType, f.filename);
                         }
 
                         break;
@@ -310,12 +318,16 @@ window.web =
 
 
 // Modrinth File Finder
-async function findModrinthFile(slug)
+async function findModrinthFile(slug, useLoader = true)
 {
+    console.log(slug, 'https://api.modrinth.com/v2/project/'+slug+'/version')
     const versions = (await (await fetch('https://api.modrinth.com/v2/project/'+slug+'/version')).json())
     .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); });
 
-    var version = versions.find(v => v.loaders.includes(window.instance.loader.name) && v.game_versions.includes(window.instance.version.number));
+    var version = versions.find(v =>
+    {
+        if(useLoader && !v.loaders.includes(window.instance.loader.name)){return false;} return v.game_versions.includes(window.instance.version.number)
+    });
     if(!version) { return []; }
 
     let files = version.files;

@@ -13,7 +13,7 @@ window.setupTab(document.getElementById('right-panel').childNodes[1],
 [
     {select: () => {document.getElementById('general-settings').style.display = 'block'; }, deselect: () => {document.getElementById('general-settings').style.display = 'none';}},
     {select: () => {document.getElementById('mods-settings').style.display = 'block'; }, deselect: () => {document.getElementById('mods-settings').style.display = 'none';}},
-    {select: () => {document.getElementById('mods-settings').style.display = 'block'; }, deselect: () => {document.getElementById('mods-settings').style.display = 'none';}},
+    {select: () => {document.getElementById('resourcepacks-settings').style.display = 'block'; }, deselect: () => {document.getElementById('resourcepacks-settings').style.display = 'none';}},
     {select: () => {document.getElementById('shaders-settings').style.display = 'block'; }, deselect: () => {document.getElementById('shaders-settings').style.display = 'none';}},
 ]);
 window.setupTab(document.getElementById('bottom-panel').childNodes[1].childNodes[1],

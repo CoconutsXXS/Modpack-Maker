@@ -7,7 +7,7 @@ async function searchResourcepack(text = '')
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:shader%22],[%22versions:${window.instance.version.number}%22]]`)).json()
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:resourcepack%22],[%22versions:${window.instance.version.number}%22]]`)).json()
     for(let h of modrinth.hits)
     {
         searchResult.push
@@ -18,20 +18,20 @@ async function searchResourcepack(text = '')
             versions: h.versions,
             source: 'modrinth',
             images: h.gallery,
-            url: `https://modrinth.com/shader/${h.slug}`,
+            url: `https://modrinth.com/resourcepack/${h.slug}`,
             originalData: h
         })
     }
 
     // Curseforge
-    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&classId=6552&filterText=${text}&gameVersion=${window.instance.version.number}&pageSize=40&sortField=1`)).json()
+    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&classId=12&filterText=${text}&gameVersion=${window.instance.version.number}&pageSize=40&sortField=1`)).json()
     if(!curseforge.data){curseforge.data=[];}
     for(let d of curseforge.data)
     {
         async function loadImages()
         {
             let i = [];
-            let page = parser.parseFromString(await (await fetch(`https://www.curseforge.com/minecraft/shaders/${d.slug}/gallery`)).text(), "text/html");
+            let page = parser.parseFromString(await (await fetch(`https://www.curseforge.com/minecraft/resourcepacks/${d.slug}/gallery`)).text(), "text/html");
 
             if(page.querySelector('.images-gallery > ul:nth-child(1)'))
             {
@@ -109,17 +109,17 @@ async function searchResourcepack(text = '')
 }
 
 // Elements
-let searchInput = document.getElementById('shaders-settings').querySelector('input:first-of-type');
+let searchInput = document.getElementById('resourcepacks-settings').querySelector('input:first-of-type');
 
-let modSample = document.querySelector('#shader-download-list > div:first-child').cloneNode(true);
-document.querySelector('#shader-download-list > div:first-child').remove();
+let modSample = document.querySelector('#resourcepack-download-list > div:first-child').cloneNode(true);
+document.querySelector('#resourcepack-download-list > div:first-child').remove();
 
 let webview = document.getElementById('web-window').querySelector('webview');
 
 // Filter Tab
 let sourceFilter = ['modrinth', 'curseforge', 'minecraftShader']
 
-window.setupTab(document.getElementById('shader-browser-filter'),
+window.setupTab(document.getElementById('resourcepack-browser-filter'),
 [
     {
         select: () => { if(!sourceFilter.find(e=>e=='modrinth')){sourceFilter.push('modrinth');displayResult()} },
@@ -152,7 +152,7 @@ webview.addEventListener('will-navigate', (event) => { event.preventDefault(); }
 function displayResult()
 {
     console.log(sourceFilter)
-    document.querySelector('#shader-download-list').innerHTML = '';
+    document.querySelector('#resourcepack-download-list').innerHTML = '';
     let i = 0;
     for(let m of result)
     {
@@ -289,7 +289,7 @@ function displayResult()
         }
         
 
-        document.querySelector('#shader-download-list').appendChild(e)
+        document.querySelector('#resourcepack-download-list').appendChild(e)
         i++;
     }
 }
