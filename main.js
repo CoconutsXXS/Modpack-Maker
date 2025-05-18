@@ -36,18 +36,36 @@ async function mainWindow()
 {    
     const win = new BrowserWindow
     ({
-      width: screen.getAllDisplays()[0].bounds.width-64,
-      height: screen.getAllDisplays()[0].bounds.height-64,
-      frame: false,
-      roundedCorners: false,
-      thickFrame: false,
-      backgroundColor: '#000000',
-      webPreferences:
-      {
-        preload: path.join(__dirname, 'preload.js'),
-        webviewTag: true,
-        contextIsolation: true
-      }
+        width: screen.getAllDisplays()[0].bounds.width-64,
+        height: screen.getAllDisplays()[0].bounds.height-64,
+        x: (screen.getAllDisplays()[0].bounds.width-(screen.getAllDisplays()[0].bounds.width-64))/2,
+        y: (screen.getAllDisplays()[0].bounds.height-(screen.getAllDisplays()[0].bounds.height-64))/2,
+        webPreferences:
+        {
+            preload: path.join(__dirname, 'preload.js'),
+            webviewTag: true,
+            contextIsolation: true
+        },
+
+        frame: false,
+        titleBarStyle: 'hidden',
+        titleBarOverlay:
+        {
+            color: '#202225',
+            symbolColor: '#ffffff',
+            height: 28
+        },
+
+        // roundedCorners: false,
+        backgroundColor: '#00000000',
+        transparent: true,
+        vibrancy: 'fullscreen-ui',
+        backgroundMaterial: 'acrylic',
+        darkTheme: true,
+
+        minimizable: true,
+        maximizable: true,
+        closable: true,
     });
     win.loadFile('index.html')
 
@@ -57,9 +75,12 @@ async function mainWindow()
 
     return win;
 }
+let selectorWindow = null;
 async function selectWindow()
-{    
-    const win = new BrowserWindow
+{
+    if(!selectorWindow?.isDestroyed() && selectorWindow?.isFocusable()) { selectorWindow.close(); }
+
+    const win = selectorWindow = new BrowserWindow
     ({
       width: screen.getAllDisplays()[0].bounds.width/2,
       height: screen.getAllDisplays()[0].bounds.height/2,
@@ -82,7 +103,7 @@ async function selectWindow()
 }
 
 // Listing
-ipcMain.on('openInstanceSelector', (event) => selectWindow)
+ipcMain.on('openInstanceSelector', (event) => {selectWindow()})
 ipcMain.handle('instanceList', (event) =>
 {
     return Instance.instanceList();

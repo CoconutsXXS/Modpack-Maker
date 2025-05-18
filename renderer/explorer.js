@@ -323,7 +323,7 @@ window.loadModsExplorer = (directory = null) =>
         files.push({path: d.path, name: d.name, folder: true, filename: d.name})
     }
 
-    console.log(files)
+    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
 
     window.setupExplorer(directory, document.getElementById('mods-explorer'), files, (from, to) =>
     {

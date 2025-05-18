@@ -1,8 +1,8 @@
 :root
 {
-    --black: #000000;
+    --black: #00000000;
     /* --primary: #050515; */
-    --primary: #020207;
+    --primary: #02020700;
     /* --primary: linear-gradient(-180deg, #0f0f1e, #020207) no-repeat center center fixed; */
     --primary-color: #050515;
     /* --text: #f3f3ffda; */
@@ -39,13 +39,14 @@ button
     margin-top: 5px;
     transition: all 50ms;
 }
-button:hover
+button:hover:not(:disabled)
 {
     background: var(--text);
     border: var(--primary) solid var(--border-width);
     color: var(--primary-color);
     font-weight: normal;
 }
+button:disabled{opacity: 0.6; cursor: no-drop;}
 
 /* Select */
 select
@@ -213,7 +214,7 @@ label:has(> input[type="checkbox"]) > span:hover
     width: 100%;
     height: 20px;
     text-align: left;
-    transition: all 20ms;
+    transition: all 0ms;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -349,6 +350,14 @@ label:has(> input[type="checkbox"]) > span:hover
 }
 #center-panel{position: fixed;}
 
+#top-tab
+{
+    height: 27px;
+    direction: rtl;
+    flex-direction: row-reverse;
+}
+#top-tab > button { height: 28px; text-overflow:clip }
+
 .tab
 {
     display: flex;
@@ -392,7 +401,7 @@ label:has(> input[type="checkbox"]) > span:hover
 {
     image-rendering: pixelated; object-fit: 100% 100%;
     image-resolution: from-image;
-    background-color: #000000;
+    background-color: var(--black);
     width: 100%; height: calc(100% - 27px);
 }
 #console-window
@@ -424,7 +433,7 @@ label:has(> input[type="checkbox"]) > span:hover
 #console-window::-webkit-scrollbar-thumb { background: var(--window-border); }
 #class-window
 {
-    background-color: #000000;
+    background-color: var(--black);
     width: 100%; height: 100%;
     overflow: hidden;
 }
@@ -517,19 +526,19 @@ label:has(> input[type="checkbox"]) > span:hover
     margin: 5px; margin-right: -5px; margin-bottom: 0;
 }
 #general-settings div { margin: 0; }
-#mods-settings
+.item-settings
 {
     text-align: center;
     padding: 5px;
     height: 100%;
     width: calc(100% - 10px);
 }
-#mods-settings > input[type="text"]
+.item-settings > input[type="text"]
 {
     width: calc(100% - 13px);
     /* margin: 5px; */
 }
-#mod-download-list
+.item-download-list
 {
     height: calc(100% - 92px);
     text-align: start; padding: 5px;
@@ -538,7 +547,7 @@ label:has(> input[type="checkbox"]) > span:hover
     flex-wrap: wrap;
     display: flex;
 }
-#mod-download-list > div
+.item-download-list > div
 {
     border: var(--text) solid var(--border-width);
     margin-bottom: 5px; margin-right: 5px;
@@ -548,15 +557,15 @@ label:has(> input[type="checkbox"]) > span:hover
     flex: 1 1 0;
     cursor: pointer;
 }
-#mod-download-list > div:hover { background: var(--overline); }
-#mod-download-list > div[selected]
+.item-download-list > div:hover { background: var(--overline); }
+.item-download-list > div[selected]
 {
     border-color: var(--important);
     color: var(--important);
 }
-#mod-download-list > div[installed] { opacity: 0.7; }
-#mod-download-list > div > div > div { display: flex; }
-#mod-download-list > div > div > div > h4
+.item-download-list > div[installed] { opacity: 0.7; }
+.item-download-list > div > div > div { display: flex; }
+.item-download-list > div > div > div > h4
 {
     margin: 0; margin-top: 4px; font-family: minecraft-alt;
     line-break: anywhere;
@@ -566,8 +575,8 @@ label:has(> input[type="checkbox"]) > span:hover
     -webkit-box-orient: vertical;  
     overflow: hidden;
 }
-#mod-download-list > div[selected] > div > div > h4 { color: var(--important); }
-#mod-download-list > div > div > div > div
+.item-download-list > div[selected] > div > div > h4 { color: var(--important); }
+.item-download-list > div > div > div > div
 {
     background-image: url('./resources/website-logos/modrinth.webp');
     background-size: contain;
@@ -578,7 +587,7 @@ label:has(> input[type="checkbox"]) > span:hover
     margin-right: 4px;
     background-repeat: no-repeat;
 }
-#mod-download-list > div > div > p
+.item-download-list > div > div > p
 {
     max-height: 45px;
     display: -webkit-box;
@@ -588,9 +597,9 @@ label:has(> input[type="checkbox"]) > span:hover
     overflow: hidden;
     margin-top: -2px;
 }
-#mod-download-list > div[selected] > div > p { color: var(--important); }
-#mod-download-list > div > img { min-width: 70px; height: 70px; margin-right: 5px; }
-#mod-browser-filter { margin-left: 1px; }
+.item-download-list > div[selected] > div > p { color: var(--important); }
+.item-download-list > div > img { min-width: 70px; height: 70px; margin-right: 5px; }
+.item-browser-filter { padding: 0; }
 
 /* Rigth Panel */
 #mod-info-panel

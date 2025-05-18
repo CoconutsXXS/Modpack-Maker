@@ -4,13 +4,10 @@ let result = [];
 const parser = new DOMParser();
 async function searchMod(text = '')
 {
-    console.log(window.instance.loader.name)
-    console.log(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22],[%22versions:${window.instance.version.number}%22]]`)
-
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22],[%22versions:${window.instance.version.number}%22]]`)).json()
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:shader%22],[%22versions:${window.instance.version.number}%22]]`)).json()
     for(let h of modrinth.hits)
     {
         searchResult.push
@@ -19,8 +16,6 @@ async function searchMod(text = '')
             icon: h.icon_url,
             description: h.description,
             versions: h.versions,
-            clientRequired: h.client_side=='required',
-            serverRequired: h.server_side=='required',
             source: 'modrinth',
             images: h.gallery,
             url: `https://modrinth.com/mod/${h.slug}`,
@@ -29,15 +24,7 @@ async function searchMod(text = '')
     }
 
     // Curseforge
-    let flavorIndex = 0;
-    switch(window.instance.loader.name)
-    {
-        case 'forge': {flavorIndex=1;break;}
-        case 'fabric': {flavorIndex=4;break;}
-        case 'neoforge': {flavorIndex=6;break;}
-        case 'quilt': {flavorIndex=5;break;}
-    }
-    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&gameVersion=${window.instance.version.number}&gameFlavors[0]=${flavorIndex}&classId=6`)).json()
+    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&classId=6552&filterText=${text}&gameVersion=${window.instance.version.number}&pageSize=40&sortField=1`)).json()
     if(!curseforge.data){curseforge.data=[];}
     for(let d of curseforge.data)
     {
@@ -81,82 +68,70 @@ async function searchMod(text = '')
             serverRequired: null,
             source: 'curseforge',
             loadImages: loadImages,
-            url: `https://www.curseforge.com/minecraft/mc-mods/${d.slug}`,
+            url: `https://www.curseforge.com/minecraft/shaders/${d.slug}`,
             originalData: d
         })
     }
 
-    // Planet Minecraft
-    let planetMinecraftPage = parser.parseFromString(await (await fetch(`https://www.planetminecraft.com/mods/?keywords=${text}`)).text(), "text/html");
+    // MinecraftShader
+    let minecraftShaderPage = parser.parseFromString(await (await fetch(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)).text(), "text/html");
+    console.log(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)
+    console.log(minecraftShaderPage);
+    console.log(minecraftShaderPage.querySelector('#post-container'))
 
-    let i = 1;
-    for (let c of planetMinecraftPage.getElementsByClassName('resource_list')[0].childNodes)
+    let i = 2;
+    for (let c of minecraftShaderPage.querySelector('#post-container').childNodes)
     {
-        if(c.nodeName != 'LI'){continue;}
-        if(c.className != 'resource r-data '){i++; continue;}
+        if(c.className != 'col-md-6'){continue;}
 
-        let img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > img")?.src
-        if(img == undefined) { img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > picture > source:nth-child(1)")?.srcset; }
+        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i})`))
+        console.log(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)
+        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`))
+
+        let img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)?.src
+        if(img == undefined) { img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > picture > img`).src; }
         if(img == undefined) { continue; }
 
         searchResult.push
         ({
-            name: planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-info > a").innerText,
+            name: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).innerText,
             icon: img,
-            // version: a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', ''),
-            source: 'planetMinecraft',
-            url: `https://www.planetminecraft.com/${planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a").href}`
+            source: 'minecraftShader',
+            url: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).href,
+            description: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > p:nth-child(2)`).innerText
         })
 
         i++
     }
 
-    // Minecraftmods    
-    let minecraftmodPage = parser.parseFromString(await (await fetch(`https://www.minecraftmods.com/search/${text}`)).text(), "text/html");
-    for(let a of minecraftmodPage.getElementById('search-results').getElementsByClassName('blog-row')[0].childNodes)
-    {
-        if(a.nodeType != 1 || a.className == 'no-results'){continue;}
-        searchResult.push
-        ({
-            name: a.childNodes[5].childNodes[0].innerText,
-            icon: a.childNodes[3].childNodes[1].childNodes[1].src,
-            versions: [a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', '')],
-            source: 'minecraftMods',
-            url: a.querySelector("div.post-meta.cf.rel > a").href
-        })
-    }
-
+    console.log(searchResult)
     return searchResult;
 }
 
 // Elements
-let searchInput = document.getElementById('mods-settings').querySelector('input:first-of-type');
+let searchInput = document.getElementById('shaders-settings').querySelector('input:first-of-type');
 
-let modSample = document.querySelector('#mod-download-list > div:first-child').cloneNode(true);
-document.querySelector('#mod-download-list > div:first-child').remove();
+let modSample = document.querySelector('#shader-download-list > div:first-child').cloneNode(true);
+document.querySelector('#shader-download-list > div:first-child').remove();
 
 let webview = document.getElementById('web-window').querySelector('webview');
 
 // Filter Tab
-let sourceFilter = ['modrinth', 'curseforge', 'planetMinecraft', 'minecraftMods']
+let sourceFilter = ['modrinth', 'curseforge', 'minecraftShader']
 
-window.setupTab(document.getElementById('mod-browser-filter'),
+window.setupTab(document.getElementById('shader-browser-filter'),
 [
     {
-        select: () => { if(!sourceFilter.find(e=>e=='modrinth')){sourceFilter.push('modrinth');displayResult(); console.log('AAAAAAA')} },
-        deselect: () => { if(sourceFilter.find(e=>e=='modrinth')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='modrinth'), 1); displayResult();} console.log('BBBBBBB') }
+        select: () => { if(!sourceFilter.find(e=>e=='modrinth')){sourceFilter.push('modrinth');displayResult()} },
+        deselect: () => { if(sourceFilter.find(e=>e=='modrinth')){delete sourceFilter[sourceFilter.findIndex(e=>e=='modrinth')];displayResult()} }
     },
     {
         select: () => { if(!sourceFilter.find(e=>e=='curseforge')){sourceFilter.push('curseforge');displayResult()} },
-        deselect: () => { if(sourceFilter.find(e=>e=='curseforge')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='curseforge'), 1); displayResult()} }
+        deselect: () => { if(sourceFilter.find(e=>e=='curseforge')){delete sourceFilter[sourceFilter.findIndex(e=>e=='curseforge')];displayResult()} }
     },
     {
-        select: () => { if(!sourceFilter.find(e=>e=='planetMinecraft')){sourceFilter.push('planetMinecraft');displayResult()} },
-        deselect: () => { if(sourceFilter.find(e=>e=='planetMinecraft')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='planetMinecraft'), 1); displayResult()} }
-    },
-    {
-        select: () => { if(!sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.push('minecraftMods');displayResult()} },
-        deselect: () => { if(sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='minecraftMods'), 1); displayResult()} }
+        select: () => { if(!sourceFilter.find(e=>e=='minecraftShader')){sourceFilter.push('minecraftShader');displayResult()} },
+        deselect: () => { if(sourceFilter.find(e=>e=='minecraftShader')){delete sourceFilter[sourceFilter.findIndex(e=>e=='minecraftShader')];displayResult()} }
     }
 ], 0, true, true);
 
@@ -177,7 +152,7 @@ webview.addEventListener('will-navigate', (event) => { event.preventDefault(); }
 function displayResult()
 {
     console.log(sourceFilter)
-    document.querySelector('#mod-download-list').innerHTML = '';
+    document.querySelector('#shader-download-list').innerHTML = '';
     let i = 0;
     for(let m of result)
     {
@@ -314,7 +289,7 @@ function displayResult()
         }
         
 
-        document.querySelector('#mod-download-list').appendChild(e)
+        document.querySelector('#shader-download-list').appendChild(e)
         i++;
     }
 }

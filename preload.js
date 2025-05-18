@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 window.onModUpdate = (i, m) => {}
 
-contextBridge.exposeInMainWorld('openInstanceSelector', async () => { return await ipcRenderer.invoke('openInstanceSelector') })
+contextBridge.exposeInMainWorld('openInstanceSelector', async () => { return await ipcRenderer.send('openInstanceSelector') })
 contextBridge.exposeInMainWorld('instanceList', async () => { return await ipcRenderer.invoke('instanceList') })
 contextBridge.exposeInMainWorld('openInstance', (name) => { ipcRenderer.send('openInstance', name) })
 

@@ -11,7 +11,7 @@ module.exports =
         ephemeralInstances: path.join(app.getPath('appData'), 'Modpack Maker', '.ephemeral-instances'),
         download: path.join(app.getPath('appData'), 'Modpack Maker', 'download'),
     },
-    javaAgent: `${app.getAppPath()}/java-agent/build/libs/MinecraftAgent-0.0.1-SNAPSHOT.jar`
+    javaAgent: `${app.getAppPath()}/agent/agent.jar`
 }
 
 if(!fs.existsSync(module.exports.directories.instances)) { fs.mkdirSync(module.exports.directories.instances, {recursive: true}); }

@@ -16,6 +16,7 @@
     <script src="./renderer/horizontal-scroll.js" type="module"></script>
     <script src="./renderer/instance-properties.js" type="module"></script>
     <script src="./renderer/mod-browser.js" type="module"></script>
+    <script src="./renderer/shader-browser.js" type="module"></script>
     <script src="./renderer/image-open.js" type="module"></script>
     <script src="./renderer/explorer.js" type="module"></script>
     <script src="./renderer/youtube.js" type="module"></script>
@@ -129,10 +130,23 @@
                 <select id="minecraft-loader-version" name="version"></select>    
             </div>
         </div>
-        <div id="mods-settings">
+        <div id="mods-settings" class="item-settings">
             <input type="text" placeholder="Shearch a mod...">
-            <div id="mod-browser-filter" class="tab" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>Planet Minecraft</button><button>MinecraftMods</button></div>
-            <div id="mod-download-list">
+            <div id="mod-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>Planet Minecraft</button><button>MinecraftMods</button></div>
+            <div class="item-download-list" id="mod-download-list">
+                <div>
+                    <img>
+                    <div>
+                        <div><div></div><h4>Title</h4></div>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="shaders-settings" class="item-settings">
+            <input type="text" placeholder="Shearch a shader...">
+            <div id="shader-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
+            <div class="item-download-list" id="shader-download-list">
                 <div>
                     <img>
                     <div>
@@ -144,7 +158,12 @@
         </div>
     </div>
     <div id="top-panel" class="side-panel">
-        <div class="tab" id="top-tab" anchor-top anchor-left fill-width><button>Open</button><button>New</button><button>Save</button><button>Quit</button><div id="drag-window"></div></div>
+        <div class="tab" id="top-tab" anchor-top anchor-right>
+            <div id="drag-window"></div>
+            <button><img src="./resources/save.png"></button>
+            <button><img src="./resources/open.png"></button>
+            <button><img src="./resources/close.png"></button>
+        </div>
 
         <div id="game-controls">
             <button id="play-button" play></button>

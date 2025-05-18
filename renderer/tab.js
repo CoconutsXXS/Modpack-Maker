@@ -5,7 +5,7 @@ window.setupTab = function setupTab(tab, events, defaultIndex = 0, multi = false
     let unselectAttr = function(){};
     for(let b of tab.childNodes)
     {
-        if(b.nodeType != 1){return;}
+        if(b.nodeName != 'BUTTON'){continue;}
         let index = i;
         b.addEventListener('click', () =>
         {
@@ -17,20 +17,21 @@ window.setupTab = function setupTab(tab, events, defaultIndex = 0, multi = false
                 unselect = events[index].deselect;
                 unselectAttr = () => b.setAttribute('current', 'false');
                 b.setAttribute('current', 'true');
+                events[index].select();
             }
             else
             {
                 if(b.getAttribute('current') == 'true')
                 {
-                    events[index].deselect();
                     b.setAttribute('current', 'false');
+                    events[index].deselect();
                 }
                 else
                 {
                     b.setAttribute('current', 'true');
+                    events[index].select();
                 }
             }
-            events[index].select();
         });
 
         if((defaultIndex == index || (allDefault && multi)) && !ephemeral)
@@ -46,7 +47,7 @@ window.setupTab = function setupTab(tab, events, defaultIndex = 0, multi = false
 
             b.setAttribute('current', 'true');
         }
-        else { b.setAttribute('current', 'false'); events[index]?.deselect(); }
+        else { b.setAttribute('current', 'false'); if(events[index]?.deselect!=undefined) { events[index]?.deselect(); } }
 
         i++;
     }

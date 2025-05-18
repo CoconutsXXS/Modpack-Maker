@@ -12,6 +12,9 @@ window.addInstanceListener((i) =>
     loaderSelector.value = i.loader?.name;
     loaderVersionSelector.value = i.loader?.version;
 
+    document.getElementById('right-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
+    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+
     if(i.loader.name == 'vanilla') { loaderVersionSelector.style.display = 'none' }
     fetch("https://mc-versions-api.net/api/java").then((response) => response.json())
     .then((data) =>
@@ -42,12 +45,18 @@ window.addInstanceListener((i) =>
     if(window.instance.name == ''){focus(nameInput)}
     nameInput.onkeyup = (ev) => {if(ev.key != "Enter"){return} window.instance.name = nameInput.value; window.instance.save(window.instance); window.loadInstance(window.instance.name);}
     descriptionInput.oninput = () => window.instance.description = descriptionInput.value;
-    loaderSelector.onchange = () => { window.instance.loader.name = loaderSelector.value; updateLoaderVersionSelector(); };
+    loaderSelector.onchange = () =>
+    {
+        window.instance.loader.name = loaderSelector.value; updateLoaderVersionSelector();
+        document.getElementById('right-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
+        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+    };
     minecraftVersionSelector.onchange = () => { window.instance.version.number = minecraftVersionSelector.value; updateLoaderVersionSelector(); }
     loaderVersionSelector.onchange = () => window.instance.loader.version = loaderVersionSelector.value;
 
     updateLoaderVersionSelector()    
 })
+
 
 async function updateLoaderVersionSelector()
 {

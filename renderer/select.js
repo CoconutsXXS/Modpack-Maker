@@ -17,6 +17,7 @@ async function list()
         b.childNodes[1].onclick = () =>
         {
             openInstance(i.title)
+            window.close();
         }
     }
     document.getElementById('container').style.display = 'block';
@@ -47,6 +48,6 @@ document.addEventListener('DOMContentLoaded', () =>
     [
         {select: () => { list(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
         {select: () => {document.getElementById('container').style.display = 'block'; networkList(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
-        {select: () => {openInstance('')}, deselect: () => {}}
+        {select: () => {openInstance('');window.close();}, deselect: () => {}}
     ]);
 })

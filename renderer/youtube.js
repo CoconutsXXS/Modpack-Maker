@@ -222,4 +222,4 @@ webview.addEventListener('ipc-message', async (event) =>
 // no parenthese
 function np(s) { return s.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim(); }
 
-// document.addEventListener('keypress', e => {if(e.key == 'd'){webview.openDevTools()}})
+document.addEventListener('keypress', e => {if(e.key == 'd'){webview.openDevTools()}})
