@@ -62,7 +62,6 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
     }
 
 
-    console.log(hierarchy)
     // Element building
     let selected = null;
     container.addEventListener('mouseleave', () => { if(selected){selected.onmouseenter()} })
@@ -310,6 +309,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
 
 window.loadModsExplorer = (directory = null) =>
 {
+    console.log(window.instance.mods);
     if(!window.instance.mods){return}
     if(directory == null) { directory = currentDirectory; }
     let files = [];
@@ -320,7 +320,6 @@ window.loadModsExplorer = (directory = null) =>
     }
     for(let d of window.instance.virtualDirectories.filter(d => d.parent=='mods'))
     {
-        console.log(d)
         files.push({path: d.path, name: d.name, folder: true, filename: d.name})
     }
 
@@ -381,22 +380,7 @@ window.loadModsExplorer = (directory = null) =>
         {
             let p = 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/mods/'+(m.filename.endsWith('.jar')?m.filename.substring(0,m.filename.length-4):(m.filename.endsWith('.disabled')?m.filename.substring(0, m.filename.length-9):m.filename))+(m.disabled?'.disabled':'.jar');
 
-            console.log(p)
-            console.log(f);
-
             window.configPanel((await window.instance.getConfigs()).sort((a,b) =>
-            {
-                return Math.max(similarity(a, f.name.toLowerCase().replace(' ','')),
-                similarity(a, f.name.toLowerCase().replace(' ','')+'-common'),
-                similarity(a, f.name.toLowerCase().replace(' ','')+'-client'),
-                similarity(a, f.name.toLowerCase().replace(' ','')+'-server')) -
-                Math.max(similarity(a, f.name.toLowerCase().replace(' ','')),
-                similarity(b, f.name.toLowerCase().replace(' ','')+'-common'),
-                similarity(b, f.name.toLowerCase().replace(' ','')+'-client'),
-                similarity(b, f.name.toLowerCase().replace(' ','')+'-server'))
-            }).reverse()[0])
-            
-            console.log((await window.instance.getConfigs()).sort((a,b) =>
             {
                 return Math.max(similarity(a, f.name.toLowerCase().replace(' ','')),
                 similarity(a, f.name.toLowerCase().replace(' ','')+'-common'),
@@ -418,7 +402,18 @@ window.loadModsExplorer = (directory = null) =>
         // Delete
         if(m.folder)
         {
-            window.instance.virtualDirectories[window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path)]
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
+
+            // Move all children
+            for(let mod of window.instance.mods)
+            {
+                if(m.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf('/')) && m.name == mod.virtualPath.split('/')[mod.virtualPath.split('/').length-1])
+                {
+                    mod.virtualPath = '';
+                    window.instance.setModData(mod)
+                }
+            }
+
             window.instance.save(window.instance);
             return
         }

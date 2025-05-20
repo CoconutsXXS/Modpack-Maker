@@ -59,20 +59,7 @@ class Instance
         let watcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
         watcher.on('all', (e, p, s) =>
         {
-            // let files = fs.readdirSync(path.join(this.path, 'mods'));
-            // for(let f of files)
-            // {
-            //     let i = this.mods.findIndex(m => m.filename==Instance.cleanModName(f));
-            //     if(i>=0)
-            //     {
-            //         this.setModData({filename: this.mods[i].filename, missing: false, disabled: f.endsWith('.disabled')})
-            //     }
-            //     else 
-            //     {
-            //         this.setModData({filename: f, missing: false, disabled: f.endsWith('.disabled')})
-            //     }
-            // }
-
+            if(e=='unlink') { this.setModData({filename: Instance.cleanModName(p.split('/')[p.split('/').length-1]), missing: true, disabled: p.endsWith('.disabled')}, true) }
             this.onModUpdate(this.mods)
         })
 
@@ -291,6 +278,7 @@ class Instance
 
     // Mods
     static cleanModName(n) { return n.endsWith('.jar')?n.substring(0,n.length-4):(n.endsWith('.disabled')?n.substring(0, n.length-9):n) }
+    modExist(n) { return fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n)+'.jar'))||fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n)+'.disabled'))||fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n))) }
     setModData(data =
         {
             filename: "UNKNOWN FILENAME",
@@ -316,6 +304,7 @@ class Instance
                 if(data[k] == undefined) { data[k] = this.mods[i][k]; }
             }
             this.mods[i] = data;
+            this.mods[i].missing = !this.modExist(this.mods[i].filename);
         }
         else
         {

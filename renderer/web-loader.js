@@ -10,7 +10,7 @@ window.web =
         webview.src = link;
         let url = new URL(link);
         let type = url.pathname.split('/')[1];
-        let cleanType = type; if(cleanType=='resourcepack'){cleanType = 'resourcepacks'}
+        let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'}
 
         const sourceCode = await (await fetch('renderer/modrinth-webview.js')).text();
 

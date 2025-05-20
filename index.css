@@ -339,9 +339,9 @@ label:has(> input[type="checkbox"]) > span:hover
 #top-panel
 {
     resize: vertical;
-    min-height: 100px;
+    min-height: 60px;
     max-height: 50%;
-    height: 10%;
+    height: 60px;
     margin: 0;
     top: 0;
     width: 100vw;
@@ -475,9 +475,12 @@ button:hover:not([current="true"]){opacity: 0.5;}
 #game-controls
 {
     display: flex;
-    position: absolute;
-    left: 50%; top: 100%;
-    translate: -50% calc(-100% - 10px);
+    position: fixed;
+    left: 50%; top: 8px;
+    translate: -50% 0;
+    z-index: 10;
+    direction: ltr;
+    -webkit-app-region: no-drag;
 }
 #game-controls > button:first-child
 {
@@ -485,6 +488,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
 }
 #game-controls > button
 {
+    background-color: var(--primary-color);
     border-left: #00000000;
     margin: 0;
     width: 54px; height: 40px;
@@ -517,6 +521,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
     background-color: var(--overline);
     border: var(--text) solid var(--border-width);
     border-left: #00000000;
+    opacity: 1;
 }
 #game-controls > button:first-child:hover { border: var(--text) solid var(--border-width); }
 

@@ -1,3 +1,5 @@
+* { overflow-x: hidden; }
+
 #main > div:first-of-type
 {
     display: flex;
@@ -10,8 +12,8 @@
     display: block;
     height: 100%; width: 100vw;
 }
-#main > div:last-of-type > div { display: flex; padding: 8px; width: 320px; }
-#main > div:last-of-type > div > img { width: 64px; height: fit-content; padding-right: 8px; cursor: pointer; transition: all 100ms; }
+#main > div:last-of-type > div { display: inline-flex; padding: 8px; width: 320px; }
+#main > div:last-of-type > div > img { min-width: 72px; max-width: 72px; height: fit-content; padding-right: 8px; cursor: pointer; transition: all 100ms; }
 #main > div:last-of-type > div > img:hover { filter: brightness(0.9); }
 #main > div:last-of-type > div > div > h4 { margin: 0; font-weight: bolder; font-size: x-large; }
 #main > div:last-of-type > div > div > p:first-of-type
