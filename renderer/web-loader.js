@@ -10,7 +10,7 @@ window.web =
         webview.src = link;
         let url = new URL(link);
         let type = url.pathname.split('/')[1];
-        let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'}
+        let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
 
         const sourceCode = await (await fetch('renderer/modrinth-webview.js')).text();
 
@@ -110,9 +110,23 @@ window.web =
     },
     loadCurseforge: async function(webview, link)
     {
-        // document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
+        document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
 
         webview.src = link;
+
+        // Type
+        let url = new URL(link);
+        let type = url.pathname.split('/')[2];
+        let cleanType = type;
+
+        let classId = 6
+        switch(type)
+        {
+            case 'mc-mods': { classId = 6; cleanType = 'mods'; break; }
+            case 'shaders': { classId = 6552; cleanType = 'shaderpacks'; break; }
+            case 'texture-packs': { classId = 12; cleanType = 'resourcepacks'; break; }
+        }
+
 
         const sourceCode = await (await fetch('renderer/curseforge-webview.js')).text();
 
@@ -130,39 +144,43 @@ window.web =
                 {
                     case 'download':
                     {
-                        for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=6`)).json()).data[0].id))
+                        console.log(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)
+                        for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods'))
                         {
                             if(!f.primary){continue}
 
                             // Metadata
                             if(!f.slug) { f.slug = link.split('/')[link.split('/').length-1]; }
-                            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${(f.slug)}&classId=6`)).json()).data[0]
-                            console.log(meta)
+                            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${(f.slug)}&classId=${classId}`)).json()).data[0]
 
-                            let categories = []; for(let i of meta.categories){categories.push(i.name)}
-                            let dependencies = []; for(let d of f.dependencies)
+                            console.log(cleanType)
+                            if(cleanType == 'mods')
                             {
-                                dependencies.push({id: d.project_id, filename: d.filename, slug: d.slug, title: d.title})
+                                let categories = []; for(let i of meta.categories){categories.push(i.name)}
+                                let dependencies = []; for(let d of f.dependencies)
+                                {
+                                    dependencies.push({id: d.project_id, filename: d.filename, slug: d.slug, title: d.title})
+                                }
+                                await window.instance.setModData
+                                ({
+                                    filename: f.filename,
+                                    title: meta.name,
+                                    categories,
+                                    id: meta.id,
+                                    clientRequired: (meta.isClientCompatible || f.client)?(meta.isClientCompatible || f.client):true,
+                                    serverRequired: f.server?f.server:true,
+                                    // serverSupport: meta.server_side!='unsupported',
+                                    description: meta.summary,
+                                    // longDescription: meta.body,
+                                    slug: meta.slug,
+                                    images: await loadImages(meta.slug, meta.name),
+                                    icon: meta.avatarUrl,
+                                    dependencies
+                                })
                             }
-                            await window.instance.setModData
-                            ({
-                                filename: f.filename,
-                                title: meta.name,
-                                categories,
-                                id: meta.id,
-                                clientRequired: (meta.isClientCompatible || f.client)?(meta.isClientCompatible || f.client):true,
-                                serverRequired: f.server?f.server:true,
-                                // serverSupport: meta.server_side!='unsupported',
-                                description: meta.summary,
-                                // longDescription: meta.body,
-                                slug: meta.slug,
-                                images: await loadImages(meta.slug, meta.name),
-                                icon: meta.avatarUrl,
-                                dependencies
-                            })
 
                             console.log('Downloading '+f.filename)
-                            await download(f.url, window.instance.path+'/mods', f.filename)
+                            await download(f.url, window.instance.path+'/'+cleanType, f.filename)
                         }
 
                         break;
@@ -185,16 +203,15 @@ window.web =
             }
             webview.addEventListener('ipc-message', webviewListener);
 
+
             await webview.insertCSS
             (
-                `#__next > div > footer,
+                `#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > *.btn-cta:not(.download-cta) { display: none !important; }
+                #__next > div > footer,
                 #__next > div > header,
                 #__next > div > main > div.game-header,
                 #__next > div > main > div.ads-layout > div.ads-layout-content > div > form,
-                #__next > div > main > div.ads-layout > div.ads-layout-content > div > nav,
-                #__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a {
-                display: none !important;
-                }
+                #__next > div > main > div.ads-layout > div.ads-layout-content > div > nav { display: none; }
                 #__next > div > main,
                 #__next > div > footer {
                 overflow-x: hidden !important;
@@ -215,6 +232,10 @@ window.web =
                 }
                 #__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button {
                 background-color: #f16436 !important;
+                border: none !important;
+                }
+                #__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a:first-of-type {background-color: #f16436 !important;}
+                #__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a {
                 border: none !important;
                 }
                 aside > div.aside-box.project-details-box.is-modal-open {
@@ -339,19 +360,22 @@ async function findModrinthFile(slug, useLoader = true)
 
     return files;
 }
-async function findCurseforgeFile(id)
+async function findCurseforgeFile(id, useLoader = true)
 {
     // https://www.curseforge.com/api/v1/mods/1193072/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&gameVersionId=9990&removeAlphas=true
     const versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
     .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
 
+    console.log(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)
     var version = versions.find(v =>
     {
+        if(!useLoader){return true;}
         let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1));
         if(!valid && window.instance.loader.name == 'forge' && v.gameVersions.includes('NeoForge')) { valid = true; }
         if(!v.gameVersions.includes(window.instance.version.number)) { valid = false; }
         return valid;
     });
+    console.log(version)
     if(!version) { return []; }
 
     let dependencies = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/dependencies?index=0&pageSize=60&type=RequiredDependency`)).json()).data;

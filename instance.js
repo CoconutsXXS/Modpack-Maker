@@ -451,9 +451,9 @@ class Instance
                 title: f,
                 description: data.description,
                 icon: data.icon,
-                modsCount: data.mods?.length,
-                resourcepacksCount: data.resourcepacks?.length,
-                shadersCount: data.shaders?.length
+                modsCount: data.mods?.filter(e=>!e.missing).length,
+                resourcepacksCount: data.resourcepacks?.filter(e=>!e.missing).length,
+                shadersCount: data.shaders?.filter(e=>!e.missing).length
             })
         }
         return list;

@@ -31,7 +31,7 @@ async function searchResourcepack(text = '')
         async function loadImages()
         {
             let i = [];
-            let page = parser.parseFromString(await (await fetch(`https://www.curseforge.com/minecraft/resourcepacks/${d.slug}/gallery`)).text(), "text/html");
+            let page = parser.parseFromString(await (await fetch(`https://www.curseforge.com/minecraft/texture-packs/${d.slug}/gallery`)).text(), "text/html");
 
             if(page.querySelector('.images-gallery > ul:nth-child(1)'))
             {
@@ -68,7 +68,7 @@ async function searchResourcepack(text = '')
             serverRequired: null,
             source: 'curseforge',
             loadImages: loadImages,
-            url: `https://www.curseforge.com/minecraft/shaders/${d.slug}`,
+            url: `https://www.curseforge.com/minecraft/texture-packs/${d.slug}`,
             originalData: d
         })
     }
@@ -174,8 +174,9 @@ function displayResult()
         // Event
         let index = i;
         e.onmouseenter = () => quickView(result[index])
-        e.onclick = async () =>
+        e.onclick = async (event) =>
         {
+            if(event.detail != 1){return}
             Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
             // webview.src = result[index].url;
 

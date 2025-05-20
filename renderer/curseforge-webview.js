@@ -16,40 +16,82 @@ function modify()
     // }
 
     // Modify & Add Buttons
-    document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").onclick = (e) =>
+    // try with <button>
+    try
     {
-        e.preventDefault();
-        window.electron.sendToHost('download', {});
-        let i = setInterval(() =>
+        document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").onclick = (e) =>
         {
-            if(document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container"))
+            e.preventDefault();
+            window.electron.sendToHost('download', {});
+            let i = setInterval(() =>
             {
-                document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container").style.display = 'none'
-                clearInterval(i);
-            }
-        }, 1000/60)
-    }
-    if(!document.getElementById('button-download-version-select'))
-    {
-        let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").cloneNode(true);
-        c.querySelector('span').innerText = 'Previous Versions';
-        c.querySelector('svg').remove();
-        c.style.backgroundColor = '#333333';
-        c.id = 'button-download-version-select'
-        c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('version-select', {}); }
+                if(document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container"))
+                {
+                    document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container").style.display = 'none'
+                    clearInterval(i);
+                }
+            }, 1000/60)
+        }
+        if(!document.getElementById('button-download-version-select'))
+        {
+            let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").cloneNode(true);
+            c.querySelector('span').innerText = 'Previous Versions';
+            c.querySelector('svg').remove();
+            c.style.backgroundColor = '#333333';
+            c.id = 'button-download-version-select'
+            c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('version-select', {}); }
 
-        document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
-    }
-    if(!document.getElementById('button-quick-test'))
-    {
-        let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").cloneNode(true);
-        c.querySelector('span').innerText = 'Quick Test';
-        c.querySelector('svg').remove();
-        c.style.backgroundColor = '#32a912';
-        c.id = 'button-quick-test'
-        c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('quick-test', {}); }
+            document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
+        }
+        if(!document.getElementById('button-quick-test'))
+        {
+            let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > button").cloneNode(true);
+            c.querySelector('span').innerText = 'Quick Test';
+            c.querySelector('svg').remove();
+            c.style.backgroundColor = '#32a912';
+            c.id = 'button-quick-test'
+            c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('quick-test', {}); }
 
-        document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
+            document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
+        }
+    }
+    catch
+    {
+        document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a").onclick = (e) =>
+        {
+            e.preventDefault();
+            window.electron.sendToHost('download', {});
+            let i = setInterval(() =>
+            {
+                if(document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container"))
+                {
+                    document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div.modal-container").style.display = 'none'
+                    clearInterval(i);
+                }
+            }, 1000/60)
+        }
+        if(!document.getElementById('button-download-version-select'))
+        {
+            let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a").cloneNode(true);
+            c.querySelector('span').innerText = 'Previous Versions';
+            c.querySelector('svg').remove();
+            c.style.backgroundColor = '#333333';
+            c.id = 'button-download-version-select'
+            c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('version-select', {}); }
+
+            document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
+        }
+        if(!document.getElementById('button-quick-test'))
+        {
+            let c = document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div > a").cloneNode(true);
+            c.querySelector('span').innerText = 'Quick Test';
+            c.querySelector('svg').remove();
+            c.style.backgroundColor = '#32a912';
+            c.id = 'button-quick-test'
+            c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('quick-test', {}); }
+
+            document.querySelector("#__next > div > main > div.ads-layout > div.ads-layout-content > div > div > div.actions > div").appendChild(c);
+        }
     }
 }
 try{modify()}catch(err){console.error(err)}

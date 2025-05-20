@@ -199,8 +199,9 @@ function displayResult()
         // Event
         let index = i;
         e.onmouseenter = () => quickView(result[index])
-        e.onclick = async () =>
+        e.onclick = async (event) =>
         {
+            if(event.detail != 1){return}
             Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
             // webview.src = result[index].url;
 
