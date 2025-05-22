@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m)
 
     return instance;
 });
+contextBridge.exposeInMainWorld('importInstance', async (link) => { ipcRenderer.invoke('importInstance', link) })
 
 contextBridge.exposeInMainWorld('saveInstance', (i) => { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(i))); })
 

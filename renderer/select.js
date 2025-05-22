@@ -22,12 +22,12 @@ async function list()
     }
     document.getElementById('container').style.display = 'block';
 }
-async function networkList(text)
+async function networkList(text = '')
 {
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22]]`)).json()
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:modpack%22]]`)).json()
     for(let h of modrinth.hits)
     {
         searchResult.push
@@ -46,7 +46,7 @@ async function networkList(text)
 
     // Curseforge
     let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&classId=4471`)).json()
-    if(!curseforge.data){curseforge.data=[];}
+    if(curseforge.data==undefined){curseforge.data=[];}
     for(let d of curseforge.data)
     {
         async function loadImages()
@@ -92,7 +92,6 @@ async function networkList(text)
         })
     }
 
-    console.log(searchResult)
     for(let i of searchResult)
     {
         let b = instanceButton.cloneNode(true);
@@ -104,7 +103,7 @@ async function networkList(text)
 
         b.childNodes[1].onclick = () =>
         {
-            // openInstance(i.title)
+            importInstance(i.url)
         }
     }
 }

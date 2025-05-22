@@ -151,7 +151,7 @@ ipcMain.handle('getInstance', (event, name) =>
 {
     let i = Instance.getInstance(name);
     loadedInstances.push({name: name, instance: i})
-    i.onModUpdate = (mods) => event.sender.send('modUpdate', mods);
+    i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
     return JSON.parse(JSON.stringify(i));
 });
 ipcMain.handle('setModData', (event, instanceName, data) =>
@@ -163,10 +163,24 @@ ipcMain.handle('setModData', (event, instanceName, data) =>
     else { Instance.getInstance(instanceName).setModData(data); }
 })
 
-ipcMain.handle('saveInstance', (event, i) => { return new Instance(i).save(); });
+ipcMain.handle('saveInstance', (event, d) =>
+{
+    if(loadedInstances.find(i => i.name == d.name))
+    {
+        loadedInstances.find(i => i.name == d.name).instance = Object.assign(loadedInstances.find(i => i.name == d.name).instance, d);
+        loadedInstances.find(i => i.name == d.name).instance.save();
+    }
+    else { Object.assign(Instance.getInstance(d.name), d).save(); }
+})
+
 ipcMain.handle('download', async (event, url, directory, filename, createDirectory = true) =>
 {
     await Download.download(url, path.join(directory, filename));
+})
+
+ipcMain.handle('importInstance', async (event, link) =>
+{
+    return await Instance.importInstance(link)
 })
 
 let instanceIndex = 0;

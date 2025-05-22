@@ -82,6 +82,18 @@ async function updateLoaderVersionSelector()
 
             break;
         }
+        case 'neoforge':
+        {
+            let text = await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text();
+            const data = parseXml(text)
+        
+            for(let v of data.metadata.versioning.versions.version.filter(e => '1.'+e["#text"].split('-')[0].substring(0, e["#text"].split('-')[0].lastIndexOf('.')) == window.instance.version.number.toString()).reverse())
+            {
+                versionList.push(v["#text"]);
+            }
+
+            break;
+        }
         case 'fabric':
         {
             const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader/'+window.instance.version.number.toString())).json();

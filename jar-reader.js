@@ -6,9 +6,11 @@ const path = require('node:path')
 
 module.exports = 
 {
-    jar: async function(p, dataPath)
+    jar: async function(p, dataPath=null, normalPath=false)
     {
-        let entries = (await unzip( fs.readFileSync(path.join(app.getPath('appData'), p)) )).entries;
+        let entries = (await unzip( fs.readFileSync(path.join(normalPath?'':app.getPath('appData'), p)) )).entries;
+
+        if(dataPath==null){return entries;}
     
         try { return await entries[dataPath].json() }
         catch(err)
@@ -16,6 +18,7 @@ module.exports =
             try
             {
                 if(!dataPath) { return entries; }
+                if(entries[dataPath]==undefined){return undefined;}
                 let arrayBuffer = await entries[dataPath].arrayBuffer();
     
                 return handleData(Buffer.from(arrayBuffer), dataPath.split('.')[dataPath.split('.').length-1])
@@ -46,7 +49,7 @@ function handleData(buffer, type)
             return parseTomlWithComments(buffer.toString('utf-8'));
         }
     }
-    return buffer.toString('utf-8');
+    return buffer;
 }
 function encodeData(data, type)
 {

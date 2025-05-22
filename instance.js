@@ -8,6 +8,8 @@ const { windowManager } = require('node-window-manager');
 const nut = require('@nut-tree-fork/nut-js');
 const net = require('net');
 var chokidar = require('chokidar');
+const { unzip } = require('unzipit');
+const { XMLParser } = require("fast-xml-parser");
 
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
@@ -15,14 +17,18 @@ const minecraftData = require('minecraft-data')
 
 const config = require('./config');
 const Download = require('./download');
+const jarReader = require('./jar-reader');
+const { default: bufferToDataUrl } = require('buffer-to-data-url');
 
 
 class Instance
 {
     constructor(data = {})
     {
+        console.trace('Constructing')
         Object.assign(this, data);
         this.path = path.join(config.directories.instances, this.name, "minecraft");
+        if(!fs.existsSync(this.path)) { fs.mkdirSync(this.path, {recursive:true}); }
         if(data == {} || this.name==''){return this;}
 
         // Everything :)
@@ -39,28 +45,44 @@ class Instance
             this.setModData({filename: m.filename, missing: true}, true)
         }
         // Create data if exist
-        if(fs.existsSync(path.join(this.path, 'mods')))
+        if(!fs.existsSync(path.join(this.path, 'mods'))) { fs.mkdirSync(path.join(this.path, 'mods'), {recursive:true}); }
+        
+        let watcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
+        watcher.on('all', (e, p, s) =>
         {
-            let files = fs.readdirSync(path.join(this.path, 'mods'));
-            for(let f of files)
+            let ogMods = JSON.parse(JSON.stringify(this.mods));
+            let f = p.split('/')[p.split('/').length-1];
+            
+            // Delete
+            if(e=='unlink')
+            {
+                let i = this.mods.findIndex(m => m.filename==Instance.cleanModName(f));
+
+                if(this.mods[i]!=undefined)
+                {
+                    this.mods[i].missing = !fs.existsSync(Instance.cleanModName(p))&&!fs.existsSync(Instance.cleanModName(p)+'.jar')&&!fs.existsSync(Instance.cleanModName(p)+'.disabled');
+                    this.save()
+                }
+            }
+            // Add (or init)
+            if(e==='add')
             {
                 let i = this.mods.findIndex(m => m.filename==Instance.cleanModName(f));
                 if(i>=0)
                 {
-                    this.setModData({filename: this.mods[i].filename, missing: false, disabled: f.endsWith('.disabled')}, true)
+                    this.mods[i].missing = false;
+                    this.mods[i].disabled = f.endsWith('.disabled')
                 }
                 else 
                 {
                     this.setModData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
                 }
             }
-        }
-        else { fs.mkdirSync(path.join(this.path, 'mods'), {recursive:true}); }
-        let watcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
-        watcher.on('all', (e, p, s) =>
-        {
-            if(e=='unlink') { this.setModData({filename: Instance.cleanModName(p.split('/')[p.split('/').length-1]), missing: true, disabled: p.endsWith('.disabled')}, true) }
-            this.onModUpdate(this.mods)
+
+            if(ogMods != this.mods)
+            {
+                this.onModUpdate(this.mods)
+            }
         })
 
         return this;
@@ -106,12 +128,12 @@ class Instance
 
         // Resource Path (download optimization)
         let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
-        if(!fs.existsSync(resourcePath)){fs.mkdirSync(resourcePath, {recursive: true});}
-        if(!fs.existsSync(resourcePath+'/assets/indexes')){fs.mkdirSync(resourcePath+'/assets/indexes', {recursive: true});}
-        if(!fs.existsSync(resourcePath+'/assets/objects')){fs.mkdirSync(resourcePath+'/assets/objects', {recursive: true});}
+        if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
+        else{fs.cpSync(resourcePath+'/assets', path.join(this.path,'assets'), {recursive:true})}
         if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
-        if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fs.mkdirSync(path.join(config.directories.resources, 'versions', {recursive: true}));}
-
+        else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
+        if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fs.mkdirSync(path.join(config.directories.resources, 'versions'), {recursive: true});}
+        // else { fs.cpSync(path.join(config.directories.resources, 'versions'), path.join(this.path,'versions'), {recursive:true}) }
 
         // Settings
         let options =
@@ -120,17 +142,28 @@ class Instance
             version: this.version,
             memory: this.memory,
             authorization: await Authenticator.getAuth("dev"),
-            forge: this.loader.name=='forge'?path.join(this.path, 'versions', `forge-${this.version.number}-${this.loader.version}`, `forge-${this.version.number}-${this.loader.version}.jar`):null,
+            forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
             clientPackage: null,
             customArgs: [`-javaagent:${config.javaAgent}`],
             overrides:
             {
-                assetRoot: resourcePath+'/assets',
-                assetIndex: resourcePath+'/assets/indexes',
-                libraryRoot: resourcePath+'/libraries',
+                // assetRoot: resourcePath+'/assets',
+                // assetIndex: resourcePath+'/assets/indexes',
+                // libraryRoot: resourcePath+'/libraries',
                 directory: path.join(config.directories.resources, 'versions')
             }
         }
+
+        // Asset Move
+        launcher.on('debug', (e) =>
+        {
+            if(e == '[MCLC]: Downloaded assets')
+            {
+                fs.cpSync(path.join(this.path,'assets'), resourcePath+'/assets', {recursive:true})
+                fs.cpSync(path.join(this.path,'libraries'), resourcePath+'/libraries', {recursive:true})
+                fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
+            }
+        });
 
         // Prepare Events
         launcher.on('progress', (e) => listeners.log('progress', e));
@@ -308,6 +341,7 @@ class Instance
         }
         else
         {
+            i = this.mods.length;
             this.mods.push(Object.assign({
                 filename: "UNKNOWN FILENAME",
                 source: null,
@@ -323,17 +357,69 @@ class Instance
         }
 
         // Disabling/Enabling File
+        let workingPath = null;
         if(fs.existsSync(path.join(this.path, 'mods', data.filename+'.jar')))
         {
-            fs.renameSync(path.join(this.path, 'mods', data.filename+'.jar'), path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar')))
+            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'));
+            fs.renameSync(path.join(this.path, 'mods', data.filename+'.jar'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'mods', data.filename+'.disabled')))
         {
-            fs.renameSync(path.join(this.path, 'mods', data.filename+'.disabled'), path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar')))
+            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'));
+            fs.renameSync(path.join(this.path, 'mods', data.filename+'.disabled'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'mods', data.filename)))
         {
-            fs.renameSync(path.join(this.path, 'mods', data.filename), path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar')))
+            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'))
+            fs.renameSync(path.join(this.path, 'mods', data.filename), workingPath)
+        }
+
+        // Find metadata in the jar if missing
+        if(workingPath!=null && !this.mods[i].fileVerified)
+        {
+            new Promise(async (resolve) =>
+            {
+                // Fabric JSON
+                let fabricModJSON = await jarReader.jar(workingPath, 'fabric.mod.json', true);
+                if(fabricModJSON != undefined)
+                {
+                    let meta = fabricModJSON;
+                    this.mods[i].fabricMeta = meta;
+                    if(!this.mods[i].title){this.mods[i].title=meta.name}
+                    if(this.mods[i].description=='No description...'){this.mods[i].description=meta.description}
+                    if(!this.mods[i].id){this.mods[i].id=meta.id}
+                    this.mods[i].clientRequired=meta.environment=='client'
+                    this.mods[i].serverRequired=meta.environment=='server'
+
+                    let potentialIcon = await jarReader.jar(workingPath, meta.icon, true);
+                    if(meta.icon && potentialIcon!=undefined)
+                    {
+                        this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(potentialIcon));
+                    }
+                }
+                // Pack Mcmeta
+                let packMcmeta = await jarReader.jar(workingPath, 'pack.mcmeta', true);
+                if(packMcmeta != undefined)
+                {
+                    let meta = packMcmeta;
+                    if(typeof(meta.description)=='object') { this.mods[i].description = meta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                    else if(typeof(meta.description) == 'string') { this.mods[i].description = meta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                }
+
+                // Icon
+                if(this.mods[i].icon==undefined)
+                {
+                    let r = await jarReader.jar(workingPath, null, true)
+                    if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                    {
+                        this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
+                    }
+                }
+
+                resolve();
+            })
+
+            this.mods[i].fileVerified=true;
         }
     
         // Virtual Path
@@ -458,6 +544,109 @@ class Instance
         }
         return list;
     }
+
+    static async importInstance(link, progress)
+    {
+        let url = new URL(link);
+
+        // Modrinth
+        if(url.hostname == "modrinth.com")
+        {
+            // Find Modpack Version
+            const version = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1]+'/version')).json())
+            .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); })[0];
+            let file = version.files.filter(f=>f.primary)[0];
+
+            // Metadata
+            let meta = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
+            let i = new Instance({name: meta.title});
+            i.description = meta.description;
+            i.version.number = version.game_versions[0];
+            i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
+            // Set last loader version
+            switch(i.loader.name)
+            {
+                case 'forge':
+                {
+                    const data = new XMLParser().parse(await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text());
+                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e["#text"].split('-')[0] == i.version.number.toString())[0]["#text"].split('-')[1];
+                    break;
+                }
+                case 'neoforge':
+                {
+                    const data = new XMLParser().parse(await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text());
+                    i.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == i.version.number.toString()).reverse()[0];
+                    break;
+                }
+                case 'fabric':
+                {
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader/'+i.version.number.toString())).json();
+                    i.loader.version = data[0].loader.version;
+                    break;
+                }
+                default: { break; }
+            }
+            i.save();
+
+            let p = path.join(config.directories.instances, i.name);
+            fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
+
+
+            // Downlaod zip
+            await Download.download(decodeURI(file.url), path.join(p, 'original.zip'))
+            let zip = fs.readFileSync(path.join(p, 'original.zip'))
+
+            const {entries} = await unzip(zip);
+            const data = await entries['modrinth.index.json'].json();
+
+            // Download content
+            let total = 0;
+            for(let f of data.files)
+            {
+                if(entries[f.path] != undefined) { continue; }
+                total += f.fileSize;
+            }
+            let loaded = 0;
+
+            // Mod Download or Transfert
+            for(let f of data.files)
+            {
+                if(fs.existsSync(path.join(p, 'minecraft', f.path))){loaded+=f.fileSize; continue;}
+
+                if(entries[f.path] != undefined)
+                {
+                    fs.writeFileSync(path.join(p, 'minecraft', f.path), await entries[f.path].arrayBuffer())
+                }
+                else if(f.downloads != undefined)
+                {
+                    if(f.downloads[0] == undefined){continue;}
+
+                    await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path))
+                }
+            }
+            // Other Files
+            for(let e of Object.entries(entries))
+            {
+                if(e[0].startsWith('overrides/') && e[0] != 'overrides/')
+                {
+                    try
+                    {
+                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
+                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+                        fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
+                    }
+                    catch(err) { console.warn(err) }
+                }
+            }
+
+            i.save();
+        }
+        // Curseforge
+        else if(url.hostname == "www.curseforge.com")
+        {
+
+        }
+    }
 }
 
 
@@ -473,7 +662,6 @@ async function installLoader(root, loader, version, listeners = null)
         {
             delete version.custom;
             return null;
-            break;
         }
         case 'forge':
         {
@@ -492,6 +680,28 @@ async function installLoader(root, loader, version, listeners = null)
             if(parseInt(version.number.split('.')[1]) <= 12 && (version.number.split('-')[0] !== '1.12.2' || (parseInt(version.number.split('.').pop()) <= 2847)))
             { link += '-universal.jar'; } else { link += '-installer.jar';  }
             
+            await download(BrowserWindow.getAllWindows()[0], link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
+            {
+                if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
+            }});
+            break;
+        }
+        case 'neoforge':
+        {
+            version.custom = `neoforge-${version.number}-${loader.version}`;
+
+            const targetPath = path.join(config.directories.resources, "versions", `neoforge-${version.number}-${loader.version}`);
+            const targetName = `neoforge-${version.number}-${loader.version}.jar`;
+
+            file = path.join(targetPath, targetName);
+            targetFile = path.join(root, 'versions', `neoforge-${version.number}-${loader.version}`, targetName);
+
+            if(fs.existsSync(path.join(targetPath, targetName))){break;}
+            if(!fs.existsSync(targetPath)){fs.mkdirSync(targetPath, {recursive:true});}
+
+            let link = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${loader.version}/neoforge-${loader.version}-installer.jar`;
+            
+            console.log(targetPath, targetName)
             await download(BrowserWindow.getAllWindows()[0], link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
@@ -577,6 +787,49 @@ async function inputOnWindow(win, action, x, y, width, height, sync = false)
 
         if(oldMousePosition != null) { await nut.mouse.setPosition(new nut.Point(oldMousePosition.x, oldMousePosition.y)); }
     }
+}
+
+function fixJSONChar(jsonString)
+{
+  let inString = false;
+  let escaped = false;
+  let result = '';
+
+  for (let i = 0; i < jsonString.length; i++) {
+    const char = jsonString[i];
+
+    if (inString) {
+      if (escaped) {
+        result += char;
+        escaped = false;
+      } else if (char === '\\') {
+        result += char;
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+        result += char;
+      } else if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        // Handle CRLF (\r\n)
+        if (jsonString[i + 1] === '\n') {
+          result += '\\n';
+          i++; // skip \n
+        } else {
+          result += '\\n';
+        }
+      } else {
+        result += char;
+      }
+    } else {
+      result += char;
+      if (char === '"') {
+        inString = true;
+      }
+    }
+  }
+
+  return result;
 }
 
 module.exports = Instance;

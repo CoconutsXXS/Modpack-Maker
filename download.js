@@ -41,12 +41,20 @@ class Download
 
         return new Promise(async (resolve) =>
         {
-            await download(BrowserWindow.getAllWindows()[0], url, {filename: dest.replace(/^.*[\\/]/, ''), directory: dest.substring(0, dest.lastIndexOf('/'))});
-            resolve();
+            let directory = dest.substring(0, dest.lastIndexOf('/'));
+            let filename = dest.replace(/^.*[\\/]/, '');
 
-            fs.copyFileSync(dest, path.join(config.directories.download, dest.replace(/^.*[\\/]/, '')));
-            this.downloadData.push({url: url, path: path.join(config.directories.download, dest.replace(/^.*[\\/]/, ''))});
-            fs.writeFileSync(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
+            if(!fs.existsSync(directory+'/')) { fs.mkdirSync(directory+'/', {recursive:true}) }
+
+            await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i)});
+            try
+            {
+                fs.copyFileSync(dest, path.join(config.directories.download, filename));
+                this.downloadData.push({url: url, path: path.join(config.directories.download, filename)});
+                fs.writeFileSync(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
+            }
+            catch(err) { console.warn(err) }
+            resolve();
         })
     }
 }
