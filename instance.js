@@ -25,7 +25,6 @@ class Instance
 {
     constructor(data = {})
     {
-        console.trace('Constructing')
         Object.assign(this, data);
         this.path = path.join(config.directories.instances, this.name, "minecraft");
         if(!fs.existsSync(this.path)) { fs.mkdirSync(this.path, {recursive:true}); }
@@ -379,6 +378,25 @@ class Instance
         {
             new Promise(async (resolve) =>
             {
+                if(!fs.existsSync(workingPath)){resolve(); return;}
+
+                // META-INF
+                let metaTOML = await jarReader.jar(workingPath, 'META-INF/mods.toml', true);
+                if(metaTOML != undefined)
+                {
+                    let meta = metaTOML;
+
+                    if(meta?.mods?.value[0]?.logoFile != undefined)
+                    {
+                        try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await jarReader.jar(workingPath, meta.mods.value[0].logoFile, true)))}
+                        catch(err){console.warn(err)}
+                    }
+                    this.mods[i].description = meta?.mods?.value[0]?.description;
+                    this.mods[i].title = meta?.mods?.value[0]?.displayName;
+                    this.mods[i].version = meta?.mods?.value[0]?.version;
+                    this.mods[i].modId = meta?.mods?.value[0]?.modId;
+                    console.log(meta)
+                }
                 // Fabric JSON
                 let fabricModJSON = await jarReader.jar(workingPath, 'fabric.mod.json', true);
                 if(fabricModJSON != undefined)
@@ -569,7 +587,7 @@ class Instance
                 case 'forge':
                 {
                     const data = new XMLParser().parse(await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text());
-                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e["#text"].split('-')[0] == i.version.number.toString())[0]["#text"].split('-')[1];
+                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == i.version.number.toString())[0].split('-')[1];
                     break;
                 }
                 case 'neoforge':
@@ -621,7 +639,7 @@ class Instance
                 {
                     if(f.downloads[0] == undefined){continue;}
 
-                    await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path))
+                    await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path), false, false)
                 }
             }
             // Other Files
@@ -644,7 +662,81 @@ class Instance
         // Curseforge
         else if(url.hostname == "www.curseforge.com")
         {
+            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split('/')[url.pathname.split('/').length-1]}&classId=4471`)).json()).data[0];
+            let id = meta.id;
 
+            // https://www.curseforge.com/api/v1/mods/936875/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true
+            const versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&removeAlphas=false`)).json()).data
+            .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
+
+            var version = versions[0];
+
+            // Metadata
+            let i = new Instance({name: meta.name});
+            i.description = meta.summary;
+            console.log(version.gameVersions)
+            i.version.number = version.gameVersions[0];
+            i.loader.name = version.gameVersions[1].toLowerCase();
+            // Set last loader version
+            switch(i.loader.name)
+            {
+                case 'forge':
+                {
+                    const data = new XMLParser().parse(await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text());
+                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == i.version.number.toString())[0].split('-')[1];
+                    break;
+                }
+                case 'neoforge':
+                {
+                    const data = new XMLParser().parse(await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text());
+                    i.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == i.version.number.toString()).reverse()[0];
+                    break;
+                }
+                case 'fabric':
+                {
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader/'+i.version.number.toString())).json();
+                    i.loader.version = data[0].loader.version;
+                    break;
+                }
+                default: { break; }
+            }
+            i.save();
+
+            let p = path.join(config.directories.instances, i.name);
+            fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
+
+
+            // Downlaod zip
+            await Download.download(decodeURI(`https://www.curseforge.com/api/v1/mods/${id}/files/${version.id}/download`), path.join(p, 'original.zip'))
+            let zip = fs.readFileSync(path.join(p, 'original.zip'))
+            const {entries} = await unzip(zip);
+
+            const data = await entries['manifest.json'].json();
+
+            // Download content
+            // Mod Download or Transfert
+            for(let f of data.files)
+            {
+                if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
+
+                Download.download(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`, path.join(p, 'minecraft/mods'), true, false)
+            }
+            // Other Files
+            for(let e of Object.entries(entries))
+            {
+                if(e[0].startsWith('overrides/') && e[0] != 'overrides/')
+                {
+                    try
+                    {
+                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
+                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+                        fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
+                    }
+                    catch(err) { console.warn(err) }
+                }
+            }
+
+            i.save();
         }
     }
 }

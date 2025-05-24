@@ -8,10 +8,13 @@ const config = require('./config');
 class Download
 {
     static downloadData = null;
-    static async download(url, dest)
+    static async download(url, dest, autoFilename = false, erase = true)
     {
         // Safely create/repair
         if(!fs.existsSync(config.directories.download)) { fs.mkdirSync(config.directories.download, {recursive:true}); }
+
+        if(autoFilename) { dest = path.join(dest, decodeURI(new URL(await getRedirectLocation(url)).pathname.split('/').pop())) }
+        if(fs.existsSync(dest) && !erase){return}
 
         if(this.downloadData == null)
         {
@@ -46,7 +49,12 @@ class Download
 
             if(!fs.existsSync(directory+'/')) { fs.mkdirSync(directory+'/', {recursive:true}) }
 
-            await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i)});
+            // Classic
+            // await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i)});
+            // New
+            let r = await fetch(url);
+            fs.writeFileSync(path.join(directory, filename), Buffer.from(await r.arrayBuffer()));
+
             try
             {
                 fs.copyFileSync(dest, path.join(config.directories.download, filename));
@@ -56,6 +64,26 @@ class Download
             catch(err) { console.warn(err) }
             resolve();
         })
+    }
+}
+
+async function getRedirectLocation(initialUrl)
+{
+    const response = await fetch(initialUrl,
+    {
+        method: 'HEAD',
+        redirect: 'manual'
+    });
+
+    if(response.status >= 300 && response.status < 400)
+    {
+        const location = response.headers.get('location');
+        const finalUrl = new URL(location, initialUrl).toString();
+        return finalUrl;
+    }
+    else
+    {
+        return initialUrl;
     }
 }
 

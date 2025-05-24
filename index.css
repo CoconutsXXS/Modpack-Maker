@@ -616,7 +616,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
 }
 #mod-info-panel > p { opacity: 0.7; margin-bottom: 12px; min-height: 80px; }
 #mod-info-panel > div:first-of-type { display: flex; margin-bottom: 12px; }
-#mod-info-panel > div:first-of-type > img { max-width: 100px; max-height: 100px; margin-right: 5px; min-height: 100px; image-rendering: pixelated; }
+#mod-info-panel > div:first-of-type > img { object-fit: contain; max-width: 100px; max-height: 100px; margin-right: 5px; min-height: 100px; image-rendering: pixelated; }
 #mod-info-panel > .content-slider { height: 150px; background-color: #00000080; min-width: 100%; }
 #mod-info-panel > #supporting { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 12px; word-spacing: -1px; }
 #mod-info-panel > #supporting > * { position: relative; left: 50%; translate: -50%; width: fit-content; }

@@ -144,7 +144,6 @@ window.web =
                 {
                     case 'download':
                     {
-                        console.log(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)
                         for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods'))
                         {
                             if(!f.primary){continue}
