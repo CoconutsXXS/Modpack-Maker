@@ -825,3 +825,26 @@ input[type="range"]::-webkit-slider-thumb
 }
 
 #instance-description { width: calc(100% - 24px); }
+
+/* Popup */
+#popup-container
+{
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    text-align: center;
+    z-index: 100;
+    background: #00000050;
+}
+#popup-container > div
+{
+    position: fixed;
+    top: 50%; left: 50%;
+    translate: -50% -50%;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 16px;
+    background: var(--primary-color);
+}
+#popup-container > div > p { margin-bottom: 16px; }
+#popup-container > div > div:first-of-type { display: flex; width: 100%; text-align: center; direction: rtl; }

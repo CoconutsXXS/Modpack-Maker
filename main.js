@@ -102,6 +102,8 @@ async function mainWindow()
         load.close();
     });
 
+    win.on('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
+
     return win;
 }
 let selectorWindow = null;
@@ -152,15 +154,19 @@ ipcMain.handle('getInstance', (event, name) =>
     let i = Instance.getInstance(name);
     loadedInstances.push({name: name, instance: i})
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
+    i.onRPUpdate = (rp) => event.sender.isDestroyed()?null:event.sender.send('RPUpdate', rp);;
+    i.onShaderUpdate = (shaders) => event.sender.isDestroyed()?null:event.sender.send('shaderUpdate', shaders);;
     return JSON.parse(JSON.stringify(i));
 });
-ipcMain.handle('setModData', (event, instanceName, data) =>
+ipcMain.handle('setItemData', (event, item='mod', instanceName, data) =>
 {
+    let fn = item=='mod'?'setModData':(item=='shader'?'setShaderData':'setRPData')
+    console.log(fn, data)
     if(loadedInstances.find(i => i.name == instanceName))
     {
-        loadedInstances.find(i => i.name == instanceName).instance.setModData(data);
+        loadedInstances.find(i => i.name == instanceName).instance[fn](data);
     }
-    else { Instance.getInstance(instanceName).setModData(data); }
+    else { Instance.getInstance(instanceName)[fn](data); }
 })
 
 ipcMain.handle('saveInstance', (event, d) =>
@@ -178,9 +184,9 @@ ipcMain.handle('download', async (event, url, directory, filename, createDirecto
     await Download.download(url, path.join(directory, filename));
 })
 
-ipcMain.handle('importInstance', async (event, link) =>
+ipcMain.handle('importInstance', async (event, link, metadata) =>
 {
-    return await Instance.importInstance(link)
+    return await Instance.importInstance(link, metadata)
 })
 
 let instanceIndex = 0;
@@ -190,12 +196,12 @@ ipcMain.handle('launch', (event, name) =>
     let instance = Instance.getInstance(name);
     instance.launch(
         {
-            log: (t, c) => event.sender.send(i+'log', t, c),
-            close: (c) => event.sender.send(i+'close', c),
+            log: (t, c) => event.sender.isDestroyed()?null:event.sender.send(i+'log', t, c),
+            close: (c) => event.sender.isDestroyed()?null:event.sender.send(i+'close', c),
             windowOpen: (w, s) =>
             {
                 console.log(`Window opened: `, w)
-                event.sender.send(i+'window-open', s);
+                event.sender.isDestroyed()?null:event.sender.send(i+'window-open', s);
 
                 ipcMain.on(i+'resize', (event, x, y, width, height, windowDependent) =>
                 {
@@ -207,7 +213,7 @@ ipcMain.handle('launch', (event, name) =>
                     else { w.setBounds({x, y, width, height}); }
                 });
             },
-            network: (m) => event.sender.send(i+'network', m)
+            network: (m) => event.sender.isDestroyed()?null:event.sender.send(i+'network', m)
         }
     , 1337+i)
     return i
@@ -222,7 +228,7 @@ ipcMain.on('ephemeralLaunch', async (event, loader, version, mods) =>
 const reader = require('./jar-reader.js');
 const { setTimeout } = require('node:timers/promises');
 ipcMain.handle('jarData', async (event, p, dataPath) => { return await reader.jar(p, dataPath) })
-ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p)); })
+ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p), {recursive:true}).filter(r=>fs.statSync(path.join(app.getPath('appData'), p, r)).isFile()); })
 ipcMain.handle('readFile', (event, p) => { return reader.autoData(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('writeFile', (event, p, d) => { return reader.saveData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ return fs.unlinkSync(path.join(app.getPath('appData'), n)); }catch(err){console.warn(err)} })

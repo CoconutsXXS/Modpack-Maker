@@ -1,6 +1,6 @@
 let instanceButton = document.getElementById('container').childNodes[1].cloneNode(true); document.getElementById('container').childNodes[1].remove();
 
-async function list()
+async function list(text = '')
 {
     document.getElementById('container').innerHTML = '';
     let list = await instanceList();
@@ -12,7 +12,6 @@ async function list()
         b.childNodes[3].childNodes[3].innerText = i.description;
         b.childNodes[3].childNodes[5].innerHTML = `${i.modsCount?i.modsCount:0} mods<br>${i.resourcepacksCount?i.resourcepacksCount:0} resourcepacks<br>${i.shadersCount?i.shadersCount:0} shaders`;
         document.getElementById('container').appendChild(b)
-        console.log(b)
 
         b.childNodes[1].onclick = () =>
         {
@@ -24,6 +23,7 @@ async function list()
 }
 async function networkList(text = '')
 {
+    document.getElementById('container').innerHTML = '';
     let searchResult = [];
 
     // Modrinth
@@ -101,19 +101,26 @@ async function networkList(text = '')
         // b.childNodes[3].childNodes[5].innerHTML = `${i.modsCount?i.modsCount:0} mods<br>${i.resourcepacksCount?i.resourcepacksCount:0} resourcepacks<br>${i.shadersCount?i.shadersCount:0} shaders`;
         document.getElementById('container').appendChild(b)
 
-        b.childNodes[1].onclick = () =>
+        b.childNodes[1].onclick = async () =>
         {
-            importInstance(i.url)
+            importInstance(i.url, {icon: i.icon})
         }
     }
 }
 
+document.getElementById('main').querySelector('input').onkeydown = (ev) =>
+{
+    if(ev.key!='Enter'){return}
+    browser?networkList(document.getElementById('main').querySelector('input').value):list(document.getElementById('main').querySelector('input').value)
+}
+
+let browser = false;
 document.addEventListener('DOMContentLoaded', () =>
 {
     window.setupTab(document.getElementById('tab'),
     [
-        {select: () => { list(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
-        {select: () => {document.getElementById('container').style.display = 'block'; networkList(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
-        {select: () => {openInstance('');window.close();}, deselect: () => {}}
+        {select: () => { browser = false; list(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
+        {select: () => { browser = true; document.getElementById('container').style.display = 'block'; networkList(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
+        {select: () => { openInstance('');window.close();}, deselect: () => {}}
     ]);
 })

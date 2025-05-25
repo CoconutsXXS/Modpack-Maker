@@ -25,3 +25,9 @@
     overflow: hidden;
 }
 #main > div:last-of-type > div > div > p { opacity: 0.5; }
+
+#main > input
+{
+    width: -webkit-fill-available;
+    border-top: 0;
+}

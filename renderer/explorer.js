@@ -323,7 +323,7 @@ window.loadModsExplorer = (directory = null) =>
         files.push({path: d.path, name: d.name, folder: true, filename: d.name})
     }
 
-    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
 
     window.setupExplorer(directory, document.getElementById('mods-explorer'), files, (from, to) =>
     {
@@ -433,14 +433,244 @@ window.loadModsExplorer = (directory = null) =>
         await window.instance.setModData(m)
     })
 }
+window.loadShadersExplorer = (directory = null) =>
+{
+    console.log(window.instance.shaders);
+    if(!window.instance.shaders){return}
+    if(directory == null) { directory = currentDirectory; }
+    let files = [];
+    for(let m of window.instance.shaders)
+    {
+        if(m.missing){continue;}
+        files.push({path: m.virtualPath?m.virtualPath:'', name: m.title?m.title:m.filename, icon: m.icon, filename: m.filename, disabled: m.disabled})
+    }
+    for(let d of window.instance.virtualDirectories.filter(d => d.parent=='shaderpacks'))
+    {
+        files.push({path: d.path, name: d.name, folder: true, filename: d.name})
+    }
+
+    window.setupExplorer(directory, document.getElementById('shaders-explorer'), files, (from, to) =>
+    {
+        window.instance.shaders[window.instance.shaders.findIndex(m => m.filename == from.split('/')[from.split('/').length-1])].virtualPath = to.substring(0, to.lastIndexOf('/'))==''?null:to.substring(0, to.lastIndexOf('/'));
+        saveInstance(window.instance)
+    }, (f) =>
+    {
+        // SELECT SHADER
+
+        if(f.folder) { return; }
+        let infoPanel = document.getElementById('mod-info-panel');
+        let m = window.instance.shaders.find(m => m.filename == f.filename)
+
+        // Title, desc, icon
+        infoPanel.querySelector('div:first-of-type > h2').innerText = m?.title;
+        infoPanel.querySelector('div:first-of-type > img').src = m.icon?m.icon:'';
+        infoPanel.querySelector('p').innerText = m?.description;
+
+        // Image
+        infoPanel.querySelector('.content-slider').innerHTML = '';
+        if(m.images)
+        {
+            for(let i of m.images)
+            {
+                let img = document.createElement('img'); img.src = i;
+                img.classList.add('openable-image');
+                infoPanel.querySelector('.content-slider').appendChild(img);   
+            }
+        }
+
+        // Client, server, dependencies
+        infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${m.clientRequired?0.8:0.3})`
+        infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', m.clientRequired?'Required in Client Side':'Unrequired in Client Side');
+        infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${m.serverRequired?0.8:0.3})`
+        infoPanel.querySelector('#supporting').childNodes[1].setAttribute('hover-info', m.clientRequired?'Required in Server Side':'Unrequired in Server Side');
+        window.loadHoverInfo();
+
+        infoPanel.querySelector('#supporting').childNodes[2].childNodes[1].innerText = m.dependencies?m.dependencies.length.toString():'0'
+        let dependents = window.instance.shaders.filter(shader => shader.dependencies?.find(d=>d.id==m.id||d.filename==m.filename||d.slug==m.slug)!=null).length;
+        infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
+
+        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        // Disable
+        infoPanel.querySelector('#actions').childNodes[1].onclick = async () =>
+        {
+            m.disabled = !m.disabled;
+            if(m.disabled==undefined){m.disabled = true;}
+            await window.instance.setShaderData(m)
+
+            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        }
+        // Config
+        infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>
+        {
+
+        }
+        // Delete
+        infoPanel.querySelector('#actions').childNodes[2].onclick = async () =>
+        {
+            window.instance.deleteShader(m.filename);
+        }
+    }, (m) =>
+    {
+        // Delete
+        if(m.folder)
+        {
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
+
+            // Move all children
+            for(let shader of window.instance.shaders)
+            {
+                if(m.path == shader.virtualPath.substring(0, shader.virtualPath.lastIndexOf('/')) && m.name == shader.virtualPath.split('/')[shader.virtualPath.split('/').length-1])
+                {
+                    shader.virtualPath = '';
+                    window.instance.setShaderData(shader)
+                }
+            }
+
+            window.instance.save(window.instance);
+            return
+        }
+        window.instance.deleteShader(m.filename);
+
+    }, async (m) =>
+    {
+        if(m.folder)
+        {
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
+            window.instance.save(window.instance);
+            return
+        }
+        // Activation
+        m.disabled = !m.disabled;
+        if(m.disabled==undefined){m.disabled = true;}
+        await window.instance.setShaderData(m)
+    })
+}
+window.loadRPExplorer = (directory = null) =>
+{
+    console.log(window.instance.rp);
+    if(!window.instance.rp){return}
+    if(directory == null) { directory = currentDirectory; }
+    let files = [];
+    for(let m of window.instance.rp)
+    {
+        if(m.missing){continue;}
+        files.push({path: m.virtualPath?m.virtualPath:'', name: m.title?m.title:m.filename, icon: m.icon, filename: m.filename, disabled: m.disabled})
+    }
+    for(let d of window.instance.virtualDirectories.filter(d => d.parent=='resourcepacks'))
+    {
+        files.push({path: d.path, name: d.name, folder: true, filename: d.name})
+    }
+
+    window.setupExplorer(directory, document.getElementById('rp-explorer'), files, (from, to) =>
+    {
+        window.instance.rp[window.instance.rp.findIndex(m => m.filename == from.split('/')[from.split('/').length-1])].virtualPath = to.substring(0, to.lastIndexOf('/'))==''?null:to.substring(0, to.lastIndexOf('/'));
+        saveInstance(window.instance)
+    }, (f) =>
+    {
+        // SELECT SHADER
+
+        if(f.folder) { return; }
+        let infoPanel = document.getElementById('mod-info-panel');
+        let m = window.instance.rp.find(m => m.filename == f.filename)
+
+        // Title, desc, icon
+        infoPanel.querySelector('div:first-of-type > h2').innerText = m?.title;
+        infoPanel.querySelector('div:first-of-type > img').src = m.icon?m.icon:'';
+        infoPanel.querySelector('p').innerText = m?.description;
+
+        // Image
+        infoPanel.querySelector('.content-slider').innerHTML = '';
+        if(m.images)
+        {
+            for(let i of m.images)
+            {
+                let img = document.createElement('img'); img.src = i;
+                img.classList.add('openable-image');
+                infoPanel.querySelector('.content-slider').appendChild(img);   
+            }
+        }
+
+        // Client, server, dependencies
+        infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${m.clientRequired?0.8:0.3})`
+        infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', m.clientRequired?'Required in Client Side':'Unrequired in Client Side');
+        infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${m.serverRequired?0.8:0.3})`
+        infoPanel.querySelector('#supporting').childNodes[1].setAttribute('hover-info', m.clientRequired?'Required in Server Side':'Unrequired in Server Side');
+        window.loadHoverInfo();
+
+        infoPanel.querySelector('#supporting').childNodes[2].childNodes[1].innerText = m.dependencies?m.dependencies.length.toString():'0'
+        let dependents = window.instance.rp.filter(rp => rp.dependencies?.find(d=>d.id==m.id||d.filename==m.filename||d.slug==m.slug)!=null).length;
+        infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
+
+        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        // Disable
+        infoPanel.querySelector('#actions').childNodes[1].onclick = async () =>
+        {
+            m.disabled = !m.disabled;
+            if(m.disabled==undefined){m.disabled = true;}
+            await window.instance.setRPData(m)
+
+            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        }
+        // Config
+        infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>
+        {
+
+        }
+        // Delete
+        infoPanel.querySelector('#actions').childNodes[2].onclick = async () =>
+        {
+            window.instance.deleteRP(m.filename);
+        }
+    }, (m) =>
+    {
+        // Delete
+        if(m.folder)
+        {
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
+
+            // Move all children
+            for(let rp of window.instance.rp)
+            {
+                if(m.path == rp.virtualPath.substring(0, rp.virtualPath.lastIndexOf('/')) && m.name == rp.virtualPath.split('/')[rp.virtualPath.split('/').length-1])
+                {
+                    rp.virtualPath = '';
+                    window.instance.setRPData(rp)
+                }
+            }
+
+            window.instance.save(window.instance);
+            return
+        }
+        window.instance.deleteRP(m.filename);
+
+    }, async (m) =>
+    {
+        if(m.folder)
+        {
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
+            window.instance.save(window.instance);
+            return
+        }
+        // Activation
+        m.disabled = !m.disabled;
+        if(m.disabled==undefined){m.disabled = true;}
+        await window.instance.setRPData(m)
+    })
+}
 
 if(window.instance)
 {
-    window.instance.onModUpdate = (instance, mods) => {if(instance.name != window.instance.name){return;} console.log('mods updated'); window.loadModsExplorer()};
+    window.instance.onModUpdate = (instance) => {if(instance.name != window.instance.name){return;} console.log('mods updated'); window.loadModsExplorer()};
+    window.instance.onRPUpdate = (instance) => {if(instance.name != window.instance.name){return;} console.log('resourecpack updated'); window.loadRPExplorer()};
+    window.instance.onShaderUpdate = (instance) => {if(instance.name != window.instance.name){return;} console.log('shaders updated'); window.loadShadersExplorer()};
     window.loadModsExplorer()
+    window.loadRPExplorer()
+    window.loadShadersExplorer()
 }
 window.addInstanceListener(() =>
 {
-    window.instance.onModUpdate = (instance, mods) => {if(instance.name != window.instance.name){return;} console.log('mods updated'); window.loadModsExplorer()};
+    window.instance.onModUpdate = (instance) => {if(instance.name != window.instance.name){return;} console.log('mods updated'); window.loadModsExplorer()};
+    window.instance.onShaderUpdate = (instance) => {if(instance.name != window.instance.name){return;} console.log('shaders updated'); window.loadShadersExplorer()};
     window.loadModsExplorer()
+    window.loadShadersExplorer()
 })

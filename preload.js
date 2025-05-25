@@ -16,7 +16,7 @@ class Instance
         if(i>=0) { this.mods[i] = Object.assign(this.mods[i], data); }
         else { this.mods.push(data); }
 
-        return ipcRenderer.invoke('setModData', this.name, data)
+        return ipcRenderer.invoke('setItemData', 'mod', this.name, data)
     }
     deleteMod = function(name)
     {
@@ -25,20 +25,57 @@ class Instance
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/mods/'+name+'.disabled')
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/mods/'+name);
     }
+
+    setRPData = function(data)
+    {
+        data = JSON.parse(JSON.stringify(data))
+        let i = this.mods.findIndex(m => m.filename == data.filename);
+        if(i>=0) { this.mods[i] = Object.assign(this.mods[i], data); }
+        else { this.mods.push(data); }
+
+        return ipcRenderer.invoke('setItemData', 'rp', this.name, data)
+    }
+    deleteRP = function(name)
+    {
+        this.setModData({filename: name, missing: true})
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.zip')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.disabled')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name);
+    }
+
+    setShaderData = function(data)
+    {
+        data = JSON.parse(JSON.stringify(data))
+        let i = this.mods.findIndex(m => m.filename == data.filename);
+        if(i>=0) { this.mods[i] = Object.assign(this.mods[i], data); }
+        else { this.mods.push(data); }
+
+        return ipcRenderer.invoke('setItemData', 'shader', this.name, data)
+    }
+    deleteShader = function(name)
+    {
+        this.setModData({filename: name, missing: true})
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.zip')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.disabled')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name);
+    }
+
     getConfigs = function() { return ipcRenderer.invoke('readFolder', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config') }
     getConfig = function(p) { return ipcRenderer.invoke('readFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p) }
     setConfig = function(p, d) { return ipcRenderer.invoke('writeFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p, d) }
     save = function(d) { console.log(JSON.parse(JSON.stringify(d))); return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
 }
 
-contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}) =>
+contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}) =>
 {
     let instance = Object.assign(new Instance(), await ipcRenderer.invoke('getInstance', name));
     ipcRenderer.on('modUpdate', (event, mods) => { instance.mods = mods; onModUpdate(instance, mods); })
+    ipcRenderer.on('RPUpdate', (event, rp) => { instance.rp = rp; onRPUpdate(instance, rp); })
+    ipcRenderer.on('shaderUpdate', (event, shaders) => { instance.shaders = shaders; onShaderUpdate(instance, shaders); })
 
     return instance;
 });
-contextBridge.exposeInMainWorld('importInstance', async (link) => { ipcRenderer.invoke('importInstance', link) })
+contextBridge.exposeInMainWorld('importInstance', async (link, metadata) => { ipcRenderer.invoke('importInstance', link, metadata) })
 
 contextBridge.exposeInMainWorld('saveInstance', (i) => { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(i))); })
 

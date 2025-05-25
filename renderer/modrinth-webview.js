@@ -55,7 +55,7 @@ function modify()
         c.onclick = async (e) =>
         {
             e.preventDefault();
-            window.electron.sendToHost('download', {});
+            window.electron.sendToHost('download');
             if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
             { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
         }
@@ -143,6 +143,25 @@ function modify()
 }
 try{modify()}catch(err){console.error(err)}
 document.body.onloadeddata = document.body.onload = document.body.onloadstart = window.onloadeddata = window.onloadedmetadata = modify;
+
+window.versionSelect = async function(versions)
+{
+    console.log(versions);
+
+    let back = document.createElement('div'); back.id = 'panelBack'
+    document.body.appendChild(back);
+    back.onclick = () => {back.remove(); panel.remove();}
+    let panel = document.createElement('div'); panel.id = 'versionPanel';
+    document.body.appendChild(panel)
+
+    for(let v of versions.reverse())
+    {
+        let e = document.createElement('button');
+        panel.appendChild(e);
+        e.innerText = `${v.name}`
+        e.onclick = () => { window.electron.sendToHost('download', v.version_number); back.remove(); panel.remove(); }
+    }
+}
 
 history.replaceState = function(state, title, url)
 {

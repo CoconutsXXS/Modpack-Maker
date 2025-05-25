@@ -32,6 +32,7 @@ module.exports =
     },
     autoData: function(path)
     {
+        console.log(path)
         return handleData(fs.readFileSync(path), path.split('.')[path.split('.').length-1])
     },
     saveData: function(path, d)

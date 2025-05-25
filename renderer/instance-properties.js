@@ -13,7 +13,7 @@ window.addInstanceListener((i) =>
     loaderVersionSelector.value = i.loader?.version;
 
     document.getElementById('right-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
-    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
 
     if(i.loader.name == 'vanilla') { loaderVersionSelector.style.display = 'none' }
     fetch("https://mc-versions-api.net/api/java").then((response) => response.json())
@@ -49,7 +49,7 @@ window.addInstanceListener((i) =>
     {
         window.instance.loader.name = loaderSelector.value; updateLoaderVersionSelector();
         document.getElementById('right-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
-        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
     };
     minecraftVersionSelector.onchange = () => { window.instance.version.number = minecraftVersionSelector.value; updateLoaderVersionSelector(); }
     loaderVersionSelector.onchange = () => window.instance.loader.version = loaderVersionSelector.value;

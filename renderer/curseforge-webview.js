@@ -96,6 +96,15 @@ function modify()
 }
 try{modify()}catch(err){console.error(err)}
 
+window.versionSelect = async function(versions)
+{
+    versions = JSON.parse(versions);
+    console.log(versions);
+
+    let panel = document.createElement('div');
+    panel.id = 'versionPanel';
+}
+
 history.replaceState = function(state, title, url)
 {
     console.log('replaceState:', state, title, url);

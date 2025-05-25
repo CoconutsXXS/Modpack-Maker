@@ -46,8 +46,8 @@ class Instance
         // Create data if exist
         if(!fs.existsSync(path.join(this.path, 'mods'))) { fs.mkdirSync(path.join(this.path, 'mods'), {recursive:true}); }
         
-        let watcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
-        watcher.on('all', (e, p, s) =>
+        let modWatcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
+        modWatcher.on('all', (e, p, s) =>
         {
             let ogMods = JSON.parse(JSON.stringify(this.mods));
             let f = p.split('/')[p.split('/').length-1];
@@ -84,19 +84,119 @@ class Instance
             }
         })
 
+        // Resourcepack Files
+        // Delete data if do not exist
+        for(let m of this.rp)
+        {
+            if(fs.existsSync(path.join(this.path, 'resourcepacks', m.filename)) || fs.existsSync(path.join(this.path, 'resourcepacks', m.filename+'.disabled')) || fs.existsSync(path.join(this.path, 'resourcepacks', m.filename+'.zip'))){continue}
+            this.onRPUpdate({filename: m.filename, missing: true}, true)
+        }
+        // Create data if exist
+        if(!fs.existsSync(path.join(this.path, 'resourcepacks'))) { fs.mkdirSync(path.join(this.path, 'resourcepacks'), {recursive:true}); }
+        
+        let rpWatcher = chokidar.watch(path.join(this.path, 'resourcepacks'), {persistent: true});
+        rpWatcher.on('all', (e, p, s) =>
+        {
+            let ogRP = JSON.parse(JSON.stringify(this.rp));
+            let f = p.split('/')[p.split('/').length-1];
+
+            if(p.substring(path.join(this.path, 'resourcepacks').length+1, p.length).includes('/')){return}
+            
+            // Delete
+            if(e=='unlink')
+            {
+                let i = this.rp.findIndex(m => m.filename==Instance.cleanShaderName(f));
+
+                if(this.rp[i]!=undefined)
+                {
+                    this.rp[i].missing = !fs.existsSync(Instance.cleanShaderName(p))&&!fs.existsSync(Instance.cleanShaderName(p)+'.zip')&&!fs.existsSync(Instance.cleanShaderName(p)+'.disabled');
+                    this.save()
+                }
+            }
+            // Add (or init)
+            if(e==='add')
+            {
+                let i = this.rp.findIndex(m => m.filename==Instance.cleanShaderName(f));
+                if(i>=0)
+                {
+                    this.rp[i].missing = false;
+                    this.rp[i].disabled = f.endsWith('.disabled')
+                }
+                else 
+                {
+                    this.setRPData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
+                }
+            }
+
+            if(ogRP != this.rp)
+            {
+                this.onRPUpdate(this.rp)
+            }
+        })
+
+        // Shader Files
+        // Delete data if do not exist
+        for(let m of this.shaders)
+        {
+            if(fs.existsSync(path.join(this.path, 'shaderpacks', m.filename)) || fs.existsSync(path.join(this.path, 'shaderpacks', m.filename+'.disabled')) || fs.existsSync(path.join(this.path, 'shaderpacks', m.filename+'.zip'))){continue}
+            this.onShaderUpdate({filename: m.filename, missing: true}, true)
+        }
+        // Create data if exist
+        if(!fs.existsSync(path.join(this.path, 'shaderpacks'))) { fs.mkdirSync(path.join(this.path, 'shaderpacks'), {recursive:true}); }
+        
+        let shaderWatcher = chokidar.watch(path.join(this.path, 'shaderpacks'), {persistent: true});
+        shaderWatcher.on('all', (e, p, s) =>
+        {
+            let ogShaders = JSON.parse(JSON.stringify(this.shaders));
+            let f = p.split('/')[p.split('/').length-1];
+
+            if(p.substring(path.join(this.path, 'shaderpacks').length+1, p.length).includes('/')){return}
+            
+            // Delete
+            if(e=='unlink')
+            {
+                let i = this.shaders.findIndex(m => m.filename==Instance.cleanShaderName(f));
+
+                if(this.shaders[i]!=undefined)
+                {
+                    this.shaders[i].missing = !fs.existsSync(Instance.cleanShaderName(p))&&!fs.existsSync(Instance.cleanShaderName(p)+'.zip')&&!fs.existsSync(Instance.cleanShaderName(p)+'.disabled');
+                    this.save()
+                }
+            }
+            // Add (or init)
+            if(e==='add')
+            {
+                let i = this.shaders.findIndex(m => m.filename==Instance.cleanShaderName(f));
+                if(i>=0)
+                {
+                    this.shaders[i].missing = false;
+                    this.shaders[i].disabled = f.endsWith('.disabled')
+                }
+                else 
+                {
+                    this.setShaderData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
+                }
+            }
+
+            if(ogShaders != this.shaders)
+            {
+                this.onShaderUpdate(this.shaders)
+            }
+        })
+
         return this;
     }
 
     static getInstance(name)
     {
-        if(!fs.existsSync( path.join(config.directories.instances, name) )) { console.error(`Instance "${name}" do not exist.`); return null; }
+        if(!fs.existsSync( path.join(config.directories.instances, name) )) { console.log(`Instance "${name}" do not exist, creating it.`); fs.mkdirSync( path.join(config.directories.instances, name) ) }
         if(!fs.existsSync( path.join(config.directories.instances, name, '.instance-data.json') ))
         {
-            let result = new Instance();
+            let result = new Instance({name});
             if(name!='')
             {
                 fs.writeFileSync( path.join(config.directories.instances, name, '.instance-data.json'), JSON.stringify(result));
-                console.warn(`Instance "${name}" do not provide data json file, creating one...`);
+                console.log(`Instance "${name}" do not provide data json file, creating one...`);
             }
 
             result.name = name;
@@ -149,7 +249,7 @@ class Instance
                 // assetRoot: resourcePath+'/assets',
                 // assetIndex: resourcePath+'/assets/indexes',
                 // libraryRoot: resourcePath+'/libraries',
-                directory: path.join(config.directories.resources, 'versions')
+                // directory: path.join(config.directories.resources, 'versions')
             }
         }
 
@@ -300,6 +400,10 @@ class Instance
     virtualDirectories = [];
     mods = [];
     onModUpdate = (mods) => {}
+    rp = [];
+    onRPUpdate = (rps) => {}
+    shaders = [];
+    onShaderUpdate = (shaders) => {}
 
     save()
     {
@@ -326,6 +430,7 @@ class Instance
         })
     {
         if(this.name == ''){return}
+        let og = JSON.stringify(this.mods);
         data.filename = Instance.cleanModName(data.filename);
 
         let i = this.mods.findIndex(m => m.filename == data.filename);
@@ -395,7 +500,6 @@ class Instance
                     this.mods[i].title = meta?.mods?.value[0]?.displayName;
                     this.mods[i].version = meta?.mods?.value[0]?.version;
                     this.mods[i].modId = meta?.mods?.value[0]?.modId;
-                    console.log(meta)
                 }
                 // Fabric JSON
                 let fabricModJSON = await jarReader.jar(workingPath, 'fabric.mod.json', true);
@@ -408,6 +512,7 @@ class Instance
                     if(!this.mods[i].id){this.mods[i].id=meta.id}
                     this.mods[i].clientRequired=meta.environment=='client'
                     this.mods[i].serverRequired=meta.environment=='server'
+                    this.mods[i].version = meta.version;
 
                     let potentialIcon = await jarReader.jar(workingPath, meta.icon, true);
                     if(meta.icon && potentialIcon!=undefined)
@@ -445,10 +550,222 @@ class Instance
             && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
         {
             this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'mods', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
+        }
+
+        if(og != JSON.stringify(this.mods))
+        {
+            this.save();
+            this.onModUpdate(this.mods);
+        }
+    }
+    // Texturepacks
+    rpExist(n) { return fs.existsSync(path.join(this.path, 'resourcepacks', Instance.cleanModName(n)+'.zip'))||fs.existsSync(path.join(this.path, 'resourcepacks', Instance.cleanModName(n)+'.disabled'))||fs.existsSync(path.join(this.path, 'resourcepacks', Instance.cleanModName(n))) }
+    setRPData(data =
+        {
+            filename: "UNKNOWN FILENAME",
+            source: null,
+            title: "Missing Title",
+            description: "No description...",
+            images: [],
+            page: null,
+            missing: false,
+            disabled: false,
+            dependencies: [],
+            virtualPath: ""
+        })
+    {
+        if(this.name == ''){return}
+        let og = JSON.stringify(this.mods);
+        data.filename = Instance.cleanShaderName(data.filename);
+
+        let i = this.rp.findIndex(m => m.filename == data.filename);
+        if(i>=0)
+        {
+            for(let k of Object.keys(this.rp[i]))
+            {
+                if(data[k] == undefined) { data[k] = this.rp[i][k]; }
+            }
+            this.rp[i] = data;
+            this.rp[i].missing = !this.modExist(this.rp[i].filename);
+        }
+        else
+        {
+            i = this.rp.length;
+            this.rp.push(Object.assign({
+                filename: "UNKNOWN FILENAME",
+                source: null,
+                title: null,
+                description: "No description...",
+                images: [],
+                page: null,
+                missing: false,
+                disabled: false,
+                dependencies: [],
+                virtualPath: ""
+            }, data));
+        }
+
+        // Disabling/Enabling File
+        let workingPath = null;
+        if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename+'.zip')))
+        {
+            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            fs.renameSync(path.join(this.path, 'resourcepacks', data.filename+'.zip'), workingPath)
+        }
+        else if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename+'.disabled')))
+        {
+            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            fs.renameSync(path.join(this.path, 'resourcepacks', data.filename+'.disabled'), workingPath)
+        }
+        else if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename)))
+        {
+            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'))
+            fs.renameSync(path.join(this.path, 'resourcepacks', data.filename), workingPath)
+        }
+
+
+        if(workingPath!=null && !this.rp[i].fileVerified)
+        {
+            new Promise(async (resolve) =>
+            {
+                let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
+
+                let packMcmeta = unziped['pack.mcmeta'];
+                if(packMcmeta != undefined)
+                {
+                    if(typeof(packMcmeta.description)=='object') { this.rp[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                    else if(typeof(packMcmeta.description) == 'string') { this.rp[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                }
+
+                let icon = unziped['pack.png'];
+                if(icon != undefined)
+                {
+                    this.rp[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
+                }
+
+                resolve();
+            });
+            this.rp[i].fileVerified=true;
+        }
+    
+        // Virtual Path
+        if(data.virtualPath != undefined && data.virtualPath != ""
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
+        {
+            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'resourcepacks', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
+        }
+
+        if(og != JSON.stringify(this.rp))
+        {
+            this.save();
+            this.onRPUpdate(this.rp);
+        }
+    }
+    // Shaders
+    static cleanShaderName(n) { return n.endsWith('.zip')?n.substring(0,n.length-4):(n.endsWith('.disabled')?n.substring(0, n.length-9):n) }
+    shaderExist(n) { return fs.existsSync(path.join(this.path, 'shaderpacks', Instance.cleanModName(n)+'.zip'))||fs.existsSync(path.join(this.path, 'shaderpacks', Instance.cleanModName(n)+'.disabled'))||fs.existsSync(path.join(this.path, 'shaderpacks', Instance.cleanModName(n))) }
+    setShaderData(data =
+        {
+            filename: "UNKNOWN FILENAME",
+            source: null,
+            title: "Missing Title",
+            description: "No description...",
+            images: [],
+            page: null,
+            missing: false,
+            disabled: false,
+            dependencies: [],
+            virtualPath: ""
+        })
+    {
+        if(this.name == ''){return}
+        let og = JSON.stringify(this.mods);
+        data.filename = Instance.cleanShaderName(data.filename);
+
+        let i = this.shaders.findIndex(m => m.filename == data.filename);
+        if(i>=0)
+        {
+            for(let k of Object.keys(this.shaders[i]))
+            {
+                if(data[k] == undefined) { data[k] = this.shaders[i][k]; }
+            }
+            this.shaders[i] = data;
+            this.shaders[i].missing = !this.modExist(this.shaders[i].filename);
+        }
+        else
+        {
+            i = this.shaders.length;
+            this.shaders.push(Object.assign({
+                filename: "UNKNOWN FILENAME",
+                source: null,
+                title: null,
+                description: "No description...",
+                images: [],
+                page: null,
+                missing: false,
+                disabled: false,
+                dependencies: [],
+                virtualPath: ""
+            }, data));
+        }
+
+        // Disabling/Enabling File
+        let workingPath = null;
+        if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename+'.zip')))
+        {
+            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            fs.renameSync(path.join(this.path, 'shaderpacks', data.filename+'.zip'), workingPath)
+        }
+        else if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename+'.disabled')))
+        {
+            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            fs.renameSync(path.join(this.path, 'shaderpacks', data.filename+'.disabled'), workingPath)
+        }
+        else if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename)))
+        {
+            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'))
+            fs.renameSync(path.join(this.path, 'shaderpacks', data.filename), workingPath)
+        }
+
+        // if(workingPath!=null && !this.shaders[i].fileVerified)
+        // {
+        //     new Promise(async (resolve) =>
+        //     {
+        //         let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
+        //         console.log(unziped)
+
+        //         let packMcmeta = unziped['pack.mcmeta'];
+        //         if(packMcmeta != undefined)
+        //         {
+        //             if(typeof(packMcmeta.description)=='object') { this.shaders[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+        //             else if(typeof(packMcmeta.description) == 'string') { this.shaders[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+        //         }
+
+        //         let icon = unziped['pack.png'];
+        //         if(icon != undefined)
+        //         {
+        //             this.shaders[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
+        //         }
+
+        //         resolve();
+        //     });
+        //     this.shaders[i].fileVerified=true;
+        // }
+
+    
+        // Virtual Path
+        if(data.virtualPath != undefined && data.virtualPath != ""
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
+        {
+            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'shaderpacks', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
             console.log(this.virtualDirectories)
         }
 
-        this.save();
+        if(og != JSON.stringify(this.shaders))
+        {
+            this.save();
+            this.onShaderUpdate(this.shaders);
+        }
     }
 
 
@@ -563,7 +880,7 @@ class Instance
         return list;
     }
 
-    static async importInstance(link, progress)
+    static async importInstance(link, metadata, progress)
     {
         let url = new URL(link);
 
@@ -578,6 +895,7 @@ class Instance
             // Metadata
             let meta = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
             let i = new Instance({name: meta.title});
+            i.icon = metadata?.icon;
             i.description = meta.description;
             i.version.number = version.game_versions[0];
             i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
@@ -651,6 +969,7 @@ class Instance
                     {
                         if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
                         { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+                        console.log(e[0].slice(10))
                         fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
                     }
                     catch(err) { console.warn(err) }
@@ -673,8 +992,8 @@ class Instance
 
             // Metadata
             let i = new Instance({name: meta.name});
+            i.icon = metadata?.icon;
             i.description = meta.summary;
-            console.log(version.gameVersions)
             i.version.number = version.gameVersions[0];
             i.loader.name = version.gameVersions[1].toLowerCase();
             // Set last loader version
@@ -715,11 +1034,13 @@ class Instance
 
             // Download content
             // Mod Download or Transfert
+            let downloaded = 0;
             for(let f of data.files)
             {
                 if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
 
                 Download.download(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`, path.join(p, 'minecraft/mods'), true, false)
+                .then(() => { downloaded++; console.log(downloaded+'/'+data.files.length) })
             }
             // Other Files
             for(let e of Object.entries(entries))

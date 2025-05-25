@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="./index.css">
 </head>
 <body>
+    <script src="./renderer/popup.js" type="module"></script>
     <script src="./renderer/instance.js" type="module"></script>
     <script src="./renderer/launch.js" type="module"></script>
     <script src="./renderer/tab.js" type="module"></script>
@@ -47,6 +48,16 @@
     </div> -->
     
     <span id="hover-info"></span>
+
+    <div id="popup-container">
+        <div id="input-popup">
+            <p>Lorem ipsum dolor sit amet consectetur, adipisicing elit. Ex quisquam vel, esse voluptatibus necessitatibus ea alias officiis impedit est ipsam molestias. Fugit omnis quasi debitis, mollitia eligendi aspernatur expedita? Quas.</p>
+            <input type="text">
+            <div>
+                <button>Ok</button>
+            </div>
+        </div>
+    </div>
 
     <div id="image-zoom">
         <img>
@@ -185,8 +196,10 @@
     </div>
     <div id="bottom-panel" class="side-panel">
         <div>
-            <div class="tab" anchor-left anchor-top><button>Mods Folder</button><button>Web</button></div>
+            <div class="tab" anchor-left anchor-top><button>Mods Folder</button><button>Resourcepacks Folder</button><button>Shaders Folder</button><button>Web</button></div>
             <div id="mods-explorer" class="folder-content"></div>
+            <div id="rp-explorer" class="folder-content"></div>
+            <div id="shaders-explorer" class="folder-content"></div>
             <div id="bottom-webview-container">
                 <webview id="bottom-webview" preload="renderer/webview-preload.js"></webview>
             </div>
