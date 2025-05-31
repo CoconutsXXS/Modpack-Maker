@@ -4,9 +4,6 @@ let result = [];
 const parser = new DOMParser();
 async function searchMod(text = '')
 {
-    console.log(window.instance.loader.name)
-    console.log(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22],[%22versions:${window.instance.version.number}%22]]`)
-
     let searchResult = [];
 
     // Modrinth
@@ -143,8 +140,8 @@ let sourceFilter = ['modrinth', 'curseforge', 'planetMinecraft', 'minecraftMods'
 window.setupTab(document.getElementById('mod-browser-filter'),
 [
     {
-        select: () => { if(!sourceFilter.find(e=>e=='modrinth')){sourceFilter.push('modrinth');displayResult(); console.log('AAAAAAA')} },
-        deselect: () => { if(sourceFilter.find(e=>e=='modrinth')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='modrinth'), 1); displayResult();} console.log('BBBBBBB') }
+        select: () => { if(!sourceFilter.find(e=>e=='modrinth')){sourceFilter.push('modrinth');displayResult(); } },
+        deselect: () => { if(sourceFilter.find(e=>e=='modrinth')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='modrinth'), 1); displayResult();} }
     },
     {
         select: () => { if(!sourceFilter.find(e=>e=='curseforge')){sourceFilter.push('curseforge');displayResult()} },
@@ -176,7 +173,6 @@ webview.addEventListener('will-navigate', (event) => { event.preventDefault(); }
 
 function displayResult()
 {
-    console.log(sourceFilter)
     document.querySelector('#mod-download-list').innerHTML = '';
     let i = 0;
     for(let m of result)
@@ -194,7 +190,7 @@ function displayResult()
             c.style.backgroundImage = `url(./resources/website-logos/${m.secondarySource}.png)`;
             e.querySelector('div > div > div').insertBefore(c, e.querySelector('div > div > div > div'));
         }
-        if(window.instance.mods.find(mod => m.slug == mod.slug || m.id == mod.id || m.name == mod.name) != undefined) { e.setAttribute('installed',''); }
+        if(window.instance.mods.find(mod => (m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.name&&m.name!=undefined)) != undefined) { e.setAttribute('installed',''); }
 
         // Event
         let index = i;
@@ -337,8 +333,6 @@ async function findCurseforgeFile(id)
     const versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
     .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
 
-    console.log(versions)
-
     var version = versions.find(v =>
     {
         let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1));
@@ -354,8 +348,6 @@ async function findCurseforgeFile(id)
         filename: version.fileName,
         primary: true
     }];
-
-    console.log(files)
 
     return files;
 }

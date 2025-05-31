@@ -110,7 +110,8 @@ window.web =
             webview.addEventListener('ipc-message', webviewListener);
 
             await webview.insertCSS
-            (`#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4) { display:none; }
+            (`#__nuxt > div.layout > main > div:nth-child(5) > div.new-page.sidebar > div.normal-page__content{ max-width: calc(100vw - 360px) !important; }
+            #__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4) { display:none; }
             .layout > header.experimental-styles-within.desktop-only {
             display: none !important;
             }
@@ -523,7 +524,10 @@ window.web =
             console.log('Downloading '+f.filename)
             await download(f.url, window.instance.path+'/'+cleanType, f.filename)
         }
-    }
+    },
+
+    findModrinthFile: findModrinthFile,
+    findCurseforgeFile: findCurseforgeFile
 }
 
 
@@ -538,7 +542,6 @@ async function findModrinthFile(slug, useLoader = true, list = false, versionNum
     var version = versions[list?'filter':'find'](v =>
     {
         if(useLoader && !v.loaders.includes(window.instance.loader.name)){return false;}
-        console.log(versionNumber)
         if(versionNumber != null && v.version_number != versionNumber){return false;}
         return v.game_versions.includes(window.instance.version.number)
     });

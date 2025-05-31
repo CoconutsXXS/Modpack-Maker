@@ -185,9 +185,11 @@ label:has(> input[type="checkbox"]) > span:hover
     height: 300px; */
     padding-bottom: 7px;
     /* padding-right: 0; */
+    overflow: hidden;
 }
 .file-explorer > div
 {
+    overflow: auto;
     height: 100%; margin: 0;
     border: var(--window-border) solid var(--border-width);
     margin: 0;
@@ -196,7 +198,7 @@ label:has(> input[type="checkbox"]) > span:hover
     padding: 0;
     margin-bottom: 5px;
 }
-.folder-content{border: transparent;}
+.folder-content{border: transparent;overflow: hidden;}
 .folder-content
 {
     display: flex;
@@ -205,7 +207,7 @@ label:has(> input[type="checkbox"]) > span:hover
     overflow: scroll;
 }
 .folder-content > div:first-of-type { border: transparent; }
-.folder-content > div { width: 100%; max-width: 300px; border: transparent; border-left: var(--window-border) solid var(--border-width); }
+.folder-content > div { overflow: auto; width: 100%; max-width: 300px; border: transparent; border-left: var(--window-border) solid var(--border-width); }
 .folder-content > div:last-of-type { max-width: 100%; }
 .folder-content button
 {
@@ -848,3 +850,69 @@ input[type="range"]::-webkit-slider-thumb
 }
 #popup-container > div > p { margin-bottom: 16px; }
 #popup-container > div > div:first-of-type { display: flex; width: 100%; text-align: center; direction: rtl; }
+
+#youtube-search
+{
+    width: 100%; height: 100%;
+    overflow: hidden;
+}
+#youtube-search > input
+{
+    width: calc(100% - 10px); height: 16px;
+    border-left: 0; border-right: 0; border-top: 0;
+}
+#youtube-search > div
+{
+    width: calc(100% - 8px); height: calc(100% - 64px);
+    overflow-y: scroll;
+    padding: 8px;
+    flex-wrap: wrap;
+    display: flex;
+    padding-right: 0;
+    overflow-x: hidden;
+}
+#youtube-search > div > div
+{
+    display: block;
+    min-width: 256px;
+    /* max-width: 358.4px; */
+    /* height: 238px; */
+    /* max-height: 238px; */
+
+    margin: 16px;
+    flex: 1 1 0;
+    cursor: pointer;
+}
+#youtube-search > div > div > h4
+{
+    margin: 0;
+    line-break: anywhere;
+    display: -webkit-box;
+    line-break: anywhere;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-height: 100%;
+    font-size: large;
+}
+
+#youtube-search > div > div > div
+{
+    background-repeat: no-repeat;
+    background-image: url("https://i.ytimg.com/vi/Tt3J7dcHcYc/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCvwviqvQ2rymEHzfreYJLA0urTOQ");
+    z-index: -1;
+    position: relative;
+    background-size: contain;
+    opacity: 0.8;
+    transition: all 200ms;
+}
+#youtube-search > div > div > div > img
+{
+    width: 100%;
+    backdrop-filter: blur(7px) saturate(1.3);
+    padding: 25px;
+    margin: -25px;
+    transition: all 200ms;
+}
+#youtube-search > div > div:hover > div > img { backdrop-filter: blur(10px) saturate(1.5) brightness(1.1); }
+#youtube-search > div > div:hover > div { opacity: 1; }

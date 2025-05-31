@@ -80,7 +80,16 @@
             <webview preload="renderer/webview-preload.js"></webview>
         </div>
         <div id="youtube-window">
-             <webview id="youtube-integration" enableblinkfeatures="CSSVariables" preload="renderer/webview-preload.js"></webview>
+             <webview id="youtube-integration" style="display: none;" enableblinkfeatures="CSSVariables" preload="renderer/webview-preload.js"></webview>
+             <div id="youtube-search">
+                <input type="text" placeholder='Search for a mod, a type of mod, a resourcepack style, etc... (ex: "Apocalypse", "RPG", "Cartoon")'>
+                <div>
+                    <div>
+                        <div><img></div>
+                        <h4>Video Name</h4>
+                    </div>
+                </div>
+             </div>
         </div>
         <div id="config-panel">
             <div id="config-options">

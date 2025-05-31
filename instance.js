@@ -37,6 +37,14 @@ class Instance
         }
 
         // Mods Files
+        // No double mod + clear missing
+        let noDuplicatedModList = [];
+        for(let m of this.mods)
+        {
+            if(noDuplicatedModList.find(mod => mod.filename == m.filename || m.missing)){continue;}
+            noDuplicatedModList.push(m);
+        }
+        this.mods = noDuplicatedModList;
         // Delete data if do not exist
         for(let m of this.mods)
         {
@@ -575,7 +583,7 @@ class Instance
         })
     {
         if(this.name == ''){return}
-        let og = JSON.stringify(this.mods);
+        let og = JSON.stringify(this.rp);
         data.filename = Instance.cleanShaderName(data.filename);
 
         let i = this.rp.findIndex(m => m.filename == data.filename);
@@ -679,7 +687,7 @@ class Instance
         })
     {
         if(this.name == ''){return}
-        let og = JSON.stringify(this.mods);
+        let og = JSON.stringify(this.shaders);
         data.filename = Instance.cleanShaderName(data.filename);
 
         let i = this.shaders.findIndex(m => m.filename == data.filename);

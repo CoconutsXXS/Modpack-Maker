@@ -75,18 +75,11 @@ async function searchResourcepack(text = '')
 
     // MinecraftShader
     let minecraftShaderPage = parser.parseFromString(await (await fetch(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)).text(), "text/html");
-    console.log(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)
-    console.log(minecraftShaderPage);
-    console.log(minecraftShaderPage.querySelector('#post-container'))
 
     let i = 2;
     for (let c of minecraftShaderPage.querySelector('#post-container').childNodes)
     {
         if(c.className != 'col-md-6'){continue;}
-
-        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i})`))
-        console.log(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)
-        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`))
 
         let img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)?.src
         if(img == undefined) { img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > picture > img`).src; }
@@ -104,7 +97,6 @@ async function searchResourcepack(text = '')
         i++
     }
 
-    console.log(searchResult)
     return searchResult;
 }
 
@@ -151,7 +143,6 @@ webview.addEventListener('will-navigate', (event) => { event.preventDefault(); }
 
 function displayResult()
 {
-    console.log(sourceFilter)
     document.querySelector('#shader-download-list').innerHTML = '';
     let i = 0;
     for(let m of result)
@@ -160,6 +151,7 @@ function displayResult()
 
         let e = modSample.cloneNode(true);
         e.querySelector('img').src = m.icon;
+        if(m.source == 'minecraftShader'){e.querySelector('img').style.width = '140px';}
         e.querySelector('div > h4').innerText = m.name;
         e.querySelector('div > p').innerText = m.description;
         e.querySelector('div > div > div > div').style.backgroundImage = `url(./resources/website-logos/${m.source}.png)`;
@@ -169,7 +161,7 @@ function displayResult()
             c.style.backgroundImage = `url(./resources/website-logos/${m.secondarySource}.png)`;
             e.querySelector('div > div > div').insertBefore(c, e.querySelector('div > div > div > div'));
         }
-        if(window.instance.mods.find(mod => m.slug == mod.slug || m.id == mod.id || m.name == mod.name) != undefined) { e.setAttribute('installed',''); }
+        if(window.instance.mods.find(mod => (m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.name&&m.name!=undefined)) != undefined) { e.setAttribute('installed',''); }
 
         // Event
         let index = i;
@@ -281,6 +273,46 @@ function displayResult()
 
                     break;
                 }
+                case 'minecraftShader':
+                {
+                    console.log(m);
+                    console.log(result[index]);
+                    webview.src = result[index].url;
+                    // const sourceCode = await (await fetch('renderer/curseforge-webview.js')).text();
+
+                    // webview.addEventListener('dom-ready', modify);
+                    // async function modify()
+                    // {
+                    //     webview.setZoomLevel(-0.5);
+                    //     if(webviewListener) { webview.removeEventListener('ipc-message', webviewListener) }
+
+                    //     webviewListener = async (event) =>
+                    //     {
+                    //         console.log(event.channel)
+
+                    //         switch(event.channel)
+                    //         {
+                    //             case 'download':
+                    //             {
+                    //                 console.log(m)
+                    //                 for(var f of await findCurseforgeFile(m.originalData.id, m.originalData.slug))
+                    //                 {
+                    //                     if(!f.primary){continue}
+                    //                     download(f.url, window.instance.path+'/mods', f.filename)
+                    //                 }
+
+                    //                 break;
+                    //             }
+                    //         }
+                    //     }
+                    //     webview.addEventListener('ipc-message', webviewListener);
+
+                    //     await webview.executeJavaScript(`window.originalLocation = "${result[index].url}";`, true)
+                    //     await webview.executeJavaScript(sourceCode, true)
+                    // };
+
+                    break;
+                }
             }
         }
         switch(m.source)
@@ -312,8 +344,6 @@ async function findCurseforgeFile(id)
     const versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
     .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
 
-    console.log(versions)
-
     var version = versions.find(v =>
     {
         let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1));
@@ -329,8 +359,6 @@ async function findCurseforgeFile(id)
         filename: version.fileName,
         primary: true
     }];
-
-    console.log(files)
 
     return files;
 }

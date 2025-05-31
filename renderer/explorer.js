@@ -67,6 +67,15 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
     container.addEventListener('mouseleave', () => { if(selected){selected.onmouseenter()} })
     function reloadExplorer(directory = [])
     {
+        // Save previous scroll
+        let lastScroll = [];
+        for(let c of container.childNodes)
+        {
+            if(c.nodeName != 'DIV'){continue;}
+            lastScroll.push(c.scrollTop)
+        }
+        console.log(lastScroll)
+
         directory = directory.filter(e=>e!='')
         if(directory[directory.length-1] != ''){directory.push('');}
         let pathDir = ''; for(let p of directory){pathDir+=p+'/';}pathDir.substring(0, pathDir.length-1);
@@ -76,6 +85,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
         container.innerHTML = '';
 
         let progressionPath = [];
+        let index = 0;
         for(let d of directory)
         {
             let subContainer = document.createElement('div');
@@ -300,7 +310,9 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
             }
             subContainer.appendChild(addButton)
             container.appendChild(subContainer)
+            if(lastScroll[index] != undefined) { subContainer.scrollTo({top: lastScroll[index]}) }
             progressionPath.push(d);
+            index++;
         }
     }
 
@@ -323,7 +335,7 @@ window.loadModsExplorer = (directory = null) =>
         files.push({path: d.path, name: d.name, folder: true, filename: d.name})
     }
 
-        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
 
     window.setupExplorer(directory, document.getElementById('mods-explorer'), files, (from, to) =>
     {
@@ -405,16 +417,21 @@ window.loadModsExplorer = (directory = null) =>
             window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(d => d.filename == m.filename && d.path == m.path), 1)
 
             // Move all children
+            let count = 0;
             for(let mod of window.instance.mods)
             {
+                if(mod.virtualPath==undefined){continue}
                 if(m.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf('/')) && m.name == mod.virtualPath.split('/')[mod.virtualPath.split('/').length-1])
                 {
                     mod.virtualPath = '';
                     window.instance.setModData(mod)
+                    count++;
                 }
             }
 
             window.instance.save(window.instance);
+
+            if(count==0){console.log(JSON.parse(JSON.stringify(window.instance))); window.loadModsExplorer()}
             return
         }
         window.instance.deleteMod(m.filename);

@@ -75,18 +75,11 @@ async function searchResourcepack(text = '')
 
     // MinecraftShader
     let minecraftShaderPage = parser.parseFromString(await (await fetch(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)).text(), "text/html");
-    console.log(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)
-    console.log(minecraftShaderPage);
-    console.log(minecraftShaderPage.querySelector('#post-container'))
 
     let i = 2;
     for (let c of minecraftShaderPage.querySelector('#post-container').childNodes)
     {
         if(c.className != 'col-md-6'){continue;}
-
-        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i})`))
-        console.log(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)
-        console.log(minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`))
 
         let img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)?.src
         if(img == undefined) { img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > picture > img`).src; }
@@ -104,7 +97,6 @@ async function searchResourcepack(text = '')
         i++
     }
 
-    console.log(searchResult)
     return searchResult;
 }
 
@@ -151,7 +143,6 @@ webview.addEventListener('will-navigate', (event) => { event.preventDefault(); }
 
 function displayResult()
 {
-    console.log(sourceFilter)
     document.querySelector('#resourcepack-download-list').innerHTML = '';
     let i = 0;
     for(let m of result)
@@ -169,7 +160,7 @@ function displayResult()
             c.style.backgroundImage = `url(./resources/website-logos/${m.secondarySource}.png)`;
             e.querySelector('div > div > div').insertBefore(c, e.querySelector('div > div > div > div'));
         }
-        if(window.instance.mods.find(mod => m.slug == mod.slug || m.id == mod.id || m.name == mod.name) != undefined) { e.setAttribute('installed',''); }
+        if(window.instance.mods.find(mod => (m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.name&&m.name!=undefined)) != undefined) { e.setAttribute('installed',''); }
 
         // Event
         let index = i;
@@ -312,8 +303,6 @@ async function findCurseforgeFile(id)
     const versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
     .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
 
-    console.log(versions)
-
     var version = versions.find(v =>
     {
         let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1));
@@ -329,8 +318,6 @@ async function findCurseforgeFile(id)
         filename: version.fileName,
         primary: true
     }];
-
-    console.log(files)
 
     return files;
 }

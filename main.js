@@ -8,8 +8,10 @@ const config = require('./config');
 const Instance = require('./instance');
 const Download = require('./download');
 
+ElectronBlocker.fromPrebuiltFull(fetch).then(b=>b.enableBlockingInSession(session.defaultSession))
+
 app.whenReady().then(selectWindow)
-app.on('activate', () =>
+app.on('activate', async () =>
 {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow()
 })
@@ -51,13 +53,6 @@ async function mainWindow()
         await setTimeout(1500/2);
         finishedLoading = true
     })()
-
-    // Blocker
-    try
-    {
-        let blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
-        blocker.enableBlockingInSession(session.defaultSession);
-    }catch{}
 
     const win = new BrowserWindow
     ({
@@ -102,7 +97,7 @@ async function mainWindow()
         load.close();
     });
 
-    win.on('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
+    win.once('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
 
     return win;
 }
