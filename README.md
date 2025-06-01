@@ -1,4 +1,4 @@
-### Modpack Maker
+# Modpack Maker
 "Modpack Maker" is a provisory name for a quite big project: the ultimate modpack creation app. Providing the best way to discover new community content and to debug/optimize modpacks while keeping them organized with a folder system to have more efficient control over big modpacks.
 
 ## Features List
