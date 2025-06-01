@@ -138,6 +138,8 @@ window.updateMod = function(name, icon, images, compatible)
     modButton.firstChild.onmouseleave = () => { modButton.firstChild.firstChild.style.outline = 'none' }
 }
 
+document.querySelectorAll()
+
 window.scrollTo({top: 0})
 
 function descTry()
@@ -147,7 +149,11 @@ function descTry()
     if(!document.querySelector("#description-inline-expander > yt-attributed-string > span")){return}
     for(let c of document.querySelector("#description-inline-expander > yt-attributed-string > span")?.childNodes)
     {
-        if(c.nodeName != 'SPAN'){continue;}
+        if(c.nodeName != 'SPAN' && c.nodeName == 'UL')
+        {
+            for(let a of c.querySelectorAll('a')){desc+=a.href+'\n';}
+        }
+        else if(c.nodeName != 'SPAN'){continue;}
         if(c.querySelector("a")) { desc+=c.querySelector("a").href+'\n'; }
         else{desc+=c.innerText+'\n'}
     }

@@ -139,7 +139,7 @@
             <div>
                 <textarea id="instance-description" placeholder="Instance description..." rows="4" cols="50"></textarea>
             </div>
-            <div>
+            <!-- <div>
                 <select id="minecraft-version" name="version"></select> 
                 <select id="minecraft-loader" name="version">
                     <option value="vanilla">Vanilla</option>
@@ -149,7 +149,20 @@
                     <option value="quilt">Quilt</option>
                 </select>
                 <select id="minecraft-loader-version" name="version"></select>    
-            </div>
+            </div> -->
+
+            <label><select id="minecraft-version" name="version"></select> Minecraft Version</label>
+            <label>
+                <select id="minecraft-loader" name="version">
+                    <option value="vanilla">Vanilla</option>
+                    <option value="forge">Forge</option>
+                    <option value="fabric">Fabric</option>
+                    <option value="neoforge">Neoforge</option>
+                    <option value="quilt">Quilt</option>
+                </select> Loader
+            </label>
+            <label><select id="minecraft-loader-version" name="version"></select> Loader Version</label>
+            <label style="padding-left: 27px;">Sinytra Connector <p style="opacity: 0.5; margin-left: 0;">(allow forge to run fabric mods)</p><input id="sinytra" type="checkbox"><span></span></label>
         </div>
         <div id="mods-settings" class="item-settings">
             <input type="text" placeholder="Shearch a mod...">

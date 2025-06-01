@@ -3,6 +3,7 @@ let descriptionInput = document.getElementById('instance-description');
 let loaderSelector = document.getElementById('minecraft-loader');
 let loaderVersionSelector = document.getElementById('minecraft-loader-version');
 let minecraftVersionSelector = document.getElementById('minecraft-version');
+let sinytraCheckbox = document.getElementById('sinytra');
 
 
 window.addInstanceListener((i) =>
@@ -11,11 +12,13 @@ window.addInstanceListener((i) =>
     descriptionInput.value = i.description;
     loaderSelector.value = i.loader?.name;
     loaderVersionSelector.value = i.loader?.version;
+    if(i.sinytra){sinytraCheckbox.parentNode.click()}
 
     document.getElementById('right-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
-        document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
+    document.getElementById('right-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
 
-    if(i.loader.name == 'vanilla') { loaderVersionSelector.style.display = 'none' }
+    loaderVersionSelector.parentNode.style.display = i.loader.name == 'vanilla'?'none':'block'
+    sinytraCheckbox.parentNode.style.display = i.loader.name == 'forge'?'block':'none';
     fetch("https://mc-versions-api.net/api/java").then((response) => response.json())
     .then((data) =>
     {
@@ -43,7 +46,7 @@ window.addInstanceListener((i) =>
     })
     
     if(window.instance.name == ''){focus(nameInput)}
-    nameInput.onkeyup = (ev) => {if(ev.key != "Enter"){return} window.instance.name = nameInput.value; window.instance.save(window.instance); window.loadInstance(window.instance.name);}
+    nameInput.onkeyup = (ev) => {if(ev.key != "Enter"){return} window.instance .name = nameInput.value; window.instance.save(window.instance); window.loadInstance(window.instance.name);}
     descriptionInput.oninput = () => window.instance.description = descriptionInput.value;
     loaderSelector.onchange = () =>
     {
@@ -53,6 +56,17 @@ window.addInstanceListener((i) =>
     };
     minecraftVersionSelector.onchange = () => { window.instance.version.number = minecraftVersionSelector.value; updateLoaderVersionSelector(); }
     loaderVersionSelector.onchange = () => window.instance.loader.version = loaderVersionSelector.value;
+    sinytraCheckbox.onclick = () =>
+    {
+        window.instance.sinytra = sinytraCheckbox.checked;
+        if(sinytraCheckbox.checked) { window.web.downloadModrinth(`https://modrinth.com/mod/connector`) }
+        let i=0;
+        for(let m of window.instance.mods)
+        {
+            if(m.sinytra){window.instance.mods[i].disabled = !sinytraCheckbox.checked; window.instance.setModData(window.instance.mods[i])}
+            i++;
+        }
+    }
 
     updateLoaderVersionSelector()    
 })
@@ -60,8 +74,11 @@ window.addInstanceListener((i) =>
 
 async function updateLoaderVersionSelector()
 {
+    loaderVersionSelector.parentNode.style.display = window.instance.loader.name == 'vanilla'?'none':'block'
+    sinytraCheckbox.parentNode.style.display = window.instance.loader.name == 'forge'?'block':'none';
     window.instance.loader.name = loaderSelector.value;
-    console.log(window.instance.loader.name)
+
+    if(window.instance.sinytra && window.instance.loader.name != 'forge') { sinytraCheckbox.checked = false; sinytraCheckbox.onclick(); }
 
     let loaderVersionSelect = loaderVersionSelector;
     let versionList = [];

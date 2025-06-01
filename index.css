@@ -534,6 +534,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
     margin: 5px; margin-right: -5px; margin-bottom: 0;
 }
 #general-settings div { margin: 0; }
+#general-settings > label:has(>select){display: block; margin-top: 0;}
 .item-settings
 {
     text-align: center;
@@ -916,3 +917,5 @@ input[type="range"]::-webkit-slider-thumb
 }
 #youtube-search > div > div:hover > div > img { backdrop-filter: blur(10px) saturate(1.5) brightness(1.1); }
 #youtube-search > div > div:hover > div { opacity: 1; }
+
+label:has(>#synitra) { padding-left: 28px; }

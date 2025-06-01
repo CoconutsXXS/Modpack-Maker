@@ -188,10 +188,17 @@ async function displaySearch(text = '')
     document.getElementById('youtube-search').style.display = 'block';
 
     document.querySelector('#youtube-search > div').innerHTML = '';
-    await searchYouTube(`https://www.youtube.com/results?search_query=Minecraft+Mod+Showcase${text.replace(/%20/g, '+')}&sp=EgQQARgD`, 60, r =>
+    await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23top${text.replace(/%20/g, '+')}&sp=EgQQARgD`, 60, resultHandler);
+    await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23top${text.replace(/%20/g, '+')}&sp=EgQQARgC`, 60, resultHandler);
+    
+    function resultHandler(r)
     {
         for(let v of r)
         {
+            let array = v.lengthText.simpleText.split(":");
+            let seconds = parseInt(array[0], 10) * 60 + parseInt(array[1], 10)
+            if(seconds<120){continue}
+
             let e = videoElement.cloneNode(true);
             document.querySelector('#youtube-search > div').appendChild(e);
             let thumbnail = v.thumbnail.thumbnails.sort((a,b)=>(a.width+a.height)-(b.width+b.height))[0].url;
@@ -200,7 +207,7 @@ async function displaySearch(text = '')
             e.querySelector('h4:first-of-type').innerText = v.title.runs[0].text;
             e.onclick = () => { loadVideo(v.videoId) }
         }
-    })
+    }
 }
 displaySearch();
 

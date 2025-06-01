@@ -365,6 +365,7 @@ window.web =
         let type = url.pathname.split('/')[1];
         let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
 
+        let sinytra = link.split('/')[link.split('/').length-1]=='connector'&&cleanType=='mods'
         for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod'))
         {
             console.log(f)
@@ -399,7 +400,8 @@ window.web =
                     slug: meta.slug,
                     images,
                     icon: meta.icon_url,
-                    dependencies
+                    dependencies,
+                    sinytra
                 })
             }
             else
@@ -471,6 +473,8 @@ window.web =
             case 'texture-packs': { classId = 12; cleanType = 'resourcepacks'; break; }
         }
 
+        let sinytra = link.split('/')[link.split('/').length-1]=='sinytra-connector'&&cleanType=='mods'
+
         for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods'))
         {
             if(!f.primary){continue}
@@ -501,7 +505,8 @@ window.web =
                     slug: meta.slug,
                     images: await loadImages(meta.slug, meta.name),
                     icon: meta.avatarUrl,
-                    dependencies
+                    dependencies,
+                    sinytra
                 })
             }
             else
@@ -545,8 +550,21 @@ async function findModrinthFile(slug, useLoader = true, list = false, versionNum
         if(versionNumber != null && v.version_number != versionNumber){return false;}
         return v.game_versions.includes(window.instance.version.number)
     });
+    if(!version || version.length==0)
+    {
+        if(window.instance.sinytra && window.instance.loader.name=='forge')
+        {
+            version = versions[list?'filter':'find'](v =>
+            {
+                if(useLoader && !v.loaders.includes(window.instance.loader.name) && !v.loaders.includes('fabric')){return false;}
+                if(versionNumber != null && v.version_number != versionNumber){return false;}
+                return v.game_versions.includes(window.instance.version.number)
+            });
+            if(!version || version.length==0) {  }
+        }
+        if(!version || version.length==0) { return []; }
+    }
     if(list){return version}
-    if(!version) { return []; }
 
     let files = version.files;
     for (let i = 0; i < files.length; i++) { files[i].dependencies = version.dependencies; }
@@ -572,8 +590,23 @@ async function findCurseforgeFile(id, useLoader = true, list = false)
         if(!v.gameVersions.includes(window.instance.version.number)) { valid = false; }
         return valid;
     });
+    if(!version || version.length==0)
+    {
+        if(window.instance.sinytra && window.instance.loader.name=='forge')
+        {
+            version = versions[list?'filter':'find'](v =>
+            {
+                if(!useLoader){return true;}
+                let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1)) || v.gameVersions.includes('Fabric');
+                if(!valid && window.instance.loader.name == 'forge' && v.gameVersions.includes('NeoForge')) { valid = true; }
+                if(!v.gameVersions.includes(window.instance.version.number)) { valid = false; }
+                return valid;
+            });
+            if(!version || version.length==0) {  }
+        }
+        if(!version || version.length==0) { return []; }
+    }
     if(list){return version}
-    if(!version) { return []; }
 
     let dependencies = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/dependencies?index=0&pageSize=60&type=RequiredDependency`)).json()).data;
 

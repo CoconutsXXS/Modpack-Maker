@@ -7,7 +7,8 @@ async function searchMod(text = '')
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22],[%22versions:${window.instance.version.number}%22]]`)).json()
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22${window.instance.sinytra&&window.instance.loader.name=='forge'?",%22categories:fabric%22":''}],[%22versions:${window.instance.version.number}%22]]`)).json()
+    console.log(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22${window.instance.sinytra&&window.instance.loader.name=='forge'?",%22categories:fabric%22":''}],[%22versions:${window.instance.version.number}%22]]`)
     for(let h of modrinth.hits)
     {
         searchResult.push
@@ -82,6 +83,56 @@ async function searchMod(text = '')
             originalData: d
         })
     }
+    if(window.instance.sinytra&&window.instance.loader.name=='forge')
+    {
+        for(let d of (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&gameVersion=${window.instance.version.number}&gameFlavors[0]=4&classId=6`)).json()).data)
+        {
+            if(curseforge.data.find(data=>data.slug==d.slug)!=undefined){continue}
+            async function loadImages()
+            {
+                let i = [];
+                let page = parser.parseFromString(await (await fetch(`https://www.curseforge.com/minecraft/mc-mods/${d.slug}/gallery`)).text(), "text/html");
+
+                if(page.querySelector('.images-gallery > ul:nth-child(1)'))
+                {
+                    for(let c of page.querySelector('.images-gallery > ul:nth-child(1)').childNodes)
+                    {
+                        if(!c.querySelector("a > img")){continue;}
+        
+                        i.push(c.querySelector("a > img").src);
+                    }
+                }
+
+                if(result.find(r=>r.name==d.name))
+                {
+                    if(i < result[result.findIndex(r=>r.name==d.name)].images) { return []; }
+                }
+                result[result.findIndex(r=>r.name==d.name)].images = i;
+                return i;
+            }
+
+            if(searchResult.find(r=>r.name==d.name))
+            {
+                searchResult[searchResult.findIndex(r=>r.name==d.name)].secondarySource = 'curseforge';
+                searchResult[searchResult.findIndex(r=>r.name==d.name)].loadImages = loadImages;
+                continue;
+            }
+
+            searchResult.push
+            ({
+                name: d.name,
+                icon: d.avatarUrl,
+                description: d.summary,
+                versions: [d.gameVersion],
+                clientRequired: d.isClientCompatible,
+                serverRequired: null,
+                source: 'curseforge',
+                loadImages: loadImages,
+                url: `https://www.curseforge.com/minecraft/mc-mods/${d.slug}`,
+                originalData: d
+            })
+        }
+    }
 
     // Planet Minecraft
     let planetMinecraftPage = parser.parseFromString(await (await fetch(`https://www.planetminecraft.com/mods/?keywords=${text}`)).text(), "text/html");
@@ -135,7 +186,8 @@ document.querySelector('#mod-download-list > div:first-child').remove();
 let webview = document.getElementById('web-window').querySelector('webview');
 
 // Filter Tab
-let sourceFilter = ['modrinth', 'curseforge', 'planetMinecraft', 'minecraftMods']
+// let sourceFilter = ['modrinth', 'curseforge', 'planetMinecraft', 'minecraftMods']
+let sourceFilter = ['modrinth', 'curseforge']
 
 window.setupTab(document.getElementById('mod-browser-filter'),
 [
