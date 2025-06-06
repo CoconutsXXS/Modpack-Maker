@@ -39,6 +39,10 @@ module.exports =
     {
         fs.writeFileSync(path, encodeData(d, path.split('.')[path.split('.').length-1]))
     },
+    writeRawData: function(path, d)
+    {
+        fs.writeFileSync(path, Buffer.from(d))
+    },
     handleData
 }
 

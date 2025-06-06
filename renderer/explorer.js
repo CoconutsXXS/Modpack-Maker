@@ -6,8 +6,33 @@ Object.filter = (obj, predicate) =>
           .reduce( (res, key) => (res[key] = obj[key], res), {} );
 
 let currentDirectory = ''
-window.setupExplorer = (directory = '', container, files, onMove = (from, to) => {}, onSelect = (f) => {}, deleteEvent=()=>{}, activationEvent=()=>{}, propertieName = null) =>
+window.setupExplorer = (directory = '', container, files, onMove = (from, to) => {}, onSelect = (f) => {}, deleteEvent=()=>{}, activationEvent=()=>{}, propertieName = null, onFile=(f)=>{}) =>
 {
+    // Drag n Drop
+    container.ondrop = (event) =>
+    {
+        if (event.dataTransfer.items)
+        {
+            [...event.dataTransfer.items].forEach((item, i) =>
+            {
+                if (item.kind === "file")
+                {
+                    onFile(item.getAsFile());
+                }
+            });
+        }
+        else
+        {
+            [...event.dataTransfer.files].forEach((file, i) =>
+            {
+                onFile(file);
+            });
+        }
+
+        event.preventDefault();
+    }
+    container.ondragover = container.ondragenter = function(e) { e.preventDefault(); };
+
     let elements = [];
     for(let d of files)
     {
@@ -103,6 +128,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                     b.style.setProperty('--custom-icon', 'url('+e.icon+')')
                 }
                 subContainer.appendChild(b);
+                b.ondrop=b.ondragover=b.ondragenter=(e)=>{e.preventDefault()};
 
                 if(e.folder)
                 {
@@ -314,6 +340,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                 })
             }
             subContainer.appendChild(addButton)
+            subContainer.ondrop=subContainer.ondragover=subContainer.ondragenter=(e)=>{e.preventDefault()};
             container.appendChild(subContainer)
             if(lastScroll[index] != undefined) { subContainer.scrollTo({top: lastScroll[index]}) }
             progressionPath.push(d);
@@ -452,7 +479,17 @@ window.loadModsExplorer = (directory = null) =>
         m.disabled = !m.disabled;
         if(m.disabled==undefined){m.disabled = true;}
         await window.instance.setModData(m)
-    }, "modButtonList")
+    }, "modButtonList",
+    (f) =>
+    {
+        // On Drop
+        let reader = new FileReader();
+        reader.onload = (e) =>
+        {
+            window.instance.saveFile(`Modpack Maker/instances/${window.instance.name}/minecraft/mods/${f.name}`, e.target.result)
+        }
+        reader.readAsArrayBuffer(f)
+    })
 }
 window.loadShadersExplorer = (directory = null) =>
 {
@@ -564,6 +601,16 @@ window.loadShadersExplorer = (directory = null) =>
         m.disabled = !m.disabled;
         if(m.disabled==undefined){m.disabled = true;}
         await window.instance.setShaderData(m)
+    }, "shaderButtonList",
+    (f) =>
+    {
+        // On Drop
+        let reader = new FileReader();
+        reader.onload = (e) =>
+        {
+            window.instance.saveFile(`Modpack Maker/instances/${window.instance.name}/minecraft/shaderpacks/${f.name}`, e.target.result)
+        }
+        reader.readAsArrayBuffer(f)
     })
 }
 window.loadRPExplorer = (directory = null) =>
@@ -676,6 +723,16 @@ window.loadRPExplorer = (directory = null) =>
         m.disabled = !m.disabled;
         if(m.disabled==undefined){m.disabled = true;}
         await window.instance.setRPData(m)
+    }, "rpButtonList",
+    (f) =>
+    {
+        // On Drop
+        let reader = new FileReader();
+        reader.onload = (e) =>
+        {
+            window.instance.saveFile(`Modpack Maker/instances/${window.instance.name}/minecraft/resourcepacks/${f.name}`, e.target.result)
+        }
+        reader.readAsArrayBuffer(f)
     })
 }
 
