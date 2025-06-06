@@ -193,10 +193,10 @@ ipcMain.handle('launch', (event, name) =>
         {
             log: (t, c) => event.sender.isDestroyed()?null:event.sender.send(i+'log', t, c),
             close: (c) => event.sender.isDestroyed()?null:event.sender.send(i+'close', c),
-            windowOpen: (w, s) =>
+            windowOpen: (w, s, k) =>
             {
                 console.log(`Window opened: `, w)
-                event.sender.isDestroyed()?null:event.sender.send(i+'window-open', s);
+                event.sender.isDestroyed()?null:event.sender.send(i+'window-open', s, i);
 
                 ipcMain.on(i+'resize', (event, x, y, width, height, windowDependent) =>
                 {
@@ -207,6 +207,7 @@ ipcMain.handle('launch', (event, name) =>
                     }
                     else { w.setBounds({x, y, width, height}); }
                 });
+                ipcMain.on(i+'kill', (event) => {k()});
             },
             network: (m) => event.sender.isDestroyed()?null:event.sender.send(i+'network', m)
         }

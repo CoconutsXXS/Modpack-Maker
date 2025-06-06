@@ -86,7 +86,7 @@ contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, 
     ipcRenderer.on(i+'log', (event, t, c) => listeners.log(t, c))
     ipcRenderer.on(i+'close', (event, c) => listeners.close(c))
     ipcRenderer.on(i+'network', (event, m) => listeners.network(m.split(':')[0], m.substring(m.split(':')[0].length+1, m.length)));
-    ipcRenderer.on(i+'window-open', (event, w) => listeners.windowOpen(w));
+    ipcRenderer.on(i+'window-open', (event, w, i) => listeners.windowOpen(w, i));
 
 
     // return new Promise(resolve =>
@@ -97,6 +97,7 @@ contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, 
 })
 
 contextBridge.exposeInMainWorld('resizeGame', function(i, x, y, width, height, windowDependent){ipcRenderer.send(i+'resize', x, y, width, height, windowDependent)})
+contextBridge.exposeInMainWorld('closeGame', function(i){ipcRenderer.send(i+'kill')})
 contextBridge.exposeInMainWorld('download', (url, directory, filename, createDirectory = true) => { return ipcRenderer.invoke('download', url, directory, filename, createDirectory); })
 
 contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })

@@ -11,7 +11,7 @@ module.exports =
         let entries = (await unzip( fs.readFileSync(path.join(normalPath?'':app.getPath('appData'), p)) )).entries;
 
         if(dataPath==null){return entries;}
-    
+
         try { return await entries[dataPath].json() }
         catch(err)
         {
@@ -38,11 +38,13 @@ module.exports =
     saveData: function(path, d)
     {
         fs.writeFileSync(path, encodeData(d, path.split('.')[path.split('.').length-1]))
-    }
+    },
+    handleData
 }
 
 function handleData(buffer, type)
 {
+    if(buffer==undefined){return null}
     switch(type)
     {
         case 'toml':

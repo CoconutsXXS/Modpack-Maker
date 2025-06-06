@@ -6,7 +6,7 @@ Object.filter = (obj, predicate) =>
           .reduce( (res, key) => (res[key] = obj[key], res), {} );
 
 let currentDirectory = ''
-window.setupExplorer = (directory = '', container, files, onMove = (from, to) => {}, onSelect = (f) => {}, deleteEvent=()=>{}, activationEvent=()=>{}) =>
+window.setupExplorer = (directory = '', container, files, onMove = (from, to) => {}, onSelect = (f) => {}, deleteEvent=()=>{}, activationEvent=()=>{}, propertieName = null) =>
 {
     let elements = [];
     for(let d of files)
@@ -111,6 +111,11 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                     {
                         reloadExplorer(Array.from(e.path).concat([e.name]));
                     })
+                }
+                else if(propertieName!=null)
+                {
+                    if(window[propertieName] == undefined){window[propertieName] = [];}
+                    window[propertieName].push({data: e, element: b});
                 }
 
                 // Over Event
@@ -321,7 +326,6 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
 
 window.loadModsExplorer = (directory = null) =>
 {
-    console.log(window.instance.mods);
     if(!window.instance.mods){return}
     if(directory == null) { directory = currentDirectory; }
     let files = [];
@@ -448,7 +452,7 @@ window.loadModsExplorer = (directory = null) =>
         m.disabled = !m.disabled;
         if(m.disabled==undefined){m.disabled = true;}
         await window.instance.setModData(m)
-    })
+    }, "modButtonList")
 }
 window.loadShadersExplorer = (directory = null) =>
 {

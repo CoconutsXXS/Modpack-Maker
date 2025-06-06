@@ -57,6 +57,7 @@ class Instance
         let modWatcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
         modWatcher.on('all', (e, p, s) =>
         {
+            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
             let ogMods = JSON.parse(JSON.stringify(this.mods));
             let f = p.split('/')[p.split('/').length-1];
             
@@ -105,6 +106,7 @@ class Instance
         let rpWatcher = chokidar.watch(path.join(this.path, 'resourcepacks'), {persistent: true});
         rpWatcher.on('all', (e, p, s) =>
         {
+            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
             let ogRP = JSON.parse(JSON.stringify(this.rp));
             let f = p.split('/')[p.split('/').length-1];
 
@@ -155,6 +157,7 @@ class Instance
         let shaderWatcher = chokidar.watch(path.join(this.path, 'shaderpacks'), {persistent: true});
         shaderWatcher.on('all', (e, p, s) =>
         {
+            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
             let ogShaders = JSON.parse(JSON.stringify(this.shaders));
             let f = p.split('/')[p.split('/').length-1];
 
@@ -224,7 +227,7 @@ class Instance
         {
             log: function(type, content){},
             close: function(code){},
-            windowOpen: function(window, windowSource){},
+            windowOpen: function(window, windowSource, kill){},
             network: function(m){}
         }, port = 1337)
     {
@@ -250,15 +253,15 @@ class Instance
             memory: this.memory,
             authorization: await Authenticator.getAuth("dev"),
             forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
-            clientPackage: null,
+            // clientPackage: null,
             customArgs: [`-javaagent:${config.javaAgent}`],
-            overrides:
-            {
-                // assetRoot: resourcePath+'/assets',
-                // assetIndex: resourcePath+'/assets/indexes',
-                // libraryRoot: resourcePath+'/libraries',
-                // directory: path.join(config.directories.resources, 'versions')
-            }
+            // overrides:
+            // {
+            //     // assetRoot: resourcePath+'/assets',
+            //     // assetIndex: resourcePath+'/assets/indexes',
+            //     // libraryRoot: resourcePath+'/libraries',
+            //     // directory: path.join(config.directories.resources, 'versions')
+            // }
         }
 
         // Asset Move
@@ -278,7 +281,7 @@ class Instance
         launcher.on('data', (e) => listeners.log('data', e));
         launcher.on('close', (e) => listeners.log('close', e));
         launcher.on('error', (e) => listeners.log('error', e));
-        launcher.on('close', (e) => listeners.close(e))
+        launcher.on('close', (e) => {listeners.close(e);launcher.removeAllListeners();})
 
 
         // Launch
@@ -394,8 +397,207 @@ class Instance
             })
         }
 
-        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == process.pid), windowSource);
+        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == process.pid), windowSource, () => {process.kill('SIGINT')});
     }
+    // async launch(listeners =
+    //     {
+    //         log: function(type, content){},
+    //         close: function(code){},
+    //         windowOpen: function(window, windowSource){},
+    //         network: function(m){}
+    //     }, port = 1337)
+    // {
+    //     //All modules can be accessed from the main GMLL index file
+    //     const gmll = require("gmll");
+    //     //GMLL supports sub modules
+    //     const { setRoot } = require("gmll/config");
+    //     //Import the auth class
+    //     const { Auth } = require("msmc");
+    //     //Changes where GMLL puts the ".minecraft" gmll creates (will default to a folder called .minecraft in the same folder in your root process directory)
+    //     setRoot(".MC");
+    //     gmll.init().then(async () =>
+    //     {
+    //         //Create a new auth manager
+    //         const authManager = new Auth("select_account");
+    //         //Launch using the 'raw' gui framework (can be 'electron' or 'nwjs')
+    //         const xboxManager = await authManager.launch("raw");
+    //         //Generate the minecraft login token
+    //         const token = await xboxManager.getMinecraft();
+    //         //GMLL uses the concept of instances. Essentially containerized minecraft installations
+    //         var int = new gmll.Instance();
+    //         //Launch with a token retrieved by msmc
+    //         int.launch(token.gmll());
+    //     });
+    //     const {Instance} = require("gmll/objects/instance");
+
+    //     if(!fs.existsSync(this.path)){fs.mkdirSync(this.path, {recursive: true});}
+
+    //     // Install Loader
+    //     this.version.custom = await installLoader(this.path, this.loader, this.version, listeners)
+
+    //     // Resource Path (download optimization)
+    //     let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
+    //     if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
+    //     else{fs.cpSync(resourcePath+'/assets', path.join(this.path,'assets'), {recursive:true})}
+    //     if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
+    //     else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
+    //     if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fs.mkdirSync(path.join(config.directories.resources, 'versions'), {recursive: true});}
+    //     // else { fs.cpSync(path.join(config.directories.resources, 'versions'), path.join(this.path,'versions'), {recursive:true}) }
+
+    //     // Settings
+    //     let options =
+    //     {
+    //         root: this.path,
+    //         version: this.version,
+    //         memory: this.memory,
+    //         authorization: await Authenticator.getAuth("dev"),
+    //         forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
+    //         clientPackage: null,
+    //         customArgs: [`-javaagent:${config.javaAgent}`],
+    //         overrides:
+    //         {
+    //             // assetRoot: resourcePath+'/assets',
+    //             // assetIndex: resourcePath+'/assets/indexes',
+    //             // libraryRoot: resourcePath+'/libraries',
+    //             // directory: path.join(config.directories.resources, 'versions')
+    //         }
+    //     }
+
+    //     // Asset Move
+    //     launcher.on('debug', (e) =>
+    //     {
+    //         if(e == '[MCLC]: Downloaded assets')
+    //         {
+    //             fs.cpSync(path.join(this.path,'assets'), resourcePath+'/assets', {recursive:true})
+    //             fs.cpSync(path.join(this.path,'libraries'), resourcePath+'/libraries', {recursive:true})
+    //             fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
+    //         }
+    //     });
+
+    //     // Prepare Events
+    //     launcher.on('progress', (e) => listeners.log('progress', e));
+    //     launcher.on('debug', (e) => listeners.log('debug', e));
+    //     launcher.on('data', (e) => listeners.log('data', e));
+    //     launcher.on('close', (e) => listeners.log('close', e));
+    //     launcher.on('error', (e) => listeners.log('error', e));
+    //     launcher.on('close', (e) => listeners.close(e))
+
+
+    //     // Launch
+    //     let process = await launcher.launch(options);
+    //     let windowSource = null;
+
+    //     // Network
+    //     let networkListeners = [];
+    //     const server = net.createServer((socket) =>
+    //     {    
+    //         socket.on('data', (data) =>
+    //         {
+    //             listeners.network(data.toString().trim());
+
+    //             for (let i = 0; i < networkListeners.length; i++)
+    //             {
+    //                 const l = networkListeners[i];
+    //                 if(!l || l.msg != data.toString().trim()){continue;}
+    //                 l.event();
+    //                 if(l.single) { delete networkListeners[i]; }
+    //             }
+    //         });
+    //         socket.on('error', (err) => console.error(`Server error ${err.code}`))
+    //         socket.on('close', () => console.log('Minecraft disconnected'));
+    //     });
+    //     server.listen(port, '127.0.0.1');
+
+        
+    //     // Wait for Window
+    //     async function trySource()
+    //     {
+    //         let sources = await desktopCapturer.getSources({ types: ['window'] });
+    
+    //         let mcSource = sources.find(source => source.name.startsWith('Minecraft'));
+    //         if(!mcSource) { return false; }
+                
+    //         windowSource = mcSource;
+
+    //         let isAppFocused = false;
+    //         for(var w of BrowserWindow.getAllWindows()) { if(w.isFocused()){isAppFocused=true;break;} }
+
+    //         if(isAppFocused)
+    //         {
+    //             app.focus({steal: true});
+    //         }
+    //         else
+    //         {
+    //             for(let win of windowManager.getWindows())
+    //             {
+    //                 if(win.processId != process.pid){continue;}
+    
+    //                 win.hide();
+    //             }
+    //         }
+    //         return true;
+    //     }
+    //     // Wait for Forge laoding window apparition
+    //     if(this.loader.name=='forge')
+    //     {
+    //         await new Promise((resolve) =>
+    //         {
+    //             let listener = async (w) =>
+    //             {
+    //                 if(w.processId == process.pid)
+    //                 {
+    //                     windowManager.removeListener('window-activated', listener);
+    //                     await trySource();
+    //                     resolve();
+    //                 }
+    //             }
+
+    //             networkListeners.push
+    //             ({
+    //                 msg: 'forge_loading',
+    //                 event: async () => {
+    //                     windowManager.removeListener('window-activated', listener);
+    //                     await trySource();
+    //                     resolve();
+    //                 },
+    //                 single: true
+    //             });
+    
+    //             windowManager.addListener('window-activated', listener);    
+    //         })
+    //     }
+    //     // Listening to new windows
+    //     else
+    //     {
+    //         await new Promise((resolve) =>
+    //         {
+    //             let listener = async (w) =>
+    //             {
+    //                 if(w.processId == process.pid)
+    //                 {
+    //                     windowManager.removeListener('window-activated', listener);
+    //                     await trySource();
+    //                     resolve();
+    //                 }
+    //             }
+    
+    //             windowManager.addListener('window-activated', listener);
+    //         })
+    //     }
+    //     // Check at intervals if still not detected
+    //     if(windowSource == undefined)
+    //     {
+    //         await new Promise(async (resolve) =>
+    //         {
+    //             let interval = setInterval(async () =>
+    //             {
+    //                 if(await trySource()) { resolve(); clearInterval(interval); }
+    //             }, 1000);
+    //         })
+    //     }
+
+    //     listeners.windowOpen(windowManager.getWindows().find(w => w.processId == process.pid), windowSource);
+    // }
 
     // Data
     name = '';
@@ -423,7 +625,7 @@ class Instance
     // Mods
     static cleanModName(n) { return n.endsWith('.jar')?n.substring(0,n.length-4):(n.endsWith('.disabled')?n.substring(0, n.length-9):n) }
     modExist(n) { return fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n)+'.jar'))||fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n)+'.disabled'))||fs.existsSync(path.join(this.path, 'mods', Instance.cleanModName(n))) }
-    setModData(data =
+    async setModData(data =
         {
             filename: "UNKNOWN FILENAME",
             source: null,
@@ -440,6 +642,7 @@ class Instance
         if(this.name == ''){return}
         let og = JSON.stringify(this.mods);
         data.filename = Instance.cleanModName(data.filename);
+        if(data.filename=='.DS_Store'){return;}
 
         let i = this.mods.findIndex(m => m.filename == data.filename);
         if(i>=0)
@@ -489,66 +692,78 @@ class Instance
         // Find metadata in the jar if missing
         if(workingPath!=null && !this.mods[i].fileVerified)
         {
-            new Promise(async (resolve) =>
+            this.analyseModJar = async function (r)
             {
-                if(!fs.existsSync(workingPath)){resolve(); return;}
-
-                // META-INF
-                let metaTOML = await jarReader.jar(workingPath, 'META-INF/mods.toml', true);
-                if(metaTOML != undefined)
+                return new Promise(async (resolve) =>
                 {
-                    let meta = metaTOML;
+                    if(r==null){resolve(); return;}
 
-                    if(meta?.mods?.value[0]?.logoFile != undefined)
+                    // Jarjar true content
+                    for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar/')&&k!='META-INF/jarjar/'&&k.endsWith('.jar')))
                     {
-                        try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await jarReader.jar(workingPath, meta.mods.value[0].logoFile, true)))}
-                        catch(err){console.warn(err)}
+                        let entries = (await unzip(await r[subJarKey].arrayBuffer())).entries;
+                        await this.analyseModJar(entries)
                     }
-                    this.mods[i].description = meta?.mods?.value[0]?.description;
-                    this.mods[i].title = meta?.mods?.value[0]?.displayName;
-                    this.mods[i].version = meta?.mods?.value[0]?.version;
-                    this.mods[i].modId = meta?.mods?.value[0]?.modId;
-                }
-                // Fabric JSON
-                let fabricModJSON = await jarReader.jar(workingPath, 'fabric.mod.json', true);
-                if(fabricModJSON != undefined)
-                {
-                    let meta = fabricModJSON;
-                    this.mods[i].fabricMeta = meta;
-                    if(!this.mods[i].title){this.mods[i].title=meta.name}
-                    if(this.mods[i].description=='No description...'){this.mods[i].description=meta.description}
-                    if(!this.mods[i].id){this.mods[i].id=meta.id}
-                    this.mods[i].clientRequired=meta.environment=='client'
-                    this.mods[i].serverRequired=meta.environment=='server'
-                    this.mods[i].version = meta.version;
 
-                    let potentialIcon = await jarReader.jar(workingPath, meta.icon, true);
-                    if(meta.icon && potentialIcon!=undefined)
+                    // META-INF
+                    if(r['META-INF/mods.toml']!=undefined)
                     {
-                        this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(potentialIcon));
-                    }
-                }
-                // Pack Mcmeta
-                let packMcmeta = await jarReader.jar(workingPath, 'pack.mcmeta', true);
-                if(packMcmeta != undefined)
-                {
-                    let meta = packMcmeta;
-                    if(typeof(meta.description)=='object') { this.mods[i].description = meta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
-                    else if(typeof(meta.description) == 'string') { this.mods[i].description = meta.description.replace(/§[0-9a-fk-or]/gi, ''); }
-                }
+                        // let metaTOML = jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()));
+                        let meta = jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()), 'toml');
 
-                // Icon
-                if(this.mods[i].icon==undefined)
-                {
-                    let r = await jarReader.jar(workingPath, null, true)
-                    if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                        if(meta?.mods?.value[0]?.logoFile != undefined)
+                        {
+                            try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await r[meta.mods.value[0].logoFile]?.arrayBuffer()))}
+                            catch(err){console.warn(err)}
+                        }
+                        this.mods[i].description = meta?.mods?.value[0]?.description;
+                        this.mods[i].title = meta?.mods?.value[0]?.displayName;
+                        this.mods[i].version = meta?.mods?.value[0]?.version;
+                        this.mods[i].modId = meta?.mods?.value[0]?.modId;
+                    }
+                    // Fabric JSON
+                    let fabricModJSON = await r['fabric.mod.json']?.json();
+                    if(fabricModJSON != undefined)
                     {
-                        this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
-                    }
-                }
+                        let meta = fabricModJSON;
+                        this.mods[i].fabricMeta = meta;
+                        if(!this.mods[i].title){this.mods[i].title=meta.name}
+                        if(this.mods[i].description=='No description...'){this.mods[i].description=meta.description}
+                        if(!this.mods[i].id){this.mods[i].id=meta.id}
+                        this.mods[i].clientRequired=meta.environment=='client'
+                        this.mods[i].serverRequired=meta.environment=='server'
+                        this.mods[i].version = meta.version;
+                        this.mods[i].modId = meta.id;
 
-                resolve();
-            })
+                        let potentialIcon = await r[meta.icon]?.arrayBuffer();
+                        if(meta.icon && potentialIcon!=undefined)
+                        {
+                            this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(potentialIcon));
+                        }
+                    }
+                    // Pack Mcmeta
+                    // let packMcmeta = await jarReader.jar(workingPath, 'pack.mcmeta', true);
+                    if(r['pack.mcmeta']!=undefined)
+                    {
+                        let meta = await r['pack.mcmeta'].json();
+                        if(typeof(meta.description)=='object') { this.mods[i].description = meta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                        else if(typeof(meta.description) == 'string') { this.mods[i].description = meta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                    }
+
+                    // Icon
+                    if(this.mods[i].icon==undefined)
+                    {
+                        // let r = await jarReader.jar(workingPath, null, true)
+                        if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                        {
+                            this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
+                        }
+                    }
+
+                    resolve();
+                })
+            }
+            await jarReader.jar(workingPath, null, true).then(r => this.analyseModJar(r))
 
             this.mods[i].fileVerified=true;
         }

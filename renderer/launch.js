@@ -1,4 +1,5 @@
 let playButton = document.getElementById('play-button');
+let stopButton = document.getElementById('stop-button');
 let consoleContainer = document.getElementById('console-window');
 var classContainer = document.getElementById('class-window').childNodes[3];
 var classShearchInput = document.getElementById('class-window').childNodes[1].childNodes[1];
@@ -46,7 +47,11 @@ playButton.addEventListener('click', async () =>
     playButton.setAttribute('load', '');
 
     // Save
-    await saveInstance(window.instance);
+    await window.instance.save(window.instance);
+
+    // Logs
+    let threads = [{name: 'main', color: '#5555ff'},{name: 'Render thread', color: '#8855aa'},{name: 'Server thread', color: '#aa5555'}];
+    let logTypes = [{name: 'INFO', color: '#dddddd', softColor: 'unset'},{name: 'WARN', color: '#dddd00', softColor: '#aaaa55'},{name: 'ERROR', color: '#dd0000', softColor: '#AA5555'},{name: 'DEBUG', color: '#55dd55', softColor: '#33aa33'}]
 
     // Launch
     const i = await launch(window.instance.name,
@@ -55,9 +60,76 @@ playButton.addEventListener('click', async () =>
             {
                 // Prepare Element
                 var el = document.createElement('p');
-                if(t == 'progress') { el.innerText = `[PROGRESS] ${c.type}: ${Math.round(c.task/c.total * 100)}%`; }
-                else if(t == 'loaderProgress') { el.innerText = `[PROGRESS] loader download: ${c}%`; }
+                if(t == 'progress')
+                {
+                    let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
+                    for (let i = 0; i < Math.floor(c.task/c.total * 64); i++)
+                    {
+                        loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
+                    }
+
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">${c.type}:</span> ${loadText} - ${Math.floor(c.task/c.total * 100)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] ${c.type}: `))
+                    {
+                        consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
+                        el.remove();
+                        return
+                    }
+                }
+                else if(t == 'loaderProgress')
+                {
+                    let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
+                    for (let i = 0; i < Math.floor(c.task/c.total * 64); i++)
+                    {
+                        loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
+                    }
+
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">loader download: :</span> ${loadText} - ${Math.floor(c.task/c.total * 100)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] loader download: `))
+                    {
+                        consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
+                        el.remove();
+                        return
+                    }
+                }
                 else { el.innerText = `[${t.toUpperCase()}] ${c}`; }
+
+                if(typeof(c)=='string')
+                {
+                    let finalContent = '';
+                    for(let c of el.innerText.split('\n'))
+                    {
+                        let thread = c.split(':')[2].match((/\[(.*?)\]/))[1].split('/')[0];
+                        let type = c.split(':')[2].match((/\[(.*?)\]/))[1].split('/')[1];
+
+                        if(threads.find(t=>t.name==thread) == undefined)
+                        {
+                            threads.push({name: thread, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                        }
+                        if(logTypes.find(t=>t.name==type) == undefined)
+                        {
+                            logTypes.push({name: type, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                        }
+                        c='<span style="color:#f3f3ff55">'+c.replace(`[${c.split(':')[2].match((/\[(.*?)\]/))[1]}]: `, `<span style="color:${threads.find(t=>t.name==thread).color}">[${thread}/<span style="color:${logTypes.find(t=>t.name==type).color}">${type}</span>]</span>: </span><span style="color:${logTypes.find(t=>t.name==type).softColor}">`)
+                        c+='</span>'
+                        finalContent = c+'\n';
+                    }
+
+                    for(let m of window.instance.mods)
+                    {
+                        if(m.modId==undefined){continue;}
+                        for(let match of finalContent.matchAll(`${m.modId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`+`[a-z0-9/_\\-.]+`+`(?:\\.[a-z0-9]+)?`+`(?:-[a-z0-9_\\-.]+)?`))
+                        {
+                            finalContent = finalContent.slice(0, match.index)+ `<b style="cursor:pointer;" onclick="window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.onmouseenter(); window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.click();">` + match[0] + '</b>'+finalContent.slice(match.index + match[0].length, finalContent.length)
+                        }
+                    }
+                    for(let match of finalContent.matchAll(/minecraft:[a-z0-9/_\-.]+(?:\.[a-z0-9]+)?(?:-[a-z0-9_\-.]+)?/g))
+                    {
+                        finalContent = finalContent.slice(0, match.index)+ '<u>' + match[0] + '</u>'+finalContent.slice(match.index + match[0].length, finalContent.length)
+                    }
+
+                    el.innerHTML = finalContent;
+                }
             
                 if(consoleContainer.childNodes.length > 0)
                 {
@@ -122,12 +194,16 @@ playButton.addEventListener('click', async () =>
                     }
                 }
             },
-            windowOpen: async (w) =>
+            windowOpen: async (w, i) =>
             {
                 // Button Pausable
                 playButton.removeAttribute('load');
                 playButton.removeAttribute('play');
                 playButton.setAttribute('pause', '');
+
+                stopButton.onclick = () => { closeGame(i); }
+
+                return;
 
                 // Resize
                 window.oncenterpanelresize(document.getElementById('center-panel').getBoundingClientRect())
