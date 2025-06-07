@@ -209,6 +209,7 @@ label:has(> input[type="checkbox"]) > span:hover
 .folder-content > div:first-of-type { border: transparent; }
 .folder-content > div { overflow: auto; width: 100%; max-width: 300px; border: transparent; border-left: var(--window-border) solid var(--border-width); }
 .folder-content > div:last-of-type { max-width: 100%; }
+.folder-content > div:first-of-type:last-of-type > button { max-width: 350px; }
 .folder-content button
 {
     border: none;
@@ -249,7 +250,7 @@ label:has(> input[type="checkbox"]) > span:hover
 .folder-content button[folder]::before { content: url(./resources/folder.png); }
 .folder-content button[add]::before { content: url(./resources/add.png); }
 .folder-content button:hover::before { filter: brightness(0.2); }
-.folder-content button:hover {text-decoration: underline;}
+.folder-content button:hover {text-decoration: underline;border: 0px;}
 .folder-content button > input { border: transparent; padding: 0; }
 
 .folder-content button[icon][selected]::before { filter: brightness(1.3); }
@@ -275,6 +276,7 @@ label:has(> input[type="checkbox"]) > span:hover
 
 .folder-content button > button:nth-child(1) { background-image: url(./resources/delete.png); }
 .folder-content button > button:nth-child(2) { background-image: url(./resources/enabled.png); }
+.folder-content button > button:hover { background-position: 2.5px 2.5px; background-size: 15px 15px; background-repeat: no-repeat; }
 
 .content-slider
 {

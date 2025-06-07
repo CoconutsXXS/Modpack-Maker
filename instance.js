@@ -58,7 +58,7 @@ class Instance
         modWatcher.on('all', (e, p, s) =>
         {
             if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
-            let ogMods = JSON.parse(JSON.stringify(this.mods));
+            let ogMods = JSON.stringify(this.mods);
             let f = p.split('/')[p.split('/').length-1];
             
             // Delete
@@ -87,7 +87,7 @@ class Instance
                 }
             }
 
-            if(ogMods != this.mods)
+            if(ogMods != JSON.stringify(this.mods))
             {
                 this.onModUpdate(this.mods)
             }
@@ -107,7 +107,7 @@ class Instance
         rpWatcher.on('all', (e, p, s) =>
         {
             if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
-            let ogRP = JSON.parse(JSON.stringify(this.rp));
+            let ogRP = JSON.stringify(this.rp);
             let f = p.split('/')[p.split('/').length-1];
 
             if(p.substring(path.join(this.path, 'resourcepacks').length+1, p.length).includes('/')){return}
@@ -138,7 +138,7 @@ class Instance
                 }
             }
 
-            if(ogRP != this.rp)
+            if(ogRP != JSON.stringify(this.rp))
             {
                 this.onRPUpdate(this.rp)
             }
@@ -158,7 +158,7 @@ class Instance
         shaderWatcher.on('all', (e, p, s) =>
         {
             if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
-            let ogShaders = JSON.parse(JSON.stringify(this.shaders));
+            let ogShaders = JSON.stringify(this.shaders);
             let f = p.split('/')[p.split('/').length-1];
 
             if(p.substring(path.join(this.path, 'shaderpacks').length+1, p.length).includes('/')){return}
@@ -189,7 +189,7 @@ class Instance
                 }
             }
 
-            if(ogShaders != this.shaders)
+            if(ogShaders != JSON.stringify(this.shaders))
             {
                 this.onShaderUpdate(this.shaders)
             }
@@ -672,20 +672,21 @@ class Instance
         }
 
         // Disabling/Enabling File
-        let workingPath = null;
+        let needUpdate = true;
+        let workingPath = path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'));
         if(fs.existsSync(path.join(this.path, 'mods', data.filename+'.jar')))
         {
-            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'));
+            needUpdate = path.join(this.path, 'mods', data.filename+'.jar') != workingPath;
             fs.renameSync(path.join(this.path, 'mods', data.filename+'.jar'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'mods', data.filename+'.disabled')))
         {
-            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'));
+            needUpdate = path.join(this.path, 'mods', data.filename+'.disabled') != workingPath;
             fs.renameSync(path.join(this.path, 'mods', data.filename+'.disabled'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'mods', data.filename)))
         {
-            workingPath=path.join(this.path, 'mods', data.filename+(data.disabled?'.disabled':'.jar'))
+            needUpdate = path.join(this.path, 'mods', data.filename) != workingPath;
             fs.renameSync(path.join(this.path, 'mods', data.filename), workingPath)
         }
 
@@ -763,7 +764,7 @@ class Instance
                     resolve();
                 })
             }
-            await jarReader.jar(workingPath, null, true).then(r => this.analyseModJar(r))
+            try{await jarReader.jar(workingPath, null, true).then(r => this.analyseModJar(r))}catch(err){console.warn(err)}
 
             this.mods[i].fileVerified=true;
         }
@@ -778,7 +779,7 @@ class Instance
         if(og != JSON.stringify(this.mods))
         {
             this.save();
-            this.onModUpdate(this.mods);
+            if(needUpdate) { this.onModUpdate(this.mods); }
         }
     }
     // Texturepacks
@@ -829,20 +830,21 @@ class Instance
         }
 
         // Disabling/Enabling File
-        let workingPath = null;
+        let needUpdate = false;
+        let workingPath = path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'));
         if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename+'.zip')))
         {
-            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            needUpdate = path.join(this.path, 'resourcepacks', data.filename+'.zip') != workingPath
             fs.renameSync(path.join(this.path, 'resourcepacks', data.filename+'.zip'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename+'.disabled')))
         {
-            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            needUpdate = path.join(this.path, 'resourcepacks', data.filename+'.disabled') != workingPath
             fs.renameSync(path.join(this.path, 'resourcepacks', data.filename+'.disabled'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'resourcepacks', data.filename)))
         {
-            workingPath=path.join(this.path, 'resourcepacks', data.filename+(data.disabled?'.disabled':'.zip'))
+            needUpdate = path.join(this.path, 'resourcepacks', data.filename) != workingPath
             fs.renameSync(path.join(this.path, 'resourcepacks', data.filename), workingPath)
         }
 
@@ -881,7 +883,7 @@ class Instance
         if(og != JSON.stringify(this.rp))
         {
             this.save();
-            this.onRPUpdate(this.rp);
+            if(needUpdate) { this.onRPUpdate(this.rp); }
         }
     }
     // Shaders
@@ -933,20 +935,21 @@ class Instance
         }
 
         // Disabling/Enabling File
-        let workingPath = null;
+        let needUpdate = true;
+        let workingPath = path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'));
         if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename+'.zip')))
         {
-            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            needUpdate = path.join(this.path, 'shaderpacks', data.filename+'.zip') != workingPath
             fs.renameSync(path.join(this.path, 'shaderpacks', data.filename+'.zip'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename+'.disabled')))
         {
-            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'));
+            needUpdate = path.join(this.path, 'shaderpacks', data.filename+'.disabled') != workingPath
             fs.renameSync(path.join(this.path, 'shaderpacks', data.filename+'.disabled'), workingPath)
         }
         else if(fs.existsSync(path.join(this.path, 'shaderpacks', data.filename)))
         {
-            workingPath=path.join(this.path, 'shaderpacks', data.filename+(data.disabled?'.disabled':'.zip'))
+            needUpdate = path.join(this.path, 'shaderpacks', data.filename) != workingPath
             fs.renameSync(path.join(this.path, 'shaderpacks', data.filename), workingPath)
         }
 
@@ -987,7 +990,7 @@ class Instance
         if(og != JSON.stringify(this.shaders))
         {
             this.save();
-            this.onShaderUpdate(this.shaders);
+            if(needUpdate) { this.onShaderUpdate(this.shaders); }
         }
     }
 

@@ -365,6 +365,9 @@ window.web =
         let type = url.pathname.split('/')[1];
         let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
 
+        let virtualPath = '';
+        if(window.explorerTab==cleanType){virtualPath=window.explorerPath}
+
         let sinytra = link.split('/')[link.split('/').length-1]=='connector'&&cleanType=='mods'
         for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod'))
         {
@@ -401,7 +404,8 @@ window.web =
                     images,
                     icon: meta.icon_url,
                     dependencies,
-                    sinytra
+                    sinytra,
+                    virtualPath
                 })
             }
             else
@@ -416,7 +420,8 @@ window.web =
                     longDescription: meta.body,
                     slug: meta.slug,
                     images,
-                    icon: meta.icon_url
+                    icon: meta.icon_url,
+                    virtualPath
                 })
             }
 
@@ -473,6 +478,9 @@ window.web =
             case 'texture-packs': { classId = 12; cleanType = 'resourcepacks'; break; }
         }
 
+        let virtualPath = '';
+        if(window.explorerTab==cleanType){virtualPath=window.explorerPath}
+
         let sinytra = link.split('/')[link.split('/').length-1]=='sinytra-connector'&&cleanType=='mods'
 
         for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods'))
@@ -483,7 +491,6 @@ window.web =
             if(!f.slug) { f.slug = link.split('/')[link.split('/').length-1]; }
             let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${(f.slug)}&classId=${classId}`)).json()).data[0]
 
-            console.log(cleanType)
             if(cleanType == 'mods')
             {
                 let categories = []; for(let i of meta.categories){categories.push(i.name)}
@@ -506,7 +513,8 @@ window.web =
                     images: await loadImages(meta.slug, meta.name),
                     icon: meta.avatarUrl,
                     dependencies,
-                    sinytra
+                    sinytra,
+                    virtualPath
                 })
             }
             else
@@ -522,7 +530,8 @@ window.web =
                     // longDescription: meta.body,
                     slug: meta.slug,
                     images: await loadImages(meta.slug, meta.name),
-                    icon: meta.avatarUrl
+                    icon: meta.avatarUrl,
+                    virtualPath
                 })
             }
 

@@ -64,7 +64,9 @@ async function mainWindow()
         {
             preload: path.join(__dirname, 'preload.js'),
             webviewTag: true,
-            contextIsolation: true
+            contextIsolation: true,
+            sandbox: false,
+        nodeIntegration: false
         },
 
         frame: false,
@@ -88,7 +90,9 @@ async function mainWindow()
         closable: true,
         show: false
     });
-    win.loadFile('index.html')
+
+    // Debug
+    // win.show();
 
     win.webContents.on('did-finish-load', async () =>
     {
@@ -96,6 +100,8 @@ async function mainWindow()
         win.show();
         load.close();
     });
+
+    win.loadFile('index.html')
 
     win.once('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
 
@@ -144,14 +150,30 @@ ipcMain.on('openInstance', async (event, name) =>
 
 // Instance
 let loadedInstances = [];
-ipcMain.handle('getInstance', (event, name) =>
+ipcMain.on('getInstance', (event, name) =>
 {
     let i = Instance.getInstance(name);
+    console.log(i)
     loadedInstances.push({name: name, instance: i})
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
     i.onRPUpdate = (rp) => event.sender.isDestroyed()?null:event.sender.send('RPUpdate', rp);;
-    i.onShaderUpdate = (shaders) => event.sender.isDestroyed()?null:event.sender.send('shaderUpdate', shaders);;
-    return JSON.parse(JSON.stringify(i));
+    i.onShaderUpdate = (shaders) => event.sender.isDestroyed()?null:event.sender.send('shaderUpdate', shaders);
+
+    const buffer = new TextEncoder().encode(JSON.stringify(i)).buffer.slice(0);
+    const chunkSize = 1.8*1024**2;
+    let d = new Date();
+    ipcMain.handle(name+'-request-buffer-chunk', (event, chunkIndex) =>
+    {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, buffer.byteLength);
+        console.log(Math.round((chunkIndex * chunkSize/buffer.byteLength)*100))
+        if(chunkIndex * chunkSize/buffer.byteLength){console.log((new Date() - d)/1000)}
+        return buffer.slice(start, end);
+    });
+
+    return null;
+
+    // return JSON.parse(JSON.stringify(i));
 });
 ipcMain.handle('setItemData', (event, item='mod', instanceName, data) =>
 {

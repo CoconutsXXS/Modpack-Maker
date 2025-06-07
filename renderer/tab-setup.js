@@ -16,11 +16,12 @@ window.setupTab(document.getElementById('right-panel').childNodes[1],
     {select: () => {document.getElementById('resourcepacks-settings').style.display = 'block'; }, deselect: () => {document.getElementById('resourcepacks-settings').style.display = 'none';}},
     {select: () => {document.getElementById('shaders-settings').style.display = 'block'; }, deselect: () => {document.getElementById('shaders-settings').style.display = 'none';}},
 ]);
+window.explorerTab = 'mods';
 window.setupTab(document.getElementById('bottom-panel').childNodes[1].childNodes[1],
 [
-    {select: () => {document.getElementById('mods-explorer').style.display = 'flex'; }, deselect: () => {document.getElementById('mods-explorer').style.display = 'none';}},
-    {select: () => {document.getElementById('rp-explorer').style.display = 'flex'; }, deselect: () => {document.getElementById('rp-explorer').style.display = 'none';}},
-    {select: () => {document.getElementById('shaders-explorer').style.display = 'flex'; }, deselect: () => {document.getElementById('shaders-explorer').style.display = 'none';}},
+    {select: () => {document.getElementById('mods-explorer').style.display = 'flex'; window.explorerTab = 'mods'; }, deselect: () => {document.getElementById('mods-explorer').style.display = 'none';}},
+    {select: () => {document.getElementById('rp-explorer').style.display = 'flex'; window.explorerTab = 'resourcepacks'; }, deselect: () => {document.getElementById('rp-explorer').style.display = 'none';}},
+    {select: () => {document.getElementById('shaders-explorer').style.display = 'flex'; window.explorerTab = 'shaderpacks'; }, deselect: () => {document.getElementById('shaders-explorer').style.display = 'none';}},
     {select: () => {document.getElementById('bottom-webview-container').style.display = 'block'; }, deselect: () => {document.getElementById('bottom-webview-container').style.display = 'none';}},
 ]);
 window.setupTab(document.getElementById('top-tab'),

@@ -73,11 +73,47 @@ class Instance
 
 contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}) =>
 {
-    let instance = Object.assign(new Instance(), await ipcRenderer.invoke('getInstance', name));
+    ipcRenderer.send('getInstance', name)
+
+    let object = null;
+    await new Promise(async (resolve) =>
+    {
+        // ipcRenderer.once(name+'-instance-buffer', (event, buffer) =>
+        // {
+        //     console.log(new Date().toTimeString())
+        //     object = JSON.parse( new TextDecoder().decode(new Uint8Array(buffer)) );
+        //     resolve();
+        // });
+
+        const chunks = [];
+        let index = 0;
+        while (true)
+        {
+            const chunk = await ipcRenderer.invoke(name+'-request-buffer-chunk', index);
+            if (chunk.byteLength === 0) break;
+            chunks.push(new Uint8Array(chunk));
+            index++;
+        }
+
+        const totalLength = chunks.reduce((acc, cur) => acc + cur.length, 0);
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks)
+        {
+            fullBuffer.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        object = JSON.parse(new TextDecoder().decode(fullBuffer));
+        resolve();
+    });
+    
+    let instance = Object.assign(new Instance(), object);
     ipcRenderer.on('modUpdate', (event, mods) => { instance.mods = mods; onModUpdate(instance, mods); })
     ipcRenderer.on('RPUpdate', (event, rp) => { instance.rp = rp; onRPUpdate(instance, rp); })
     ipcRenderer.on('shaderUpdate', (event, shaders) => { instance.shaders = shaders; onShaderUpdate(instance, shaders); })
 
+    console.log('getInstance', instance)
     return instance;
 });
 contextBridge.exposeInMainWorld('importInstance', async (link, metadata) => { ipcRenderer.invoke('importInstance', link, metadata) })

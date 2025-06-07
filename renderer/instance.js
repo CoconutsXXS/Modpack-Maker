@@ -25,6 +25,7 @@ window.loadInstance = async (name) =>
         if(window?.instance?.onShaderUpdate) { window.instance.onShaderUpdate(i, s) }
     }).then(r =>
     {
+        console.log(r)
         window.instance = r;
         for(let i of instanceListeners) { i(r); }
     })

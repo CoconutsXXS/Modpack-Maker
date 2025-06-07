@@ -6,8 +6,10 @@ Object.filter = (obj, predicate) =>
           .reduce( (res, key) => (res[key] = obj[key], res), {} );
 
 let currentDirectory = ''
+window.explorerPath = '';
 window.setupExplorer = (directory = '', container, files, onMove = (from, to) => {}, onSelect = (f) => {}, deleteEvent=()=>{}, activationEvent=()=>{}, propertieName = null, onFile=(f)=>{}) =>
 {
+    console.log('SETUP')
     // Drag n Drop
     container.ondrop = (event) =>
     {
@@ -86,6 +88,14 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
         e.children = e.children();
     }
 
+    console.log(files, elements, hierarchy, directory)
+
+    console.log('e.folder&&e.name=='+directory.split('/')[directory.split('/').length-1]+'&&e.path=='+JSON.stringify(directory.split('/').slice(0, directory.split('/').length-1)))
+    while(Object.values(hierarchy).find(e=>e.folder&&e.name==directory.split('/')[directory.split('/').length-1]&&JSON.stringify(e.path)==JSON.stringify(directory.split('/').slice(0, directory.split('/').length-1)))==undefined&&directory.length>0)
+    {
+        directory = directory.substring(0, directory.lastIndexOf('/'));
+        console.log(directory);
+    }
 
     // Element building
     let selected = null;
@@ -103,7 +113,8 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
 
         directory = directory.filter(e=>e!='')
         if(directory[directory.length-1] != ''){directory.push('');}
-        let pathDir = ''; for(let p of directory){pathDir+=p+'/';}pathDir.substring(0, pathDir.length-1);
+        let pathDir = ''; for(let p of directory){pathDir+='/'+p;}pathDir = pathDir.substring(1, pathDir.length-1);
+        window.explorerPath = pathDir;
         currentDirectory = pathDir
 
         // directory.push('')
@@ -132,6 +143,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
 
                 if(e.folder)
                 {
+                    console.log(Object.values(hierarchy), e)
                     b.setAttribute('folder', '')
                     b.addEventListener('click', () =>
                     {
@@ -151,7 +163,12 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                 // Delete Button
                 let db = document.createElement('button');
                 b.appendChild(db);
-                db.onclick = () => { deleteEvent(e); }
+                db.onclick = () =>
+                { 
+                    delete hierarchy[Object.keys(hierarchy).find(k=>e == hierarchy[k])];
+                    b.remove();
+                    deleteEvent(e);
+                }
                 // Active Button
                 let ab = document.createElement('button');
                 ab.style.backgroundImage = `url("./resources/${e.disabled?'disabled':'enabled'}.png")`
@@ -292,7 +309,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
             let currentPath = ''; for(let p of progressionPath){currentPath+='/'+p;}
             let addButton = document.createElement('button');
             addButton.setAttribute('add', '')
-            addButton.innerText = 'Add...';
+            addButton.innerText = 'New Folder...';
             addButton.onclick = () =>
             {
                 let newButton = document.createElement('button');
@@ -339,6 +356,7 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                     }
                 })
             }
+            addButton.style.minWidth = '100%'
             subContainer.appendChild(addButton)
             subContainer.ondrop=subContainer.ondragover=subContainer.ondragenter=(e)=>{e.preventDefault()};
             container.appendChild(subContainer)
