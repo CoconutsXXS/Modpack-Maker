@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <style>
+        *{margin: 0; padding: 0; color: #ffffffd0; font-family: SF Mono;text-align: start; font-size: small; caret-color: transparent;}
+        body{width: 100vw; height: 100vh;overflow: hidden;overflow-y: scroll;}
+        *::-webkit-scrollbar{display: none;}
+        @font-face
+        {
+            font-family: 'SF Mono';
+            src: url(./resources/sf-mono/SFMonoLight.otf);
+            size-adjust: 100%;
+            line-gap-override: 0%;
+            descent-override: 25%;
+            ascent-override: 85%;
+            font-stretch: 50% 200%;
+        }
+        textarea
+        {
+            background: transparent;
+            border: transparent;
+            outline: transparent;
+            width: 100vw;
+            max-width: 100vw;
+            height: fit-content;
+            resize: none;
+        }
+        pre
+        {
+            width: 100vw;
+            max-width: 100vw;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <pre></pre>
+    <textarea></textarea>
+
+    <script type="module">
+        let p = document.querySelector('pre');
+        let ta = document.querySelector('textarea'); ta.disabled=true;
+        let finalText = '';
+        let typing = false;
+
+        let unzipLoad = ipcInvoke('unzipInstance1');
+
+//         await type('Initializing');
+//         await wait(300); await type('.');
+//         await wait(300); await type('.');
+//         await wait(300); await type('.');
+        
+//         await type(String.raw`
+//  ___      ___    ______   ________   _______    __      ______  __   ___      ___      ___      __      __   ___ _______  _______   
+// |"  \    /"  |  /    " \ |"      "\ |   __ "\  /""\    /" _  "\|/"| /  ")    |"  \    /"  |    /""\    |/"| /  ")"     "|/"      \  
+//  \   \  //   | // ____  \(.  ___  :)(. |__) :)/    \  (: ( \___|: |/   /      \   \  //   |   /    \   (: |/   (: ______):        | 
+//  /\\  \/.    |/  /    ) :): \   ) |||:  ____//' /\  \  \/ \    |    __/       /\\  \/.    |  /' /\  \  |    __/ \/    | |_____/   ) 
+// |: \.        (: (____/ //(| (___\ ||(|  /   //  __'  \ //  \ _ (// _  \      |: \.        | //  __'  \ (// _  \ // ___)_ //      /  
+// |.  \    /:  |\        / |:       :)|__/ \ /   /  \\  (:   _) \|: | \  \     |.  \    /:  |/   /  \\  \|: | \  (:      "|:  __   \  
+// |___|\__/|___| \"_____/  (________(_______|___/    \___)_______|__|  \__)    |___|\__/|___(___/    \___|__|  \__)_______)__|  \___) 
+// `, 0.1)
+
+//         await wait(300); await type('\n\nWelcome, you are about to live an ultra immersive Minecraft experience. Please quit every other running programs before starting, this will cost a lot of performances.', 40);
+//         await wait(1500); await type('\nAre you ready? (y or n)')
+//         await ask((v) =>
+//         {
+//             console.log(v)
+//             if(v == 'n'){window.close();}
+//             else if(v == 'y'){return true}
+//             return false
+//         })
+//         await wait(200); await type('\nThank you for your time and interest. Enjoy...')
+//         await type('\nUnziping instance...');
+        await unzipLoad;
+        let unzipLoad2 = ipcInvoke('unzipInstance2');
+
+        // Launch
+        let firstClosed = false;
+        setWindowPropertie('setAlwaysOnTop', false)
+        const i = await launch('Ultra Unimmersive',
+        {
+            log: async (t, c) =>
+            {
+                if(firstClosed){return}
+                if(typeof(c)!='string'||t=='loaderProgress'||t=='progress') { return; }
+                await type('\n'+c, 0.05, c.length/10)
+            },
+            close: c =>
+            {
+                firstClosed = true;
+            },
+            network: (i, c) =>
+            {
+
+            },
+            windowOpen: async (w, i2) =>
+            {
+                setWindowPropertie('setAlwaysOnTop', false)
+                window.oncenterpanelresize({width: window.screen.width/2, height: window.screen.height/2, x: window.screenX+window.screen.width/2-window.screen.width/4, y: window.screenY+window.screen.height/2-window.screen.height/4})
+                let interuptionMessage = false;
+                firstClosed = true;
+
+                await wait(30000)
+                interuptionMessage = true;
+                setWindowPropertie('setAlwaysOnTop', true)
+                closeGame(i2)
+                await type('\nINTERUPTING PROGRAM!', 1)
+                await type('\nLaunching higher version, please wait...', 10)
+                await type('\nUnziping instance...');
+                await unzipLoad2;
+                while(!firstClosed){await wait(100)}
+                interuptionMessage = false;
+                
+                const i = launch('Ultra Immersive',
+                {
+                    log: async (t, c) =>
+                    {
+                        if(interuptionMessage){return}
+                        if(typeof(c)!='string'||t=='loaderProgress'||t=='progress') { return; }
+
+                        if(c.includes(`[Render thread/WARN] [Embeddium-MixinTaintDetector/]: Mod(s) [oculus] are modifying Embeddium class me.jellysquid.mods.sodium.client.render.chunk.region.RenderRegion$DeviceResources, which may cause instability.`))
+                        {
+                            await wait(1000);
+                            ipcSend('setHidable', false)
+                            setWindowPropertie('setAlwaysOnTop', false)
+                            setWindowPropertie('hide')
+                        }
+
+                        await type('\n'+c, 0.01, c.length/10)
+                    },
+                    close: c =>
+                    {
+                        setWindowPropertie('show')
+                    },
+                    network: (i, c) =>
+                    {
+
+                    },
+                    windowOpen: async (w, i3) =>
+                    {
+                        setWindowPropertie('setAlwaysOnTop', true)
+                    },
+                },
+                {
+                    type: 'singleplayer',
+                    identifier: 'world'
+                })
+                finalText = p.innerHTML+'█';
+
+                await i;
+                await wait(5000)
+            },
+        },
+        {
+            type: 'singleplayer',
+            identifier: 'world'
+        })
+        window.oncenterpanelresize = (rect) => resizeGame(i, rect.x, rect.y, rect.width, rect.height, true);
+
+        function ask(f)
+        {
+            p.innerHTML = finalText;
+            ta.value = '█';
+            ta.disabled = false;
+            ta.select()
+            return new Promise((resolve) =>
+            {
+                ta.onkeypress = (ev) => ev.preventDefault;
+                ta.oninput = (ev) =>
+                {
+                    if(ev.inputType == "insertLineBreak")
+                    {
+                        ev.preventDefault();
+                        if(f(ta.value.slice(0, ta.value.length-2)))
+                        {
+                            ta.disabled = true;
+                            finalText+='\n'+ta.value.slice(0, ta.value.length-2);
+                            ta.value = '';
+                            resolve();
+                        }
+                        else { ta.value='█'; }
+                    }
+                    else if(ev.inputType == "deleteContentBackward")
+                    {
+                        ta.value = ta.value.slice(0, ta.value.length-2) + '█';
+                    }
+                    else if(ev.inputType == "insertText")
+                    {
+                        ta.value = ta.value.slice(0, -2) + ta.value.slice(-1) + '█'
+                        ev.preventDefault();
+                    }
+                }
+            })
+        }
+        function wait(t){return new Promise((resolve)=>setTimeout(resolve, t))}
+        async function type(text, speed = 1, perChar = 1)
+        {
+            while(typing){await wait(1);}
+
+            typing=true;
+            let i = 0;
+            for(let letter of text)
+            {
+                finalText+=letter;
+
+                p.innerHTML = finalText+'█';
+                window.scrollTo(0, document.body.scrollHeight);
+
+                i++;
+                if(i<perChar){continue}
+                i=0;
+                await wait(Math.random()*2*speed);
+            }
+            typing=false;
+        }
+    </script>
+</body>
+</html>

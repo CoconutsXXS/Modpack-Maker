@@ -13,21 +13,46 @@ window.loadInstance = async (name) =>
 
     await getInstance(name, (i, m) =>
     {
+        for(let [i, e] of m.entries())
+        {
+            if(e.missing){m.splice(i, 1)}
+        }
         window.instance.mods = m;
         if(window?.instance?.onModUpdate) { window.instance.onModUpdate(i, m) }
     }, (i, s) =>
     {
+        for(let [i, e] of s.entries())
+        {
+            if(e.missing){s.splice(i, 1)}
+        }
         window.instance.rp = s;
         if(window?.instance?.onRPUpdate) { window.instance.onRPUpdate(i, s) }
     }, (i, s) =>
     {
+        for(let [i, e] of s.entries())
+        {
+            if(e.missing){s.splice(i, 1)}
+        }
         window.instance.shaders = s;
         if(window?.instance?.onShaderUpdate) { window.instance.onShaderUpdate(i, s) }
+    }, (r) =>
+    {
+        console.log(r);
+        if(r.type = "download")
+        {
+            window.web[r.website=="modrinth"?"downloadModrinth":"downloadCurseforge"](r.link);
+        }
     }).then(r =>
     {
-        console.log(r)
         window.instance = r;
+        console.log(JSON.parse(JSON.stringify(instanceListeners)));
         for(let i of instanceListeners) { i(r); }
     })
 }
-if(instanceToLoad!=undefined){window.loadInstance(window.instanceToLoad)}
+if(instanceToLoad!=undefined)
+{
+    document.addEventListener('DOMContentLoaded', () =>
+    {
+        window.loadInstance(window.instanceToLoad)
+    })
+}

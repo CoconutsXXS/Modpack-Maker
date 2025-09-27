@@ -1,0 +1,46 @@
+{
+
+  "description": "View and save mods from different websites. Integrated with Modpack Maker.",
+  "manifest_version": 2,
+  "name": "Modpack Maker",
+  "version": "1.0",
+
+  "permissions": [
+    "tabs",
+    "<all_urls>",
+    "nativeMessaging",
+    "webRequest"
+  ],
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["youtube.js"]
+    },
+    {
+      "matches": ["*://modrinth.com/*"],
+      "js": ["modrinth.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["*://*.curseforge.com/*"],
+      "js": ["curseforge.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "modpack_maker@example.com"
+    }
+  },
+
+  "icons": {
+    "64": "icon.png"
+  },
+
+  "web_accessible_resources": ["icon.png"]
+}

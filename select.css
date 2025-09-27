@@ -26,8 +26,17 @@
 }
 #main > div:last-of-type > div > div > p { opacity: 0.5; }
 
+#main > div:last-of-type > div[selected] { filter: opacity(0.7); }
+
 #main > input
 {
     width: -webkit-fill-available;
     border-top: 0;
+}
+
+#finish
+{
+    position: fixed;
+    bottom: 16px; right: 16px;
+    font-size: larger;
 }

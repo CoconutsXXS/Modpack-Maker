@@ -7,7 +7,7 @@ async function searchResourcepack(text = '')
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:shader%22],[%22versions:${window.instance.version.number}%22]]`)).json()
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:shader%22]${document.getElementById("filter-version-browsing").checked?`,[%22versions:${window.instance.version.number}%22]`:""}]`)).json()
     for(let h of modrinth.hits)
     {
         searchResult.push
@@ -24,7 +24,7 @@ async function searchResourcepack(text = '')
     }
 
     // Curseforge
-    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&classId=6552&filterText=${text}&gameVersion=${window.instance.version.number}&pageSize=40&sortField=1`)).json()
+    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&classId=6552&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&pageSize=40&sortField=1`)).json()
     if(!curseforge.data){curseforge.data=[];}
     for(let d of curseforge.data)
     {
@@ -73,29 +73,29 @@ async function searchResourcepack(text = '')
         })
     }
 
-    // MinecraftShader
-    let minecraftShaderPage = parser.parseFromString(await (await fetch(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)).text(), "text/html");
+    // // MinecraftShader
+    // let minecraftShaderPage = parser.parseFromString(await (await fetch(`https://minecraftshader.com/platform/java-edition/?loader=iris&search=${text}`)).text(), "text/html");
 
-    let i = 2;
-    for (let c of minecraftShaderPage.querySelector('#post-container').childNodes)
-    {
-        if(c.className != 'col-md-6'){continue;}
+    // let i = 2;
+    // for (let c of minecraftShaderPage.querySelector('#post-container').childNodes)
+    // {
+    //     if(c.className != 'col-md-6'){continue;}
 
-        let img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)?.src
-        if(img == undefined) { img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > picture > img`).src; }
-        if(img == undefined) { continue; }
+    //     let img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > img`)?.src
+    //     if(img == undefined) { img = minecraftShaderPage.querySelector(`#post-container > div:nth-child(${i}) > div > div.thumbnail > a > picture > img`).src; }
+    //     if(img == undefined) { continue; }
 
-        searchResult.push
-        ({
-            name: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).innerText,
-            icon: img,
-            source: 'minecraftShader',
-            url: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).href,
-            description: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > p:nth-child(2)`).innerText
-        })
+    //     searchResult.push
+    //     ({
+    //         name: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).innerText,
+    //         icon: img,
+    //         source: 'minecraftShader',
+    //         url: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > h2:nth-child(1) > a:nth-child(1)`).href,
+    //         description: minecraftShaderPage.querySelector(`div.col-md-6:nth-child(${i}) > div:nth-child(1) > div:nth-child(2) > p:nth-child(2)`).innerText
+    //     })
 
-        i++
-    }
+    //     i++
+    // }
 
     return searchResult;
 }

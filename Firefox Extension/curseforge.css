@@ -1,0 +1,53 @@
+#versionPanel
+{
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    max-width: 50vw;
+    translate: -50% -50%;
+    background: var(--rt-color-dark);
+    padding: 8px;
+    display: block;
+}
+#versionPanel > button
+{
+    background: var(--icon-accent);
+    padding: 8px;
+    border-radius: 1px;
+    font-size: 16px;
+    color: #fff;
+    font-family: 'latoLocalFont';
+    display: block;
+    margin-top: 8px;
+}
+#versionPanel > button:first-of-type { margin-top: 0; }
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div { padding-top:8px;padding-bottom:8px; }
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div:first-of-type { padding-top:32px; }
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div:last-of-type { padding-bottom:32px; }
+#__next > div > main,
+#__next > div > footer {
+overflow-x: hidden !important;
+}
+#__next,
+div.ads-layout-content,
+div.ads-layout-content > div {
+max-width: 100% !important;
+min-width: 100% !important;
+}
+div.ads-layout-content > div {
+margin: 25px !important;
+min-width: calc(100% - 50px) !important;
+grid-template-columns: 3fr 1fr !important;
+}
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div > button {
+border: none !important;
+}
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div > a:first-of-type {background-color: #f16436 !important;}
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div > a {
+border: none !important;
+}
+aside > div.aside-box.project-details-box.is-modal-open {
+margin-top: -50px !important;
+}
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div > button#button-quick-test{background-color: #32a912 !important;}
+div.ads-layout-content > div > aside > div > div:nth-child(3) > div > button#button-download-version-select{background-color: #333333 !important;}

@@ -10,6 +10,7 @@ const net = require('net');
 var chokidar = require('chokidar');
 const { unzip } = require('unzipit');
 const { XMLParser } = require("fast-xml-parser");
+const es = require('event-stream');
 
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
@@ -19,6 +20,7 @@ const config = require('./config');
 const Download = require('./download');
 const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
+const { setTimeout } = require('node:timers/promises');
 
 
 class Instance
@@ -87,13 +89,21 @@ class Instance
                 }
             }
 
-            if(ogMods != JSON.stringify(this.mods))
+            if(ogMods != JSON.stringify(this.mods) || e==='add' || e=='unlink')
             {
                 this.onModUpdate(this.mods)
             }
         })
 
         // Resourcepack Files
+        // No double mod + clear missing
+        noDuplicatedModList = [];
+        for(let m of this.rp)
+        {
+            if(noDuplicatedModList.find(mod => mod.filename == m.filename || m.missing)){continue;}
+            noDuplicatedModList.push(m);
+        }
+        this.rp = noDuplicatedModList;
         // Delete data if do not exist
         for(let m of this.rp)
         {
@@ -106,7 +116,6 @@ class Instance
         let rpWatcher = chokidar.watch(path.join(this.path, 'resourcepacks'), {persistent: true});
         rpWatcher.on('all', (e, p, s) =>
         {
-            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
             let ogRP = JSON.stringify(this.rp);
             let f = p.split('/')[p.split('/').length-1];
 
@@ -138,13 +147,21 @@ class Instance
                 }
             }
 
-            if(ogRP != JSON.stringify(this.rp))
+            if(ogRP != JSON.stringify(this.rp) || e==='add' || e=='unlink')
             {
                 this.onRPUpdate(this.rp)
             }
         })
 
         // Shader Files
+        // No double mod + clear missing
+        noDuplicatedModList = [];
+        for(let m of this.shaders)
+        {
+            if(noDuplicatedModList.find(mod => mod.filename == m.filename || m.missing)){continue;}
+            noDuplicatedModList.push(m);
+        }
+        this.shaders = noDuplicatedModList;
         // Delete data if do not exist
         for(let m of this.shaders)
         {
@@ -157,7 +174,6 @@ class Instance
         let shaderWatcher = chokidar.watch(path.join(this.path, 'shaderpacks'), {persistent: true});
         shaderWatcher.on('all', (e, p, s) =>
         {
-            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
             let ogShaders = JSON.stringify(this.shaders);
             let f = p.split('/')[p.split('/').length-1];
 
@@ -177,7 +193,7 @@ class Instance
             // Add (or init)
             if(e==='add')
             {
-                let i = this.shaders.findIndex(m => m.filename==Instance.cleanShaderName(f));
+                let i = this.shaders.findIndex(m => Instance.cleanShaderName(m.filename)==Instance.cleanShaderName(f));
                 if(i>=0)
                 {
                     this.shaders[i].missing = false;
@@ -185,15 +201,33 @@ class Instance
                 }
                 else 
                 {
+                    console.log('setShaderData', {filename: f, missing: false, disabled: f.endsWith('.disabled')})
                     this.setShaderData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
                 }
             }
 
-            if(ogShaders != JSON.stringify(this.shaders))
+            if(ogShaders != JSON.stringify(this.shaders) || e==='add' || e=='unlink')
             {
+                console.log('this.onShaderUpdate', JSON.parse(JSON.stringify(this.shaders)))
                 this.onShaderUpdate(this.shaders)
             }
         })
+
+
+        // Download Request
+        if(!fs.existsSync(path.join(config.directories.instances, this.name, '.request.json')))
+        { fs.writeFileSync(path.join(config.directories.instances, this.name, '.request.json'), '[]'); }
+
+        let requestWatcher = chokidar.watch(path.join(config.directories.instances, this.name, '.request.json'), {persistent: true});
+        requestWatcher.on('all', (e, p, s) =>
+        {
+            if(p != path.join(config.directories.instances, this.name, '.request.json') || !fs.existsSync(p)){return;}
+            for(let r of JSON.parse(fs.readFileSync(p)))
+            {
+                this.onRequestUpdate(r);
+            }
+            fs.writeFileSync(p, '[]');
+        });
 
         return this;
     }
@@ -229,7 +263,7 @@ class Instance
             close: function(code){},
             windowOpen: function(window, windowSource, kill){},
             network: function(m){}
-        }, port = 1337)
+        }, port = 1337, world = null)
     {
         if(!fs.existsSync(this.path)){fs.mkdirSync(this.path, {recursive: true});}
 
@@ -242,8 +276,6 @@ class Instance
         else{fs.cpSync(resourcePath+'/assets', path.join(this.path,'assets'), {recursive:true})}
         if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
         else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
-        if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fs.mkdirSync(path.join(config.directories.resources, 'versions'), {recursive: true});}
-        // else { fs.cpSync(path.join(config.directories.resources, 'versions'), path.join(this.path,'versions'), {recursive:true}) }
 
         // Settings
         let options =
@@ -254,7 +286,7 @@ class Instance
             authorization: await Authenticator.getAuth("dev"),
             forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
             // clientPackage: null,
-            customArgs: [`-javaagent:${config.javaAgent}`],
+            // customArgs: [`-javaagent:${config.javaAgent}`],
             // overrides:
             // {
             //     // assetRoot: resourcePath+'/assets',
@@ -262,7 +294,9 @@ class Instance
             //     // libraryRoot: resourcePath+'/libraries',
             //     // directory: path.join(config.directories.resources, 'versions')
             // }
+            quickPlay: world!=undefined?world:null
         }
+        console.log(options)
 
         // Asset Move
         launcher.on('debug', (e) =>
@@ -288,26 +322,45 @@ class Instance
         let process = await launcher.launch(options);
         let windowSource = null;
 
-        // Network
-        let networkListeners = [];
-        const server = net.createServer((socket) =>
-        {    
-            socket.on('data', (data) =>
-            {
-                listeners.network(data.toString().trim());
+        // Crashlog
+        let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
+        crashLogWatcher.on('add', (p) =>
+        {
+            if(p.split('/')[p.split('/').length-1] != `hs_err_pid${process.pid}.log`){return}
 
-                for (let i = 0; i < networkListeners.length; i++)
-                {
-                    const l = networkListeners[i];
-                    if(!l || l.msg != data.toString().trim()){continue;}
-                    l.event();
-                    if(l.single) { delete networkListeners[i]; }
-                }
-            });
-            socket.on('error', (err) => console.error(`Server error ${err.code}`))
-            socket.on('close', () => console.log('Minecraft disconnected'));
-        });
-        server.listen(port, '127.0.0.1');
+            let s = fs.createReadStream(p)
+            .pipe(es.split())
+            .pipe(es.mapSync(function(line)
+            {
+                s.pause();
+                console.log(line)
+                listeners.log('data', line)
+                s.resume();
+            })
+        );
+        })
+
+        // Network (need java agent)
+        // let networkListeners = [];
+        // const server = net.createServer((socket) =>
+        // {    
+        //     socket.on('data', (data) =>
+        //     {
+        //         listeners.network(data.toString().trim());
+
+        //         for (let i = 0; i < networkListeners.length; i++)
+        //         {
+        //             const l = networkListeners[i];
+        //             if(!l || l.msg != data.toString().trim()){continue;}
+        //             l.event();
+        //             if(l.single) { delete networkListeners[i]; }
+        //         }
+        //     });
+        //     socket.on('error', (err) => console.error(`Server error ${err.code}`))
+        //     socket.on('close', () => console.log('Minecraft disconnected'));
+        // });
+        // net.
+        // server.listen(port, '127.0.0.1');
 
         
         // Wait for Window
@@ -615,6 +668,8 @@ class Instance
     shaders = [];
     onShaderUpdate = (shaders) => {}
 
+    onRequestUpdate = (list) => {}
+
     save()
     {
         if(this.name == ''){return}
@@ -773,6 +828,7 @@ class Instance
         if(data.virtualPath != undefined && data.virtualPath != ""
             && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
         {
+            console.log('created virtual dir for mod', data)
             this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'mods', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
         }
 
@@ -810,7 +866,7 @@ class Instance
                 if(data[k] == undefined) { data[k] = this.rp[i][k]; }
             }
             this.rp[i] = data;
-            this.rp[i].missing = !this.modExist(this.rp[i].filename);
+            this.rp[i].missing = !this.rpExist(this.rp[i].filename);
         }
         else
         {
@@ -851,26 +907,30 @@ class Instance
 
         if(workingPath!=null && !this.rp[i].fileVerified)
         {
-            new Promise(async (resolve) =>
+            if(fs.existsSync(workingPath))
             {
-                let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
-
-                let packMcmeta = unziped['pack.mcmeta'];
-                if(packMcmeta != undefined)
+                new Promise(async (resolve) =>
                 {
-                    if(typeof(packMcmeta.description)=='object') { this.rp[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
-                    else if(typeof(packMcmeta.description) == 'string') { this.rp[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
-                }
+                    let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
 
-                let icon = unziped['pack.png'];
-                if(icon != undefined)
-                {
-                    this.rp[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
-                }
+                    let packMcmeta = unziped['pack.mcmeta'];
+                    if(packMcmeta != undefined)
+                    {
+                        if(typeof(packMcmeta.description)=='object') { this.rp[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                        else if(typeof(packMcmeta.description) == 'string') { this.rp[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                    }
 
-                resolve();
-            });
-            this.rp[i].fileVerified=true;
+                    let icon = unziped['pack.png'];
+                    if(icon != undefined)
+                    {
+                        this.rp[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
+                    }
+
+                    resolve();
+                });
+                this.rp[i].fileVerified=true;                
+            }
+            else { console.log("rp file not found") }
         }
     
         // Virtual Path
@@ -905,6 +965,7 @@ class Instance
     {
         if(this.name == ''){return}
         let og = JSON.stringify(this.shaders);
+        if(data.filename.endsWith('.txt')){return;}
         data.filename = Instance.cleanShaderName(data.filename);
 
         let i = this.shaders.findIndex(m => m.filename == data.filename);
@@ -915,7 +976,7 @@ class Instance
                 if(data[k] == undefined) { data[k] = this.shaders[i][k]; }
             }
             this.shaders[i] = data;
-            this.shaders[i].missing = !this.modExist(this.shaders[i].filename);
+            this.shaders[i].missing = !this.shaderExist(this.shaders[i].filename);
         }
         else
         {
@@ -997,92 +1058,107 @@ class Instance
 
     static async ephemeralInstance(loader, version, mods)
     {
+        console.log("Launching ephemeral instance:", loader, version)
+
         //  Create temp instance directory + world
-        let p = path.join(config.directories.ephemeralInstances, new Date().toISOString())
-        if(!fs.existsSync(p)){fs.mkdirSync(p, {recursive: true});}
+        // let p = path.join(config.directories.ephemeralInstances, new Date().toISOString())
+        let p = path.join("/tmp/ephemeral-instances/", "/minecraft")
+        if(fs.existsSync(p)){fs.rmSync(p, { recursive: true, force: true });}
+        fs.mkdirSync(p, {recursive: true});
     
-        // New World
-        if(!fs.existsSync(path.join(p, 'saves', 'world'))){fs.mkdirSync(path.join(p, 'saves', 'world'), {recursive: true});}
-
-        let levelData = 
-        {
-            name: "",
-            type: "compound",
-            value:
-            {
-                Data: {
-                    type: "compound",
-                    value: {
-                        Version:
-                        {
-                            type: "compound",
-                            value:
-                            {
-                                Id: { type: "int", value: minecraftData(version.number.toString()).version.dataVersion },
-                                Name: { type: "string", value: version.number.toString() },
-                                Series: { type: "string", value: "main" },
-                                Snapshot: { type: "byte", value: version.type=='release'?0:1 }
-                            }
-                        },
-                        LevelName: { type: "string", value: 'world' },
-                        GameType: { type: "int", value: 1 },
-                        hardcore: { type: "byte", value: 0 },
-                        allowCommands: { type: "byte", value: 1 },
-                        Difficulty: { type: "byte", value: 2 },
-                        DataVersion: { type: "int", value: minecraftData(version.number.toString()).version.dataVersion },
-                        confirmedExperimentalSettings: { type: 'byte', value: 1 },
-                        initialized: { type: 'byte', value: 1 },
-                        WasModded: { type: 'byte', value: 1 },    
-                    }
-                }    
-            }
-        };
-
-        const buffer = nbt.writeUncompressed(levelData);
-        let compressed = zlib.gzipSync(buffer)
-        fs.writeFileSync(path.join(p, 'saves', 'world', 'level.dat'), compressed);
-
-        // Loader
-        version.custom = await installLoader(p, loader, version)
-    
-        // Resource Path (download optimization)
-        let resourcePath = path.join(config.directories.resources, version.number+'-'+version.type)
-        if(!fs.existsSync(resourcePath)){fs.mkdirSync(resourcePath, {recursive: true});}
-        if(!fs.existsSync(resourcePath+'/assets/indexes')){fs.mkdirSync(resourcePath+'/assets/indexes', {recursive: true});}
-        if(!fs.existsSync(resourcePath+'/assets/objects')){fs.mkdirSync(resourcePath+'/assets/objects', {recursive: true});}
-        if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
-        if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fsmkdirSync(path.join(config.directories.resources, 'versions', {recursive: true}));}   
-        
         // Install Mods
         for(let m of mods)
         {
-            await Download.download(m.url, path.join(p, 'mods', m.filename))
+            console.log(m);
+            if(!m.type){m.type="mods"}
+            await Download.download(m.url, path.join(p, m.type, m.filename))
         }
+
+        // Loader
+        version.custom = await installLoader(p, loader, version)
+
+        // // New World
+        // if(!fs.existsSync(path.join(p, 'saves', 'world'))){fs.mkdirSync(path.join(p, 'saves', 'world'), {recursive: true});}
+
+        // let levelData = 
+        // {
+        //     name: "",
+        //     type: "compound",
+        //     value:
+        //     {
+        //         Data: {
+        //             type: "compound",
+        //             value: {
+        //                 Version:
+        //                 {
+        //                     type: "compound",
+        //                     value:
+        //                     {
+        //                         Id: { type: "int", value: minecraftData(version.number.toString()).version.dataVersion },
+        //                         Name: { type: "string", value: version.number.toString() },
+        //                         Series: { type: "string", value: "main" },
+        //                         Snapshot: { type: "byte", value: version.type=='release'?0:1 }
+        //                     }
+        //                 },
+        //                 LevelName: { type: "string", value: 'world' },
+        //                 GameType: { type: "int", value: 1 },
+        //                 hardcore: { type: "byte", value: 0 },
+        //                 allowCommands: { type: "byte", value: 1 },
+        //                 Difficulty: { type: "byte", value: 2 },
+        //                 DataVersion: { type: "int", value: minecraftData(version.number.toString()).version.dataVersion },
+        //                 confirmedExperimentalSettings: { type: 'byte', value: 1 },
+        //                 initialized: { type: 'byte', value: 1 },
+        //                 WasModded: { type: 'byte', value: 1 },    
+        //             }
+        //         }    
+        //     }
+        // };
+
+        // const buffer = nbt.writeUncompressed(levelData);
+        // let compressed = zlib.gzipSync(buffer)
+        // fs.writeFileSync(path.join(p, 'saves', 'world', 'level.dat'), compressed);
     
-        let process = await launcher.launch
-        ({
+        // Resource Path (download optimization)
+        let resourcePath = path.join(config.directories.resources, version.number+'-'+version.type)
+        if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
+        else{fs.cpSync(resourcePath+'/assets', path.join(p,'assets'), {recursive:true})}
+        if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
+        else{fs.cpSync(resourcePath+'/libraries', path.join(p,'libraries'), {recursive:true})}
+
+
+        // Asset Move
+        launcher.on('debug', (e) =>
+        {
+            if(e == '[MCLC]: Downloaded assets')
+            {
+                fs.cpSync(path.join(p,'assets'), resourcePath+'/assets', {recursive:true})
+                fs.cpSync(path.join(p,'libraries'), resourcePath+'/libraries', {recursive:true})
+                fs.cpSync(path.join(p,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
+            }
+        });
+
+        // Prepare Events
+        // launcher.on('progress', (e) => console.log('progress', e));
+        launcher.on('debug', (e) => console.log('debug', e));
+        launcher.on('data', (e) => console.log('data', e));
+        launcher.on('close', (e) => console.log('close', e));
+        launcher.on('error', (e) => console.log('error', e));
+        launcher.on('close', (e) => {console.log(e);launcher.removeAllListeners()})
+
+        let options =
+        {
             root: p,
             version: version,
             memory: {max: '6G', min: '4G'},
             authorization: await Authenticator.getAuth("tester"),
-            forge: loader.name=='forge'?path.join(p, 'versions', `forge-${version.number}-${loader.version}`, `forge-${version.number}-${loader.version}.jar`):null,
-            clientPackage: null,
-            overrides:
-            {
-                assetRoot: resourcePath+'/assets',
-                assetIndex: resourcePath+'/assets/indexes',
-                libraryRoot: resourcePath+'/libraries',
-                directory: path.join(config.directories.resources, 'versions')
-            },
-            quickPlay:
-            {
-                type: 'singleplayer',
-                identifier: 'World'
-            },
-            customArgs: [`-javaagent:${config.javaAgent}`],
-        });
+            forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
+            quickPlay: null
+        }
+        console.log(options);
 
-        process.on('close', () => fs.unlinkSync(p))
+        let process = await launcher.launch(options);
+
+        if(!process) { console.error("Process is null..."); return; }
     }
 
     static instanceList()

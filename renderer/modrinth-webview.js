@@ -3,19 +3,31 @@ setInterval(() =>
     if(document.getElementById('button-download-version-select') == undefined) { modify(); }
 }, 1000/60);
 
+try{
+    var downloaded = false;
+    var name;
+}
+catch(err){}
+
 function modify()
 {
-    document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').onclick = async (e) =>
+    if(document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)'))
     {
-        e.preventDefault();
-        window.electron.sendToHost('download', {});
-        if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
-        { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
+        document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').onclick = async (e) =>
+        {
+            e.preventDefault();
+            window.electron.sendToHost('download', {});
+            if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
+            { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
+        }
+        document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').style.display = 'none';
     }
-    document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').style.display = 'none';
+
+
+    if(!name) { window.electron.sendToHost('name', document.querySelector("h1").innerText); }
 
     // Add new buttons
-    if(!document.getElementById('button-download'))
+    if(!document.getElementById('button-download') && document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)'))
     {
         let c = document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').cloneNode(true);
         c.innerHTML = 'Add'
@@ -52,15 +64,9 @@ function modify()
         }`
         document.head.appendChild(style);
 
-        c.onclick = async (e) =>
-        {
-            e.preventDefault();
-            window.electron.sendToHost('download');
-            if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
-            { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
-        }
+        window.updateDownloaded(downloaded);
     }    
-    if(!document.getElementById('button-download-version-select'))
+    if(!document.getElementById('button-download-version-select') && document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)'))
     {
         let c = document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').cloneNode(true);
         c.innerHTML = 'Previous Versions'
@@ -99,7 +105,7 @@ function modify()
 
         c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('version-select', {}); }
     }
-    if(!document.getElementById('button-quick-test'))
+    if(!document.getElementById('button-quick-test') && document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)'))
     {
         let c = document.querySelector('div.hidden:nth-child(1) > div:nth-child(1) > button:nth-child(1)').cloneNode(true);
         c.innerHTML = 'Quick Test'
@@ -138,11 +144,80 @@ function modify()
 
         c.onclick = async (e) => { e.preventDefault(); window.electron.sendToHost('quick-test', {}); }
     }
+
+    // Modify Save
+    if(document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4) > a"))
+    {
+        document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4)").replaceWith(document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4)").cloneNode(true));
+
+        // window.isSaved
+        if(window.isSaved) { document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4) > a > svg").style.color = "#da895b"; }
+        else { document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4) > a > svg").style.color = "rgb(176, 186, 197)"; }
+
+        document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4)").onclick = (ev) =>
+        {
+            ev.preventDefault();
+
+            if(!window.isSaved)
+            {
+                window.electron.sendToHost('save',
+                {
+                    url: location.protocol + '//' + location.host + location.pathname,
+                    name: document.querySelector("h1").innerText,
+                    description: document.querySelector("div.flex.gap-4 > div > p").innerText,
+                    icon: document.querySelector("div > div.flex.gap-4 > img").src,
+                    date: new Date()
+                });
+
+                window.isSaved = true;
+                document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4) > a > svg").style.color = "#da895b";
+            }
+            else
+            {
+                window.electron.sendToHost('unsave', location.protocol + '//' + location.host + location.pathname);
+                document.querySelector("div.flex.flex-wrap.gap-2.items-center > div:nth-child(4) > a > svg").style.color = "rgb(176, 186, 197)";
+                window.isSaved = false;
+            }
+        }
+    }
     
     document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div.new-page.sidebar > div.normal-page__header.relative.my-4 > div > div.flex.flex-wrap.gap-2.items-center > div.hidden.sm\\:contents > div > button").childNodes[1].data = 'Add'
 }
 try{modify()}catch(err){console.error(err)}
 document.body.onloadeddata = document.body.onload = document.body.onloadstart = window.onloadeddata = window.onloadedmetadata = modify;
+
+window.updateDownloaded = (l) =>
+{
+    downloaded=l;
+    if(!document.getElementById('button-download')){return;}
+
+    if(l)
+    {
+        document.getElementById('button-download').innerText = 'Remove'
+        document.getElementById('button-download').style.opacity = '0.8'
+
+        document.getElementById('button-download').onclick = async (e) =>
+        {
+            e.preventDefault();
+            window.electron.sendToHost('remove');
+            if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
+            { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
+        }
+    }
+    else
+    {
+        document.getElementById('button-download').innerText = 'Add'
+        document.getElementById('button-download').style.opacity = '1'
+
+        document.getElementById('button-download').onclick = async (e) =>
+        {
+            e.preventDefault();
+            window.electron.sendToHost('download');
+            if(document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)"))
+            { document.querySelector("#__nuxt > div.layout > main > div.experimental-styles-within > div:nth-child(4)").style.display = 'none' }
+        }
+    }
+}
 
 window.versionSelect = async function(versions)
 {

@@ -3,6 +3,7 @@ const fs = require('fs')
 const { unzip } = require('unzipit');
 const toml = require('toml');
 const path = require('node:path')
+const StreamZip = require('node-stream-zip');
 
 module.exports = 
 {
@@ -43,7 +44,52 @@ module.exports =
     {
         fs.writeFileSync(path, Buffer.from(d))
     },
-    handleData
+    handleData,
+    unzipSave: async function(from, dest)
+    {
+        if(!fs.existsSync(dest)){fs.mkdirSync(dest, {recursive:true})}
+
+        const waitForFileReady = (minSize = 1e6, timeout = 10000) => new Promise((resolve, reject) => {
+            const start = Date.now();
+            (function check() {
+            fs.stat(from, (err, stats) => {
+                if (err) return reject(err);
+                if (stats.size >= minSize) return resolve();
+                if (Date.now() - start > timeout) return reject(new Error('ZIP file not fully available'));
+                setTimeout(check, 2000);
+            });
+            })();
+        });
+
+        await waitForFileReady();
+
+        // Extraire le ZIP
+        return new Promise((resolve, reject) =>
+        {
+            const zip = new StreamZip.async({ file: from });
+            zip.extract(null, dest)
+            .then(() => zip.close())
+            .then(resolve)
+            .catch(async err => {
+                await zip.close().catch(() => {});
+                reject(err);
+            });
+        });
+        // const unziped = await unzip(buffer);
+        // for (const [name, entry] of Object.entries(unziped.entries))
+        // {
+        //     const fullPath = path.join(dest, name);
+        //     if (entry.isDirectory)
+        //     {
+        //         fs.mkdirSync(fullPath, { recursive: true });
+        //     }
+        //     else
+        //     {
+        //         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        //         fs.writeFileSync(fullPath, Buffer.from(await entry.arrayBuffer()))
+        //     }
+        // }
+    }
 }
 
 function handleData(buffer, type)

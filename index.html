@@ -8,6 +8,13 @@
     <link rel="stylesheet" href="./index.css">
 </head>
 <body>
+    <script type="importmap">
+    {
+        "imports": {
+        "cdn/": "https://esm.sh/"
+        }
+    }
+    </script>
     <script src="./renderer/popup.js" type="module"></script>
     <script src="./renderer/instance.js" type="module"></script>
     <script src="./renderer/launch.js" type="module"></script>
@@ -21,10 +28,13 @@
     <script src="./renderer/shader-browser.js" type="module"></script>
     <script src="./renderer/image-open.js" type="module"></script>
     <script src="./renderer/explorer.js" type="module"></script>
+    <script src="./renderer/mods-explorer.js" type="module"></script>
     <script src="./renderer/youtube.js" type="module"></script>
     <script src="./renderer/web-loader.js" type="module"></script>
     <script src="./renderer/config-editor.js" type="module"></script>
     <script src="./renderer/hover-info.js" type="module"></script>
+    <script src="./renderer/saves-importer.js" type="module"></script>
+    <script src="./renderer/content-editor.js" type="module"></script>
 
     <!-- <div id="drag-window"></div> -->
     <!-- <div class="panel">
@@ -67,7 +77,7 @@
     </div>
 
     <div id="center-panel">
-        <div class="tab" anchor-left><button>Game</button><button>Console</button><button>Class</button><button>Web</button><button>Youtube</button><button>Config</button></div>
+        <div class="tab" anchor-left><button>Game</button><button>Console</button><button>Class</button><button>Web</button><button>Youtube</button><button>Config</button><button>Collections</button><button>Content</button></div>
         <video id="game-window" autoplay muted></video>
         <div id="console-window"></div>
         <div id="class-window">
@@ -119,19 +129,90 @@
                 </div>    
             </div>
         </div>
+        <div id="saves-panel">
+            <div id="select">
+                <div class="tab" id="tab" anchor-top anchor-left anchor-right fill-width><button>Packs</button><button>Saved</button><button>Videos</button></div>
+                <input type="text">
+                <div id="container">
+                    <div>
+                        <img src="https://static.wikia.nocookie.net/logopedia/images/3/3c/Minecraft_icon_2021.svg/revision/latest/scale-to-width-down/250?cb=20230427140314">
+                        <div>
+                            <h4>Name</h4>
+                            <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Consequuntur laborum sint corporis sunt impedit quos delectus voluptates, commodi, quae at a maiores autem numquam repellat quia exercitationem. Minus, repellendus in.</p>
+                            <p>278 mods<br>8 resourcepacks<br>4 shaders</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="pack-editor">
+                    <input id="name" type="text" placeholder="Pack Name">
+                    <div>
+                        <table>
+                            <caption>
+                                Compatibility
+                            </caption>
+                            <thead>
+                                <tr>
+                                <th scope="col">Loader</th>
+                                <th scope="col">Minecraft Version</th>
+                                <th scope="col">Files</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Forge</td>
+                                    <td>1.20.1</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Forge</th>
+                                    <td>1.20</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Fabric</th>
+                                    <td>1.20.1</td>
+                                </tr>
+                            </tbody>
+                        </table>                        
+                    </div>
+                    <div id="pack-content-explorer" class="folder-content"></div>
+                    <div>
+                        <button>Back</button>
+                        <button>Test</button>
+                        <button>Import</button>
+                    </div>
+                </div>
+            </div>
+            <div id="view">
+                <div>
+                    <button><b><</b></button>
+                    <h2></h2>
+                </div>
+                <div id="pack-explorer" class="folder-content"></div>
+            </div>
+        </div>
+        <div id="content-editor">
+            <div id="mod-content-editor">
+                <button>Compile</button>
+                <!-- Mod Selection -->
+                <div class="content-explorer-section">
+                    <h3>Content</h3>
+                </div>
+            </div>
+            <div id="code-editor">
+                <div class="exit-options"><button>Save</button><button>Exit</button></div>
+            </div>
+        </div>
     </div>
 
     <div id="left-panel" class="side-panel">
-        <div id="mod-info-panel">
+        <!-- <div id="mod-info-panel">
             <div><img><h2>Mod</h2></div>
             <p>Mod description will be displayed here.</p>
             <div class="content-slider"></div>
             <div id="supporting"><img src="./resources/client.png"><img src="./resources/server.png"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
-            <div id="actions"><button config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"></button></div>
-        </div>
+            <div id="actions"><button config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button></div>
+        </div> -->
     </div>
     <div id="right-panel" class="side-panel">
-        <div class="tab" anchor-bottom fill-width><button>General</button><button>Mods</button><button>Resourcepacks</button><button>Shaders</button></div>
         <div id="general-settings">
             <div>
                 <input id="instance-name" type="text" placeholder="Instance Name">
@@ -139,18 +220,6 @@
             <div>
                 <textarea id="instance-description" placeholder="Instance description..." rows="4" cols="50"></textarea>
             </div>
-            <!-- <div>
-                <select id="minecraft-version" name="version"></select> 
-                <select id="minecraft-loader" name="version">
-                    <option value="vanilla">Vanilla</option>
-                    <option value="forge">Forge</option>
-                    <option value="fabric">Fabric</option>
-                    <option value="neoforge">Neoforge</option>
-                    <option value="quilt">Quilt</option>
-                </select>
-                <select id="minecraft-loader-version" name="version"></select>    
-            </div> -->
-
             <label><select id="minecraft-version" name="version"></select> Minecraft Version</label>
             <label>
                 <select id="minecraft-loader" name="version">
@@ -164,44 +233,13 @@
             <label><select id="minecraft-loader-version" name="version"></select> Loader Version</label>
             <label style="padding-left: 27px;">Sinytra Connector <p style="opacity: 0.5; margin-left: 0;">(allow forge to run fabric mods)</p><input id="sinytra" type="checkbox"><span></span></label>
         </div>
-        <div id="mods-settings" class="item-settings">
-            <input type="text" placeholder="Shearch a mod...">
-            <div id="mod-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>Planet Minecraft</button><button>MinecraftMods</button></div>
-            <div class="item-download-list" id="mod-download-list">
-                <div>
-                    <img>
-                    <div>
-                        <div><div></div><h4>Title</h4></div>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="resourcepacks-settings" class="item-settings">
-            <input type="text" placeholder="Shearch a resource pack...">
-            <div id="resourcepack-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
-            <div class="item-download-list" id="resourcepack-download-list">
-                <div>
-                    <img>
-                    <div>
-                        <div><div></div><h4>Title</h4></div>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="shaders-settings" class="item-settings">
-            <input type="text" placeholder="Shearch a shader...">
-            <div id="shader-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
-            <div class="item-download-list" id="shader-download-list">
-                <div>
-                    <img>
-                    <div>
-                        <div><div></div><h4>Title</h4></div>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
-                    </div>
-                </div>
-            </div>
+        <div id="mod-info-panel">
+            <div><img><h2>Mod</h2></div>
+            <p>Mod description will be displayed here.</p>
+            <p>version: </p>
+            <div class="content-slider"></div>
+            <div id="supporting"><img src="./resources/client.png"><img src="./resources/server.png"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
+            <div id="actions"><button config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button><button edit hover-info="Edit"></button></div>
         </div>
     </div>
     <div id="top-panel" class="side-panel">
@@ -218,10 +256,57 @@
     </div>
     <div id="bottom-panel" class="side-panel">
         <div>
-            <div class="tab" anchor-left anchor-top><button>Mods Folder</button><button>Resourcepacks Folder</button><button>Shaders Folder</button><button>Web</button></div>
+            <div class="tab" anchor-left anchor-top><button>Mods</button><button>Resourcepacks</button><button>Shaders</button><button>Download</button></div>
             <div id="mods-explorer" class="folder-content"></div>
             <div id="rp-explorer" class="folder-content"></div>
             <div id="shaders-explorer" class="folder-content"></div>
+
+            <div id="browse-panel">
+                <div class="tab" anchor-bottom fill-width>
+                    <label style="padding-left: 27px;">Filter Version<input id="filter-version-browsing" type="checkbox" checked><span></span></label>
+                    <button>Mods</button><button>Resourcepacks</button><button>Shaders</button>
+                </div>
+                <div id="mods-settings" class="item-settings">
+                    <input type="text" placeholder="Shearch a mod...">
+                    <div id="mod-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button current="false" disabled>Planet Minecraft</button><button disabled current="false">MinecraftMods</button></div>
+                    <div class="item-download-list" id="mod-download-list">
+                        <div>
+                            <img>
+                            <div>
+                                <div><div></div><h4>Title</h4></div>
+                                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="resourcepacks-settings" class="item-settings">
+                    <input type="text" placeholder="Shearch a resource pack...">
+                    <div id="resourcepack-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
+                    <div class="item-download-list" id="resourcepack-download-list">
+                        <div>
+                            <img>
+                            <div>
+                                <div><div></div><h4>Title</h4></div>
+                                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="shaders-settings" class="item-settings">
+                    <input type="text" placeholder="Shearch a shader...">
+                    <div id="shader-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
+                    <div class="item-download-list" id="shader-download-list">
+                        <div>
+                            <img>
+                            <div>
+                                <div><div></div><h4>Title</h4></div>
+                                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="bottom-webview-container">
                 <webview id="bottom-webview" preload="renderer/webview-preload.js"></webview>
             </div>

@@ -1,0 +1,18 @@
+#mod-gallery
+{
+    display: flex;
+    width: 100%;
+    overflow-x: scroll;
+    max-height: 50vh;
+    margin-top: 8px;
+    overflow: hidden;
+    height: 315px;
+}
+#mod-gallery > img
+{
+    border-radius: 12px;
+    margin-right: 8px;
+    height: fit-content;
+    max-width: 50vw;
+    height: 304px;
+}

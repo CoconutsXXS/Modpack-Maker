@@ -1,7 +1,7 @@
-// import ytSearch from 'https://cdn.skypack.dev/youtube-search-api'
-import YouTube from "https://cdn.skypack.dev/youtube-sr";
-import { getSubtitles } from 'https://cdn.skypack.dev/youtube-captions-scraper'
-import similarity from 'https://cdn.skypack.dev/similarity'
+// import ytSearch from 'cdn/youtube-search-api'
+import YouTube from "cdn/youtube-sr";
+import { getSubtitles } from 'cdn/youtube-captions-scraper'
+import similarity from 'cdn/similarity'
 
 let webview = document.getElementById('youtube-integration');
 const sourceCode = await (await fetch('renderer/youtube-webview.js')).text();
@@ -188,8 +188,8 @@ async function displaySearch(text = '')
     document.getElementById('youtube-search').style.display = 'block';
 
     document.querySelector('#youtube-search > div').innerHTML = '';
-    await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23top${text.replace(/%20/g, '+')}&sp=EgQQARgD`, 60, resultHandler);
-    await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23top${text.replace(/%20/g, '+')}&sp=EgQQARgC`, 60, resultHandler);
+    // await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23top${text.replace(/%20/g, '+')}&sp=EgQQARgD`, 60, resultHandler);
+    await searchYouTube(`https://www.youtube.com/results?search_query=%23minecraft+%23mod+%23showcase${text.replace(/%20/g, '+')}&sp=EgQQARgC`, 60, resultHandler);
     
     function resultHandler(r)
     {
@@ -232,9 +232,10 @@ async function loadVideo(videoId)
                 display: flex;
                 width: 100%;
                 overflow-x: scroll;
-                height: auto;
                 max-height: 50vh;
                 margin-top: 8px;
+                overflow-y: hidden;
+                height: 315px;
             }
             #mod-gallery > img
             {
@@ -242,6 +243,7 @@ async function loadVideo(videoId)
                 margin-right: 8px;
                 height: fit-content;
                 max-width: 50vw;
+                height: 304px;
             }
             #content > ytd-mini-guide-renderer { display: none; }
             #header#header#header#header { margin: 0; }
@@ -258,6 +260,7 @@ async function loadVideo(videoId)
             #secondary#secondary {
                 min-height: calc(100% - 48px) !important;
                 width: calc(100% - 48px); !important;
+                display: none; !important
             }
             #primary#primary {
                 min-width: calc(100% - 48px) !important;
@@ -268,7 +271,6 @@ async function loadVideo(videoId)
             ytd-watch-flexy[full-bleed-player] #full-bleed-container.ytd-watch-flexy#full-bleed-container.ytd-watch-flexy{
                 min-height: calc(100vh - 24px);
             }
-
             ytd-watch-flexy[flexy][use-larger-max-player-value]:not([full-bleed-player][full-bleed-no-max-width-columns]) #columns.ytd-watch-flexy {
                 display: block;
             }
@@ -300,13 +302,15 @@ async function loadVideo(videoId)
         let url = new URL(baseUrl);
         openFunction = function()
         {
-            document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('bottom-webview').openDevTools()}})
-            window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('bottom-webview'), baseUrl)
-            Array.from(document.getElementById('bottom-panel').childNodes[1].childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
+            document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
+            window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), baseUrl)
+            // Array.from(document.getElementById('bottom-panel').childNodes[1].childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
+            Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
         }
 
         // Youtube Button Update
         // let page = new DOMParser().parseFromString(await (await fetch(url)).text(), 'text/html');
+        console.log(setCurrentMod);
         if(url.hostname=='www.curseforge.com')
         {
             let i = [];
@@ -335,7 +339,16 @@ async function loadVideo(videoId)
             }
             let files = await window.web.findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split('/')[3]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods')
 
-            await webview.executeJavaScript(`window.updateMod("${galPage.querySelector("#__next > div > main > div.ads-layout > div > div > div > div.name-container > h1").innerText}", "${galPage.querySelector(".project-header > #row-image").src}", ${JSON.stringify(i)}, ${files.length>0});`, true)
+            await webview.executeJavaScript(`window.updateMod
+            (
+                "${url.protocol+'//'+url.host+url.pathname}",
+                "${galPage.querySelector(".name-container > h1").innerText}", 
+                "${galPage.querySelector(".author-info > img").src}", 
+                "${galPage.querySelector(".project-summary").innerHTML}",
+                ${JSON.stringify(i)}, 
+                ${files.length>0}, 
+                ${((await ipcInvoke('savedList')).find(s=>s.url==url.protocol+'//'+url.host+url.pathname || s.name == galPage.querySelector(".name-container > h1").innerText)==undefined)?'false':'true'}
+            );`, true)
         }
         else
         {
@@ -358,7 +371,16 @@ async function loadVideo(videoId)
 
             let files = await window.web.findModrinthFile(url.pathname.split('/')[2], url.pathname.split('/')[1]=='mod');
 
-            await webview.executeJavaScript(`window.updateMod("${galPage.querySelector("h1.m-0").innerText}", "${galPage.querySelector(".gap-x-8 > div:nth-child(1) > img:nth-child(1)").src}", ${JSON.stringify(i)}, ${files.length>0});`, true)
+            await webview.executeJavaScript(`window.updateMod
+            (
+                "${url.protocol+'//'+url.host+url.pathname}",
+                "${galPage.querySelector("h1.m-0").innerText}", 
+                "${galPage.querySelector(".gap-x-8 > div:nth-child(1) > img:nth-child(1)").src}", 
+                "${galPage.querySelector("div.flex.gap-4 > div > p").innerText}", 
+                ${JSON.stringify(i)},
+                ${files.length>0}, 
+                ${((await ipcInvoke('savedList')).find(s=>s.url==url.protocol+'//'+url.host+url.pathname)==undefined)?'false':'true'}
+            );`, true)
         }
 
         lastURL=baseUrl
@@ -391,11 +413,25 @@ async function loadVideo(videoId)
                     currentChapter = chapters.sort((a,b) => b.time-a.time).find(a => a.time < time);
                     if(!currentChapter) { console.log('no chapter found, chapter =', chapters, 'time = ', time); break; }
                     console.log(currentChapter.name)
-                    let l = links.sort((a,b) => similarity(np(b.before), np(currentChapter.name), {sensitive: true}) - similarity(np(a.before), np(currentChapter.name), {sensitive: true}))[0];
+                    let l  = links.sort((a,b) =>
+                    {
+                        // return similarity(np(b.before), np(currentChapter.name), {sensitive: true}) - similarity(np(a.before), np(currentChapter.name), {sensitive: true});
+                        let ia = 0;
+                        for(let before of a.fullBefore)
+                        {
+                            ia+=similarity(np(before), np(currentChapter.name), {sensitive: true});
+                        }
+                        ia /= a.fullBefore.length;
 
-                    console.log(currentChapter, links)
-                    console.log("similar = ", l, similarity(np(l.before), np(currentChapter.name), {sensitive: true}))
-                    if(similarity(np(l.before), np(currentChapter.name), {sensitive: true}) < 0.5) { return }
+                        let ib = 0;
+                        for(let before of b.fullBefore)
+                        {
+                            ib+=similarity(np(before), np(currentChapter.name), {sensitive: true});
+                        }
+                        ib /= b.fullBefore.length;
+
+                        return Math.max(ib, similarity(np(b.before), np(currentChapter.name), {sensitive: true})) - Math.max(ia, similarity(np(a.before), np(currentChapter.name), {sensitive: true}));
+                    })[0];
 
                     setCurrentMod(l.url);
                 }
@@ -443,24 +479,26 @@ async function loadVideo(videoId)
                             index2++;
 
                             let before = null;
+                            let fullBefore = null;
                             if(nolinkText.filter(p=>!urlRegex.test(p))[index2-1])
                             {
-                                let previousList = nolinkText.filter(p=>!urlRegex.test(p))[index2-1].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+                                fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-1].split('\n').filter(p=>p.replaceAll(' ', '')!='');
 
                                 let substract = 2
-                                while(previousList.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > index2-substract && index2-substract >= 0)
+                                while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > index2-substract && index2-substract >= 0)
                                 {
-                                    previousList = nolinkText.filter(p=>!urlRegex.test(p))[index2-substract].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+                                    fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-substract].split('\n').filter(p=>p.replaceAll(' ', '')!='');
                                     substract++;
                                 }
         
-                                before = previousList[previousList.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
+                                before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
                             }
                             
                             final.push
                             ({
                                 url: l,
-                                before
+                                before,
+                                fullBefore
                             })
                         }
                     }
@@ -476,23 +514,25 @@ async function loadVideo(videoId)
                     if(url.hostname != 'www.curseforge.com' && url.hostname != 'modrinth.com') { continue; }
 
                     let before = null;
+                    let fullBefore = null;
                     if(nolinkText.filter(p=>!urlRegex.test(p))[i-1])
                     {
-                        let previousList = nolinkText.filter(p=>!urlRegex.test(p))[i-1].split('\n').filter(p=>p!='');
+                        fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[i-1].split('\n').filter(p=>p!='');
 
                         let substract = 2
-                        while(previousList.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > i-substract && i-substract >= 0)
+                        while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > i-substract && i-substract >= 0)
                         {
-                            previousList = nolinkText.filter(p=>!urlRegex.test(p))[i-substract].split('\n').filter(p=>p!='');
+                            fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[i-substract].split('\n').filter(p=>p!='');
                             substract++;
                         }
 
-                        before = previousList[previousList.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
+                        before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
                     }
                     final.push
                     ({
                         url: url.href,
-                        before
+                        before,
+                        fullBefore
                     })
                 }
                 links = final;
@@ -535,6 +575,14 @@ async function loadVideo(videoId)
                     // chapters = [];
                     // description = '';
                 }
+            }
+            case 'save':
+            {
+                await ipcInvoke('addSaved', event.args[0]);
+            }
+            case 'unsave':
+            {
+                await ipcInvoke('deleteSaved', event.args[0]);
             }
         }
     });

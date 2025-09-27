@@ -51,13 +51,18 @@ playButton.addEventListener('click', async () =>
 
     // Logs
     let threads = [{name: 'main', color: '#5555ff'},{name: 'Render thread', color: '#8855aa'},{name: 'Server thread', color: '#aa5555'}];
-    let logTypes = [{name: 'INFO', color: '#dddddd', softColor: 'unset'},{name: 'WARN', color: '#dddd00', softColor: '#aaaa55'},{name: 'ERROR', color: '#dd0000', softColor: '#AA5555'},{name: 'DEBUG', color: '#55dd55', softColor: '#33aa33'}]
+    let logTypes = [{name: 'DATA', color: '#dddddd', softColor: 'var(--text)'},{name: 'INFO', color: '#dddddd', softColor: 'var(--text)'},{name: 'WARN', color: '#dddd00', softColor: '#aaaa55'},{name: 'ERROR', color: '#dd0000', softColor: '#AA5555'},{name: 'DEBUG', color: '#55dd55', softColor: 'var(--text)'}]
+    let preLogs = [];
 
     // Launch
+    let closed = false;
+    consoleContainer.innerHTML='';
     const i = await launch(window.instance.name,
         {
             log: (t, c) =>
             {
+                if(closed){return;}
+                console.log(t, c)
                 // Prepare Element
                 var el = document.createElement('p');
                 if(t == 'progress')
@@ -94,24 +99,70 @@ playButton.addEventListener('click', async () =>
                 }
                 else { el.innerText = `[${t.toUpperCase()}] ${c}`; }
 
+                // [DATA] [15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/assets/.mcassetsroot' uses unexpected schema[15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/data/.mcassetsroot' uses unexpected schema
                 if(typeof(c)=='string')
                 {
                     let finalContent = '';
+
                     for(let c of el.innerText.split('\n'))
                     {
-                        let thread = c.split(':')[2].match((/\[(.*?)\]/))[1].split('/')[0];
-                        let type = c.split(':')[2].match((/\[(.*?)\]/))[1].split('/')[1];
+                        let finalType = t.toUpperCase();
+                        if(c.split(': ')[0]!=undefined && c.split(': ')[0].match((/\[(.*?)\]/)) != null)
+                        {
+                            let matches = c.split(': ')[0].match(/\[(.*?)\]/g);
+                            for(let k in matches)
+                            {
+                                let name = matches[k].slice(1, matches[k].length-1);
+                                if(name.includes('/'))
+                                {
+                                    let thread = name.split('/')[0];
+                                    let type = name.split('/')[1];
 
-                        if(threads.find(t=>t.name==thread) == undefined)
-                        {
-                            threads.push({name: thread, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                                    if(threads.find(t=>t.name==thread) == undefined)
+                                    {
+                                        threads.push({name: thread, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                                    }
+                                    if(logTypes.find(t=>t.name==type) == undefined)
+                                    {
+                                        logTypes.push({name: type, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                                    }
+                                    if(type != '' && finalType == t.toUpperCase()){finalType=type}
+
+                                    let lastAdd = ''
+                                    if(!c.includes(']: ') && Number(k)==matches.length-1)
+                                    {
+                                        lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`;
+                                    }
+
+                                    c=c.replace(`[${name}]`, `[<span style="color:${threads.find(t=>t.name==thread).color}">${thread}</span>/<span style="color:${logTypes.find(t=>t.name==type).color}">${type}</span>]`+lastAdd)
+                                    continue
+                                }
+
+                                if(preLogs.find(p=>p.name==name) == undefined)
+                                {
+                                    preLogs.push({name: name, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
+                                }
+                                if(name.match(/\[\d{2}:\d{2}:\d{2}\]/)!=undefined)
+                                {
+                                    preLogs[preLogs.findIndex(p=>p.name==name)].color = '#f3f3ff55'
+                                }
+
+                                let lastAdd = ''
+                                if(!c.includes(']: ') && Number(k)==matches.length-1)
+                                {
+                                    lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`;
+                                }
+
+                                c=c.replace(`[${name}]`, `[<span style="color:${preLogs.find(p=>p.name==name).color}">${name}</span>]`+lastAdd)
+                            }
+
+                            if(c.includes(']: '))
+                            {
+                                c=c.replace(`]: `, `]: <span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`)
+                            }
                         }
-                        if(logTypes.find(t=>t.name==type) == undefined)
-                        {
-                            logTypes.push({name: type, color: '#'+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(Math.random()*255/2+255/2).toString(16).padStart(2, '0')})
-                        }
-                        c='<span style="color:#f3f3ff55">'+c.replace(`[${c.split(':')[2].match((/\[(.*?)\]/))[1]}]: `, `<span style="color:${threads.find(t=>t.name==thread).color}">[${thread}/<span style="color:${logTypes.find(t=>t.name==type).color}">${type}</span>]</span>: </span><span style="color:${logTypes.find(t=>t.name==type).softColor}">`)
-                        c+='</span>'
+
+                        c='<span style="color:#f3f3ff55">'+c+'</span>';
                         finalContent = c+'\n';
                     }
 
@@ -125,7 +176,7 @@ playButton.addEventListener('click', async () =>
                     }
                     for(let match of finalContent.matchAll(/minecraft:[a-z0-9/_\-.]+(?:\.[a-z0-9]+)?(?:-[a-z0-9_\-.]+)?/g))
                     {
-                        finalContent = finalContent.slice(0, match.index)+ '<u>' + match[0] + '</u>'+finalContent.slice(match.index + match[0].length, finalContent.length)
+                        finalContent = finalContent.slice(0, match.index)+ '<b>' + match[0] + '</b>'+finalContent.slice(match.index + match[0].length, finalContent.length)
                     }
 
                     el.innerHTML = finalContent;
@@ -155,7 +206,8 @@ playButton.addEventListener('click', async () =>
             {
                 playButton.removeAttribute('pause');
                 playButton.removeAttribute('load');
-                playButton.setAttribute('play', '');            
+                playButton.setAttribute('play', '');      
+                closed = true;      
             },
             network: (i, c) =>
             {

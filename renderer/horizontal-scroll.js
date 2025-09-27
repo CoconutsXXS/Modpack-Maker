@@ -12,6 +12,6 @@ for(let e of document.getElementsByClassName('content-slider'))
     {
         if(scroll == e.scrollLeft){return;}
         e.scrollLeft = lerp(e.scrollLeft, scroll, 0.3);
-    }, 1000/60)        
+    }, 1000/60)
 }
 function lerp(a, b, t) { return a+(b-a)*t; }

@@ -1,4 +1,7 @@
+import similarity from 'cdn/similarity'
 let result = [];
+
+let sinytraCompat = JSON.parse(await (await fetch("./renderer/sinytra-compatibilities.json")).text())
 
 // Web search
 const parser = new DOMParser();
@@ -7,10 +10,11 @@ async function searchMod(text = '')
     let searchResult = [];
 
     // Modrinth
-    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22${window.instance.sinytra&&window.instance.loader.name=='forge'?",%22categories:fabric%22":''}],[%22versions:${window.instance.version.number}%22]]`)).json()
-    console.log(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22${window.instance.sinytra&&window.instance.loader.name=='forge'?",%22categories:fabric%22":''}],[%22versions:${window.instance.version.number}%22]]`)
+    let modrinth = await (await fetch(`https://api.modrinth.com/v2/search?limit=40&index=relevance&query=${text}&facets=[[%22project_type:mod%22],[%22categories:${window.instance.loader.name}%22${window.instance.sinytra&&window.instance.loader.name=='forge'?",%22categories:fabric%22":''}]${document.getElementById("filter-version-browsing").checked?`,[%22versions:${window.instance.version.number}%22]`:""}]`)).json()
     for(let h of modrinth.hits)
     {
+        let sinytra = window.instance.sinytra&&window.instance.loader.name=='forge'&&h.categories.find(c=>c==window.instance.loader.name)==undefined;
+        if(sinytra && sinytraCompat.incompatibles.find(i=>similarity(i,h.title)>0.8)){continue;}
         searchResult.push
         ({
             name: h.title,
@@ -22,7 +26,8 @@ async function searchMod(text = '')
             source: 'modrinth',
             images: h.gallery,
             url: `https://modrinth.com/mod/${h.slug}`,
-            originalData: h
+            originalData: h,
+            sinytra
         })
     }
 
@@ -35,7 +40,7 @@ async function searchMod(text = '')
         case 'neoforge': {flavorIndex=6;break;}
         case 'quilt': {flavorIndex=5;break;}
     }
-    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&gameVersion=${window.instance.version.number}&gameFlavors[0]=${flavorIndex}&classId=6`)).json()
+    let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&gameFlavors[0]=${flavorIndex}&classId=6`)).json()
     if(!curseforge.data){curseforge.data=[];}
     for(let d of curseforge.data)
     {
@@ -129,50 +134,51 @@ async function searchMod(text = '')
                 source: 'curseforge',
                 loadImages: loadImages,
                 url: `https://www.curseforge.com/minecraft/mc-mods/${d.slug}`,
-                originalData: d
+                originalData: d,
+                sinytra: true
             })
         }
     }
 
-    // Planet Minecraft
-    let planetMinecraftPage = parser.parseFromString(await (await fetch(`https://www.planetminecraft.com/mods/?keywords=${text}`)).text(), "text/html");
+    // // Planet Minecraft
+    // let planetMinecraftPage = parser.parseFromString(await (await fetch(`https://www.planetminecraft.com/mods/?keywords=${text}`)).text(), "text/html");
 
-    let i = 1;
-    for (let c of planetMinecraftPage.getElementsByClassName('resource_list')[0].childNodes)
-    {
-        if(c.nodeName != 'LI'){continue;}
-        if(c.className != 'resource r-data '){i++; continue;}
+    // let i = 1;
+    // for (let c of planetMinecraftPage.getElementsByClassName('resource_list')[0].childNodes)
+    // {
+    //     if(c.nodeName != 'LI'){continue;}
+    //     if(c.className != 'resource r-data '){i++; continue;}
 
-        let img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > img")?.src
-        if(img == undefined) { img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > picture > source:nth-child(1)")?.srcset; }
-        if(img == undefined) { continue; }
+    //     let img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > img")?.src
+    //     if(img == undefined) { img = planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a > picture > source:nth-child(1)")?.srcset; }
+    //     if(img == undefined) { continue; }
 
-        searchResult.push
-        ({
-            name: planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-info > a").innerText,
-            icon: img,
-            // version: a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', ''),
-            source: 'planetMinecraft',
-            url: `https://www.planetminecraft.com/${planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a").href}`
-        })
+    //     searchResult.push
+    //     ({
+    //         name: planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-info > a").innerText,
+    //         icon: img,
+    //         // version: a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', ''),
+    //         source: 'planetMinecraft',
+    //         url: `https://www.planetminecraft.com/${planetMinecraftPage.querySelector("#full_screen > div > div.resource_block > ul > li:nth-child("+i+") > div.r-preview > a").href}`
+    //     })
 
-        i++
-    }
+    //     i++
+    // }
 
-    // Minecraftmods    
-    let minecraftmodPage = parser.parseFromString(await (await fetch(`https://www.minecraftmods.com/search/${text}`)).text(), "text/html");
-    for(let a of minecraftmodPage.getElementById('search-results').getElementsByClassName('blog-row')[0].childNodes)
-    {
-        if(a.nodeType != 1 || a.className == 'no-results'){continue;}
-        searchResult.push
-        ({
-            name: a.childNodes[5].childNodes[0].innerText,
-            icon: a.childNodes[3].childNodes[1].childNodes[1].src,
-            versions: [a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', '')],
-            source: 'minecraftMods',
-            url: a.querySelector("div.post-meta.cf.rel > a").href
-        })
-    }
+    // // Minecraftmods    
+    // let minecraftmodPage = parser.parseFromString(await (await fetch(`https://www.minecraftmods.com/search/${text}`)).text(), "text/html");
+    // for(let a of minecraftmodPage.getElementById('search-results').getElementsByClassName('blog-row')[0].childNodes)
+    // {
+    //     if(a.nodeType != 1 || a.className == 'no-results'){continue;}
+    //     searchResult.push
+    //     ({
+    //         name: a.childNodes[5].childNodes[0].innerText,
+    //         icon: a.childNodes[3].childNodes[1].childNodes[1].src,
+    //         versions: [a.childNodes[7].childNodes[1].childNodes[2].innerText.replace('Minecraft ', '')],
+    //         source: 'minecraftMods',
+    //         url: a.querySelector("div.post-meta.cf.rel > a").href
+    //     })
+    // }
 
     return searchResult;
 }
@@ -207,7 +213,7 @@ window.setupTab(document.getElementById('mod-browser-filter'),
         select: () => { if(!sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.push('minecraftMods');displayResult()} },
         deselect: () => { if(sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='minecraftMods'), 1); displayResult()} }
     }
-], 0, true, true);
+], 0, true, false);
 
 // Display event
 searchInput.onkeydown = async (e) =>
@@ -242,6 +248,12 @@ function displayResult()
             c.style.backgroundImage = `url(./resources/website-logos/${m.secondarySource}.png)`;
             e.querySelector('div > div > div').insertBefore(c, e.querySelector('div > div > div > div'));
         }
+        if(m.sinytra)
+        { 
+            let c = e.querySelector('div > div > div > div').cloneNode(true);
+            c.style.backgroundImage = `url(./resources/website-logos/sinytra.png)`;
+            e.querySelector('div > div > div').insertBefore(c, e.querySelector('div > div > div > div'));
+        }
         if(window.instance.mods.find(mod => (m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.name&&m.name!=undefined)) != undefined) { e.setAttribute('installed',''); }
 
         // Event
@@ -257,6 +269,7 @@ function displayResult()
             selected = e;
             e.setAttribute('selected', '');
 
+            document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
             switch(m.source)
             {
                 case 'modrinth':
@@ -356,6 +369,7 @@ function displayResult()
                 }
             }
         }
+
         switch(m.source)
         {
             case 'modrinth': { e.ondblclick = async () => { await window.web.downloadModrinth(result[index].url); e.setAttribute('installed',''); }; break; }

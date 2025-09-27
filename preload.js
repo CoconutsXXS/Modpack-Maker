@@ -37,7 +37,7 @@ class Instance
     }
     deleteRP = function(name)
     {
-        this.setModData({filename: name, missing: true})
+        this.setRPData({filename: name, missing: true})
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.zip')
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.disabled')
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name);
@@ -54,7 +54,7 @@ class Instance
     }
     deleteShader = function(name)
     {
-        this.setModData({filename: name, missing: true})
+        this.setShaderData({filename: name, missing: true})
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.zip')
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.disabled')
         ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name);
@@ -71,9 +71,11 @@ class Instance
     save = function(d) { console.log(JSON.parse(JSON.stringify(d))); return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
 }
 
-contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}) =>
+contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}, onRequestUpdate = (i, m) => {}) =>
 {
     ipcRenderer.send('getInstance', name)
+    
+    ipcRenderer.on('requestUpdate', (event, r) => { onRequestUpdate(r); })
 
     let object = null;
     await new Promise(async (resolve) =>
@@ -109,7 +111,7 @@ contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m)
     });
     
     let instance = Object.assign(new Instance(), object);
-    ipcRenderer.on('modUpdate', (event, mods) => { instance.mods = mods; onModUpdate(instance, mods); })
+    ipcRenderer.on('modUpdate', (event, mods) => { console.log("mod update"); instance.mods = mods; onModUpdate(instance, mods); })
     ipcRenderer.on('RPUpdate', (event, rp) => { instance.rp = rp; onRPUpdate(instance, rp); })
     ipcRenderer.on('shaderUpdate', (event, shaders) => { instance.shaders = shaders; onShaderUpdate(instance, shaders); })
 
@@ -120,9 +122,9 @@ contextBridge.exposeInMainWorld('importInstance', async (link, metadata) => { ip
 
 contextBridge.exposeInMainWorld('saveInstance', (i) => { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(i))); })
 
-contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, network, windowOpen}) =>
+contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, network, windowOpen}, world) =>
 {
-    let i = await ipcRenderer.invoke('launch', name);
+    let i = await ipcRenderer.invoke('launch', name, world);
 
     ipcRenderer.on(i+'log', (event, t, c) => listeners.log(t, c))
     ipcRenderer.on(i+'close', (event, c) => listeners.close(c))
@@ -144,3 +146,25 @@ contextBridge.exposeInMainWorld('download', (url, directory, filename, createDir
 contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })
 
 contextBridge.exposeInMainWorld('jarData', async (path, subPath) => { return await ipcRenderer.invoke('jarData', path, subPath); })
+
+contextBridge.exposeInMainWorld('addPackListener', async (name, callback) =>
+{
+    let index = await ipcRenderer.invoke('addPackListener', name)
+    ipcRenderer.on('packUpdate', (event, i, pack) => { if(i!=index){return} callback(pack) })
+    return;
+})
+
+
+contextBridge.exposeInMainWorld('setWindowPropertie', (k, v) => {ipcRenderer.send('windowPropertie', k, v)})
+
+contextBridge.exposeInMainWorld('ipcSend', (channel, ...args) => {ipcRenderer.send(channel, ...args)})
+contextBridge.exposeInMainWorld('ipcInvoke', (channel, ...args) => {return ipcRenderer.invoke(channel, ...args)})
+
+
+// Save Window
+ipcRenderer.on('instance', (event, minecraft, loader) =>
+{
+    console.log(minecraft, loader)
+    window.minecraft = minecraft;
+    window.loader = loader;
+})

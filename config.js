@@ -10,6 +10,9 @@ module.exports =
         resources: path.join(app.getPath('appData'), 'Modpack Maker', 'resources'),
         ephemeralInstances: path.join(app.getPath('appData'), 'Modpack Maker', '.ephemeral-instances'),
         download: path.join(app.getPath('appData'), 'Modpack Maker', 'download'),
+        saves: path.join(app.getPath('appData'), 'Modpack Maker', 'saves'),
+        browserRequests: path.join(app.getPath('appData'), 'Modpack Maker', '.browser-requests.json'),
+        extension: path.join(app.getPath('appData'), 'Modpack Maker', 'extension'),
     },
     javaAgent: `${app.getAppPath()}/agent/agent.jar`
 }
