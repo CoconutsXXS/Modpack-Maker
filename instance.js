@@ -294,6 +294,7 @@ class Instance
             //     // libraryRoot: resourcePath+'/libraries',
             //     // directory: path.join(config.directories.resources, 'versions')
             // }
+            // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
             quickPlay: world!=undefined?world:null
         }
         console.log(options)
@@ -406,16 +407,16 @@ class Instance
                     }
                 }
 
-                networkListeners.push
-                ({
-                    msg: 'forge_loading',
-                    event: async () => {
-                        windowManager.removeListener('window-activated', listener);
-                        await trySource();
-                        resolve();
-                    },
-                    single: true
-                });
+                // networkListeners.push
+                // ({
+                //     msg: 'forge_loading',
+                //     event: async () => {
+                //         windowManager.removeListener('window-activated', listener);
+                //         await trySource();
+                //         resolve();
+                //     },
+                //     single: true
+                // });
     
                 windowManager.addListener('window-activated', listener);    
             })

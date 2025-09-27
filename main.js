@@ -214,7 +214,6 @@ let loadedInstances = [];
 ipcMain.on('getInstance', (event, name) =>
 {
     let i = Instance.getInstance(name);
-    console.log(i)
     loadedInstances.push({name: name, instance: i})
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
     i.onRPUpdate = (rp) => event.sender.isDestroyed()?null:event.sender.send('RPUpdate', rp);;
@@ -230,7 +229,6 @@ ipcMain.on('getInstance', (event, name) =>
     {
         const start = chunkIndex * chunkSize;
         const end = Math.min(start + chunkSize, buffer.byteLength);
-        if(chunkIndex * chunkSize/buffer.byteLength){console.log((new Date() - d)/1000)}
         return buffer.slice(start, end);
     });
 
@@ -315,6 +313,15 @@ ipcMain.handle('writeModContent', async (event, p, data) =>
     let directoryObject = await contentModifier.modDataToDirectoryObject(data)
     await contentModifier.writeDirectoryObject(directoryObject, path.join(app.getPath('appData'), 'Modpack Maker', p));
 })
+ipcMain.handle('addEditionWorld', async (event, instanceName) =>
+{
+    if(!fs.existsSync(path.join(config.directories.instances, instanceName, "minecraft/saves"))) { fs.mkdirSync(path.join(config.directories.instances, instanceName, "minecraft/saves"), {recursive: true}) }
+    fs.cpSync("./.Structure Edition", path.join(config.directories.instances, instanceName, "minecraft/saves/.Structure Edition"), {recursive: true});
+
+    // TODO Rust integration to write data to .mca
+    // let reader = await WorldReader.create(path.join(config.directories.instances, instanceName, "minecraft/saves/.Structure Edition"));
+    // console.log(await reader.getRegionData(0, 0))
+})
 
 // Saves
 ipcMain.handle('packList', (event, minecraft, loader) =>
@@ -361,7 +368,9 @@ const reader = require('./jar-reader.js');
 const { setTimeout } = require('node:timers/promises');
 ipcMain.handle('jarData', async (event, p, dataPath) => { return await reader.jar(p, dataPath) })
 ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p), {recursive:true}).filter(r=>fs.statSync(path.join(app.getPath('appData'), p, r)).isFile()); })
-ipcMain.handle('readFile', (event, p) => { return reader.autoData(path.join(app.getPath('appData'), p)); })
+ipcMain.handle('readFile', async (event, p) => { return await reader.autoData(path.join(app.getPath('appData'), p)); })
+ipcMain.handle('readRawFile', (event, p) => { return fs.readFileSync(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('writeFile', (event, p, d) => { return reader.saveData(path.join(app.getPath('appData'), p), d); })
+ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData'), p); if(!fs.existsSync(p.substring(0, p.lastIndexOf("/")))){fs.mkdirSync(p.substring(0, p.lastIndexOf("/")), {recursive: true})} fs.writeFileSync(p, Buffer.from(b)) })
 ipcMain.handle('writeRawData', (event, p, d) => { return reader.writeRawData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ return fs.unlinkSync(path.join(app.getPath('appData'), n)); }catch(err){console.warn(err)} })

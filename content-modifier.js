@@ -7,84 +7,59 @@ const jarReader = require('./jar-reader');
 const similarity = require('similarity');
 const javaParser = require("./java-parser");
 const JSZip = require("jszip");
+const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
 
-// convertit une valeur JS en tag NBT au format attendu par prismarine-nbt
 function toNBT(value)
 {
-  // helpers pour types numériques (simplifié)
-  const asIntegerType = (n) => {
+  const asIntegerType = (n, forceInt = false) => {
     if (!Number.isInteger(n)) return { type: 'float', value: n };
-    if (n >= -128 && n <= 127) return { type: 'byte', value: n };
-    if (n >= -32768 && n <= 32767) return { type: 'short', value: n };
-    if (n >= -2147483648 && n <= 2147483647) return { type: 'int', value: n };
-    // Si besoin de long, adapter (prismarine-nbt attend un pair [low, high] pour long)
-    return { type: 'long', value: [0, n] }; // simplifié
+    if (forceInt) return { type: 'int', value: Number(n) };
+    if (n >= -128 && n <= 127) return { type: 'byte', value: Number(n) };
+    if (n >= -32768 && n <= 32767) return { type: 'short', value: Number(n) };
+    return { type: 'int', value: Number(n) };
   };
 
-  if (value === null || value === undefined) {
-    // choix arbitraire : string vide
-    return { type: 'string', value: '' };
-  }
-
+  if (value === null || value === undefined) return { type: 'string', value: '' };
   if (typeof value === 'number') {
-    return asIntegerType(value);
+    return asIntegerType(value, true);
   }
-
-  if (typeof value === 'string') {
-    return { type: 'string', value };
-  }
-
-  if (typeof value === 'boolean') {
-    return { type: 'byte', value: value ? 1 : 0 };
-  }
+  if (typeof value === 'string') return { type: 'string', value };
+  if (typeof value === 'boolean') return { type: 'byte', value: value ? 1 : 0 };
 
   if (Array.isArray(value)) {
-    // tableau vide -> on choisit par défaut 'compound' vide (si tu veux un autre comportement, mets-le ici)
-    if (value.length === 0) {
-      return { type: 'list', value: { type: 'end', value: [] } }; // prismarine peut accepter 'end' pour liste vide
-    }
+    if (value.length === 0) return { type: 'list', value: { type: 'end', value: [] } };
 
-    // tous les éléments sont des objets (candidates pour list<compound>)
     const allObjects = value.every(v => v && typeof v === 'object' && !Array.isArray(v));
-    const allPrimitives = value.every(v => (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean'));
+    const allPrimitives = value.every(v => ['number','string','boolean'].includes(typeof v));
 
     if (allObjects) {
-      // chaque élément doit être un "plain compound" : un objet dont chaque clé est un tag (type,value)
       const arr = value.map(elem => {
         const compound = {};
-        for (const [k, v] of Object.entries(elem)) {
-          compound[k] = toNBT(v);
-        }
-        return compound; // NOT wrapped in {type:'compound', value:...}, c'est ce que prismarine attend dans la liste
+        for (const [k,v] of Object.entries(elem)) compound[k] = toNBT(v);
+        return compound;
       });
       return { type: 'list', value: { type: 'compound', value: arr } };
     }
 
     if (allPrimitives) {
-      // déterminer le type primitif de la liste à partir du premier élément
       const first = value[0];
       if (typeof first === 'number') {
-        // utiliser int/short/byte selon les valeurs (ici on simplifie en int)
         const raw = value.map(n => Number(n));
+        // if (raw.every(x => x >= -128 && x <= 127)) return { type: 'list', value: { type: 'byte', value: raw } };
+        // if (raw.every(x => x >= -32768 && x <= 32767)) return { type: 'list', value: { type: 'short', value: raw } };
         return { type: 'list', value: { type: 'int', value: raw } };
       }
-      if (typeof first === 'string') {
-        return { type: 'list', value: { type: 'string', value: value.slice() } };
-      }
-      // boolean -> byte list
-      if (typeof first === 'boolean') {
-        return { type: 'list', value: { type: 'byte', value: value.map(b => b ? 1 : 0) } };
-      }
+      if (typeof first === 'string') return { type: 'list', value: { type: 'string', value: value.slice() } };
+      if (typeof first === 'boolean') return { type: 'list', value: { type: 'byte', value: value.map(b => b?1:0) } };
     }
 
-    // tableau mixte ou autre -> essaye de normaliser chaque élément en tag "compound" intermédiaire
+    // tableau mixte
     const arr = value.map(v => {
       if (v && typeof v === 'object' && !Array.isArray(v)) {
         const obj = {};
-        for (const [k, vv] of Object.entries(v)) obj[k] = toNBT(vv);
+        for (const [k,vv] of Object.entries(v)) obj[k] = toNBT(vv);
         return obj;
       } else {
-        // valeur primitive -> la mettre dans un champ "value"
         return { value: toNBT(v) };
       }
     });
@@ -93,24 +68,22 @@ function toNBT(value)
 
   if (typeof value === 'object') {
     const comp = {};
-    for (const [k, v] of Object.entries(value)) {
-      comp[k] = toNBT(v);
-    }
+    for (const [k,v] of Object.entries(value)) comp[k] = toNBT(v);
     return { type: 'compound', value: comp };
   }
 
-  // fallback
   return { type: 'string', value: String(value) };
 }
+
 
 // Parsing
 async function readZipEntry(path, value)
 {
     if(path.endsWith(".json")) { return await value.json(); }
-    else if(path.endsWith(".nbt")) { return await readStructure(Buffer.from(await value.arrayBuffer())); }
+    else if(path.endsWith(".nbt")) { return {parsed: await jarReader.parseNbt(Buffer.from(await value.arrayBuffer())), buffer: Buffer.from(await value.arrayBuffer())}; }
     else if(path.endsWith(".class"))
     {
-        return {data: "ABC", buffer: Buffer.from(await value.arrayBuffer())}
+        return {data: "TODO", buffer: Buffer.from(await value.arrayBuffer())}
         try
         {
             return {data: javaParser.parse(await value.arrayBuffer()), buffer: Buffer.from(await value.arrayBuffer())};
@@ -131,9 +104,22 @@ async function toBuffer(path, value, fail = false)
         }
         else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".nbt"))
         {
-            let correctNbt = toNBT(value);
-            correctNbt.name = '';
-            value = nbt.writeUncompressed(correctNbt, "big");
+            if(value.buffer != undefined)
+            {
+                // Convert Buffer
+                if(!Buffer.isBuffer(value.buffer)){value.buffer = Buffer.from(value.buffer);}
+                // Update parsed
+                value.parsed = await jarReader.parseNbt(value.buffer)
+
+                value = value.buffer;
+            }
+            else
+            {
+                console.warn("Risked NBT loss convertion for ", path);
+                let correctNbt = toNBT(value.parsed);
+                correctNbt.name = '';
+                value = nbt.writeUncompressed(correctNbt, "big");
+            }
         }
         else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".class"))
         {
@@ -221,41 +207,7 @@ async function expandPaths(obj, modifyValue = (path, value) => {return value;})
 
     return result;
 }
-async function readStructure(buffer)
-{
-    const data = nbt.simplify((await nbt.parse(buffer)).parsed);
-    let blocks = [];
-    for(let b of data.blocks)
-    {
-        blocks.push
-        ({
-            position: {x: b.pos[0], y: b.pos[1], z: b.pos[2]},
-            id: data.palette[b.state].Name,
-            properties: data.palette[b.state].Properties
-        })
-    }
 
-    let entities = [];
-    for(let b of data.entities)
-    {
-        entities.push
-        ({
-            blockPosition: {x: b.blockPos[0], y: b.blockPos[1], z: b.blockPos[2]},
-            position: {x: b.pos[0], y: b.pos[1], z: b.pos[2]},
-            data: b.nbt
-        })
-    }
-
-    let result =
-    {
-        blocks,
-        size: {x: data.size[0], y: data.size[1], z: data.size[2]},
-        entities
-    };
-    Object.assign(result, data);
-
-    return result
-}
 
 module.exports =
 {
@@ -496,5 +448,8 @@ module.exports =
 
         const content = await main.generateAsync({type:"arraybuffer"});
         fs.writeFileSync(path, Buffer.from(content))
-    }
+    },
+
+    readZipEntry: readZipEntry,
+    toBuffer: toBuffer
 }

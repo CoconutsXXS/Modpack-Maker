@@ -4,6 +4,7 @@ const { unzip } = require('unzipit');
 const toml = require('toml');
 const path = require('node:path')
 const StreamZip = require('node-stream-zip');
+const nbt = require('prismarine-nbt');
 
 module.exports = 
 {
@@ -22,7 +23,7 @@ module.exports =
                 if(entries[dataPath]==undefined){return undefined;}
                 let arrayBuffer = await entries[dataPath].arrayBuffer();
     
-                return handleData(Buffer.from(arrayBuffer), dataPath.split('.')[dataPath.split('.').length-1])
+                return await handleData(Buffer.from(arrayBuffer), dataPath.split('.')[dataPath.split('.').length-1])
             }
             catch(err)
             {
@@ -31,10 +32,9 @@ module.exports =
             }
         }
     },
-    autoData: function(path)
+    autoData: async function(path)
     {
-        console.log(path)
-        return handleData(fs.readFileSync(path), path.split('.')[path.split('.').length-1])
+        return await handleData(fs.readFileSync(path), path.split('.')[path.split('.').length-1])
     },
     saveData: function(path, d)
     {
@@ -44,7 +44,7 @@ module.exports =
     {
         fs.writeFileSync(path, Buffer.from(d))
     },
-    handleData,
+    handleData: handleData,
     unzipSave: async function(from, dest)
     {
         if(!fs.existsSync(dest)){fs.mkdirSync(dest, {recursive:true})}
@@ -89,10 +89,11 @@ module.exports =
         //         fs.writeFileSync(fullPath, Buffer.from(await entry.arrayBuffer()))
         //     }
         // }
-    }
+    },
+    parseNbt: parseNbt
 }
 
-function handleData(buffer, type)
+async function handleData(buffer, type)
 {
     if(buffer==undefined){return null}
     switch(type)
@@ -101,8 +102,47 @@ function handleData(buffer, type)
         {
             return parseTomlWithComments(buffer.toString('utf-8'));
         }
+        case 'nbt':
+        {
+            return await parseNbt(buffer)
+        }
     }
     return buffer;
+}
+async function parseNbt(buffer)
+{
+    const data = nbt.simplify((await nbt.parse(buffer)).parsed);
+    let blocks = [];
+    for(let b of data.blocks)
+    {
+        blocks.push
+        ({
+            position: {x: b.pos[0], y: b.pos[1], z: b.pos[2]},
+            id: data.palette[b.state].Name,
+            properties: data.palette[b.state].Properties
+        })
+    }
+
+    let entities = [];
+    for(let b of data.entities)
+    {
+        entities.push
+        ({
+            blockPosition: {x: b.blockPos[0], y: b.blockPos[1], z: b.blockPos[2]},
+            position: {x: b.pos[0], y: b.pos[1], z: b.pos[2]},
+            data: b.nbt
+        })
+    }
+
+    let result =
+    {
+        blocks,
+        size: {x: data.size[0], y: data.size[1], z: data.size[2]},
+        entities
+    };
+    Object.assign(result, data);
+
+    return result
 }
 function encodeData(data, type)
 {

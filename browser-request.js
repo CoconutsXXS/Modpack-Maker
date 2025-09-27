@@ -11,7 +11,6 @@ if(!fs.existsSync(config.directories.browserRequests)){fs.writeFileSync(config.d
 let watcher = chokidar.watch(config.directories.browserRequests, {persistent: true});
 watcher.on('all', (e, p, s) =>
 {
-    console.log(e)
     // Delete
     if(e=='unlink')
     {

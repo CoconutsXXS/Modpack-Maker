@@ -49,6 +49,6 @@ module.exports =
 
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-        console.log("Installed Firefox host.");
+        // console.log("Installed Firefox host.");
     }
 }

@@ -26,6 +26,7 @@ let section = document.querySelector(".content-explorer-section").cloneNode(true
 let codeEditor = document.getElementById("code-editor"); codeEditor.style.display = "none";
 
 let modEditor = document.getElementById("mod-content-editor"); modEditor.style.display = "none";
+let nbtEditor = document.getElementById("nbt-editor"); document.getElementById("nbt-editor").style.display = "none";
 
 // Core Functions
 function explorer(o, open, keysPath = [], iteration = 0)
@@ -66,7 +67,7 @@ function explorer(o, open, keysPath = [], iteration = 0)
         }
     }
 }
-function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {})
+async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {})
 {
     if(filename.endsWith(".json"))
     {
@@ -116,9 +117,43 @@ function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {})
         }
         codeEditor.querySelector(".exit-options > button:last-of-type").onclick = () =>
         {
+            codeEditor.style.display = "none"
             editor.dom.remove();
             onExit();
         }
+    }
+    else if(filename.endsWith(".nbt"))
+    {
+        modEditor.style.display = "none";
+        nbtEditor.style.display = "block";
+
+        nbtEditor.querySelector("span.filename").innerText = filename.slice(0, filename.length-4);
+
+        await ipcInvoke("addEditionWorld", window.instance.name);
+        await launch(
+            window.instance.name,
+            {
+                log: (t, c) => {},
+                close: async c =>
+                {
+                    nbtEditor.style.display = "none";
+
+                    // Save
+                    let data =
+                    {
+                        parsed: await ipcInvoke("readFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/'+filename),
+                        buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/'+filename)
+                    };
+                    onChange(data)
+                    onExit()
+                },
+                network: (i, c) => {},
+                windowOpen: async (w, i) => {},
+            },
+            {type: "singleplayer", identifier: ".Structure Edition"}
+        )
+
+        ipcInvoke('writeBuffer', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/'+filename, data.buffer)
     }
 }
 
