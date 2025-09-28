@@ -1067,6 +1067,9 @@ class Instance
         if(fs.existsSync(p)){fs.rmSync(p, { recursive: true, force: true });}
         fs.mkdirSync(p, {recursive: true});
     
+        // World
+        fs.cpSync("./.Test World", path.join(p, "saves/Test World"), {recursive: true});
+
         // Install Mods
         for(let m of mods)
         {
@@ -1153,7 +1156,7 @@ class Instance
             memory: {max: '6G', min: '4G'},
             authorization: await Authenticator.getAuth("tester"),
             forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
-            quickPlay: null
+            quickPlay: {type: "singleplayer", identifier: "Test World"}
         }
         console.log(options);
 
