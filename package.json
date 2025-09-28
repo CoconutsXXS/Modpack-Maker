@@ -19,6 +19,7 @@
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@ghostery/adblocker-electron": "^2.5.1",
     "@nut-tree-fork/nut-js": "^4.2.6",
+    "@spyglassmc/mcfunction": "^0.2.7",
     "@xmcl/game-data": "^1.2.6",
     "@xmcl/world": "^1.2.0",
     "buffer-to-data-url": "^1.0.0",

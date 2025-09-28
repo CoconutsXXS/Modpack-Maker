@@ -196,13 +196,64 @@
                 <div class="content-explorer-section">
                     <h3>Content</h3>
                 </div>
+                <button class="unexpend"><</button>
             </div>
             <div id="code-editor">
                 <div class="exit-options"><button>Save</button><button>Exit</button></div>
             </div>
             <div id="nbt-editor">
-                <p style="color: #ffffffA0;">Minecraft is launching...<br><span style="color: #ffffff;">Load the Structure: </span>Write <span style="color: #ffffff;" class="filename">filename</span> into the structure block and click "LOAD" twice.<br><span style="color: #ffffff;">Save the Modification: </span>Select "Save" mod instead of "Load" in the structure block and press "PRESS". Quit Minecraft to exit.</p>
+                <button>Open in Minecraft</button>
+                <br><p>Dimensions x: 0, y: 0, z: 0</p>
+
+                <br><p>Entities:</p>
+                <ul></ul>
+
+                <table>
+                    <caption></caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Block</th>
+                            <th scope="col">Types</th>
+                            <th scope="col">Properties</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
             </div>
+            <div id="image-editor">
+                <div>
+                    <button class="download">Download</button>
+                    <button class="replace">Replace</button>
+                    <button class="save">Save</button>
+                    <input type="file">
+                </div>
+
+                <canvas id="content-image-canvas"></canvas>
+
+                <div>
+                    <button hover-info="Draw"></button><input type="color">
+                    <button hover-info="Erase"></button><input type="color">
+                    <button hover-info="Color"></button><input type="color">
+                    <button hover-info="Lock Transparency"></button><input type="color">
+                    <button hover-info="Lock Opacity"></button><input type="color">
+                    <button hover-info="Hue"></button><input type="color">
+                    <input hover-info="Size" type="range" value="1" step="1" min="1" max="5">
+                    <input value="333399" type="color">
+                </div>
+            </div>
+            <div id="no-editor">
+                <div>
+                    <p>Format not supported... You can download it and/or replace it with another file to modify it externally.</p>
+                    <div>
+                        <button>Download</button>
+                        <button>Replace</button>
+                        <input type="file">
+                    </div>
+                </div>
+            </div>
+
+            <button class="expend">></button>
         </div>
     </div>
 

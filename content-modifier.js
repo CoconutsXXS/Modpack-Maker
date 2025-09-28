@@ -7,6 +7,7 @@ const jarReader = require('./jar-reader');
 const similarity = require('similarity');
 const javaParser = require("./java-parser");
 const JSZip = require("jszip");
+const mcFunction = require("@spyglassmc/mcfunction");
 const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
 
 function toNBT(value)
@@ -79,7 +80,7 @@ function toNBT(value)
 // Parsing
 async function readZipEntry(path, value)
 {
-    if(path.endsWith(".json")) { return await value.json(); }
+    if(path.endsWith(".json") || path.endsWith(".mcmeta")) { return await value.json(); }
     else if(path.endsWith(".nbt")) { return {parsed: await jarReader.parseNbt(Buffer.from(await value.arrayBuffer())), buffer: Buffer.from(await value.arrayBuffer())}; }
     else if(path.endsWith(".class"))
     {
@@ -90,6 +91,17 @@ async function readZipEntry(path, value)
         }
         catch(err) { return {data: Buffer.from(await value.arrayBuffer()).toString(), buffer: Buffer.from(await value.arrayBuffer())} }
     }
+    else if(path.endsWith(".mcfunction"))
+    {
+        return await value.text();
+    }
+    else if(path.endsWith(".png"))
+    {
+        return {
+            buffer: Buffer.from(await value.arrayBuffer()),
+            url: Buffer.from(await value.arrayBuffer()).toString('base64')
+        }
+    }
     else if(!path.endsWith("/")){value = Buffer.from(await value.arrayBuffer());}
 
     return value;
@@ -98,7 +110,7 @@ async function toBuffer(path, value, fail = false)
 {
     if(value.constructor.name != "ZipEntry")
     {
-        if(value.constructor.name == "Object" && path[path.length-1].endsWith(".json"))
+        if(value.constructor.name == "Object" && (path[path.length-1].endsWith(".json") || path[path.length-1].endsWith(".mcmeta")))
         {
             value = Buffer.from(JSON.stringify(value));
         }
@@ -126,6 +138,22 @@ async function toBuffer(path, value, fail = false)
             value = value.buffer;
             if(!Buffer.isBuffer(value))
             { try{value = Buffer.from(value)}catch(err){} }
+        }
+        else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".mcfunction"))
+        {
+            value = Buffer.from(value, "utf8")
+        }
+        else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".png"))
+        {
+            if(value.buffer)
+            {
+                value = value.buffer
+                if(!Buffer.isBuffer(value)){value = Buffer.from(value)}
+            }
+            else
+            {
+                value = Buffer.from(value.url, "base64");
+            }
         }
         else
         {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, session } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, session, dialog, shell } = require('electron');
 const path = require('node:path')
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
 const fetch = require('cross-fetch');
@@ -261,6 +261,20 @@ ipcMain.handle('download', async (event, url, directory, filename, createDirecto
 {
     await Download.download(url, path.join(directory, filename));
 })
+ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
+{
+    let p = await dialog.showOpenDialog
+    ({
+        properties: ['openDirectory']
+    });
+
+    if(!Buffer.isBuffer(buffer)){buffer = Buffer.from(buffer);}
+
+    fs.writeFileSync(path.join(p.filePaths[0], filename), buffer);
+
+    shell.showItemInFolder(path.join(p.filePaths[0], filename))
+    shell.openPath(p)
+})
 
 ipcMain.handle('importInstance', async (event, link, metadata) =>
 {
@@ -374,3 +388,4 @@ ipcMain.handle('writeFile', (event, p, d) => { return reader.saveData(path.join(
 ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData'), p); if(!fs.existsSync(p.substring(0, p.lastIndexOf("/")))){fs.mkdirSync(p.substring(0, p.lastIndexOf("/")), {recursive: true})} fs.writeFileSync(p, Buffer.from(b)) })
 ipcMain.handle('writeRawData', (event, p, d) => { return reader.writeRawData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ return fs.unlinkSync(path.join(app.getPath('appData'), n)); }catch(err){console.warn(err)} })
+ipcMain.handle('deleteFolder', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ fs.rmSync(path.join(app.getPath('appData'), n), { recursive: true, force: true }); }catch(err){console.warn(err)} })

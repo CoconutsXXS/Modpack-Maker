@@ -469,7 +469,8 @@ button:hover:not([current="true"]){opacity: 0.5;}
 }
 *::-webkit-scrollbar
 {
-    width: 8px;
+    width: 4px;
+    height: 4px;
     background: var(--primary);
 }
 *::-webkit-scrollbar-thumb
@@ -1113,7 +1114,7 @@ label:has(#filter-version-browsing)
 {
     position: absolute;
     bottom: 8px;
-    right: 8px;
+    left: 8px;
 }
 .content-explorer-section
 {
@@ -1152,7 +1153,7 @@ label:has(#filter-version-browsing)
     padding: 4px;
 }
 
-#code-editor { height: 100%; width: 100%; overflow: auto; }
+#code-editor{ height: calc(100% + 16px); width: 100%; overflow: auto; }
 #code-editor > .exit-options
 {
     position: absolute;
@@ -1160,3 +1161,106 @@ label:has(#filter-version-browsing)
     right: 8px;
 }
 #code-editor > .exit-options > button:first-of-type:not(:disabled) { border-right: none; }
+
+#nbt-editor
+{
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+    width: 100%;
+}
+#nbt-editor > button { margin-bottom: 8px; }
+
+#no-editor { width: 100%;}
+#no-editor > div
+{
+    position: relative;
+    top: 50%; left: 50%;
+    translate: -50% -50%;
+    text-align: center;
+    width: 100%;
+}
+#no-editor > div > div
+{
+    display: flex;
+    width: 100%;
+    text-align: center;
+}
+#no-editor > div > div > button
+{
+    left: 50%;
+    translate: -100% 0;
+    position: relative;
+    margin: 8px;
+    height: 32px;
+}
+#no-editor input { display: none;}
+
+#content-editor .expend
+{
+    position: absolute;
+    bottom: 0px;
+    left: 0;
+    top: calc(100% - 17px);
+    border: none !important;
+    height: 16px; width: 16px; padding: 0; margin: 0;
+    display: none;
+}
+#content-editor .unexpend
+{
+    position: relative;
+    bottom: 0px;
+    left: calc(100% - 17px);
+    top: calc(100% - 17px);
+    border: none !important;
+    height: 16px; width: 16px; padding: 0; margin: 0;
+}
+
+#image-editor
+{
+    width: 100%;
+}
+#image-editor > div:first-child
+{
+    display: flex;
+    width: 100%;
+    text-align: center;
+}
+#image-editor > div:first-child > button
+{
+    left: 50%;
+    translate: -100% 0;
+    position: relative;
+    margin: 8px;
+    height: 32px;
+}
+#image-editor input[type="color"] { display: none;}
+#image-editor input[type="file"] { display: none;}
+#image-editor > canvas
+{
+    position: relative;
+    top: 50%; left: 50%;
+    translate: -50% -50%;
+    text-align: center;
+    height: calc(80% - 32px);
+    image-rendering: pixelated;
+}
+#image-editor > div:last-child
+{
+    display: flex;
+    width: 100%;
+    text-align: center;
+    position: absolute;
+    padding: 8px;
+    bottom: 0;
+}
+#image-editor > div:last-child > button
+{
+    width: 32px; height: 32px;
+    border: none !important;
+    transition: all 0 !important;
+}
+#image-editor > div:last-child > button[current]
+{
+    outline: solid var(--text) 2px !important;
+}
