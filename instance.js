@@ -208,7 +208,6 @@ class Instance
 
             if(ogShaders != JSON.stringify(this.shaders) || e==='add' || e=='unlink')
             {
-                console.log('this.onShaderUpdate', JSON.parse(JSON.stringify(this.shaders)))
                 this.onShaderUpdate(this.shaders)
             }
         })

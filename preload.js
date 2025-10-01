@@ -139,13 +139,54 @@ contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, 
     return i;
 })
 
+contextBridge.exposeInMainWorld('getCombined', (name, version) => 
+{
+    // const msgpack = require('@msgpack/msgpack');
+
+    return new Promise((resolve) =>
+    {
+        let totalSize = 0;
+        let finalBuffer = null;
+        let receivedChunks = 0;
+
+        const startEvent = (event, { totalSize: ts }) =>
+        {
+            totalSize = ts;
+            finalBuffer = new Uint8Array(totalSize);
+        };
+        ipcRenderer.on('shared-buffer-start', startEvent);
+
+        const chunkEvent = (event, { chunk, offset }) =>
+        {
+            if (!finalBuffer) return;
+            finalBuffer.set(new Uint8Array(chunk), offset);
+            receivedChunks++;
+        }
+        ipcRenderer.on('shared-buffer-chunk', chunkEvent);
+
+        const endEvent = () =>
+        {
+            ipcRenderer.removeListener('shared-buffer-start', startEvent)
+            ipcRenderer.removeListener('shared-buffer-chunk', chunkEvent)
+            ipcRenderer.removeListener('shared-buffer-end', endEvent)
+            
+            resolve(finalBuffer)
+            // const obj = msgpack.decode(finalBuffer);
+            // console.log(obj)
+        };
+        ipcRenderer.on('shared-buffer-end', endEvent);
+
+        ipcRenderer.invoke("getCombined", name, version)
+    })
+});
+
 contextBridge.exposeInMainWorld('resizeGame', function(i, x, y, width, height, windowDependent){ipcRenderer.send(i+'resize', x, y, width, height, windowDependent)})
 contextBridge.exposeInMainWorld('closeGame', function(i){ipcRenderer.send(i+'kill')})
 contextBridge.exposeInMainWorld('download', (url, directory, filename, createDirectory = true) => { return ipcRenderer.invoke('download', url, directory, filename, createDirectory); })
 
 contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })
 
-contextBridge.exposeInMainWorld('jarData', async (path, subPath) => { return await ipcRenderer.invoke('jarData', path, subPath); })
+// contextBridge.exposeInMainWorld('jarData', async (path, subPath) => { return await ipcRenderer.invoke('jarData', path, subPath); })
 
 contextBridge.exposeInMainWorld('addPackListener', async (name, callback) =>
 {
@@ -158,7 +199,7 @@ contextBridge.exposeInMainWorld('addPackListener', async (name, callback) =>
 contextBridge.exposeInMainWorld('setWindowPropertie', (k, v) => {ipcRenderer.send('windowPropertie', k, v)})
 
 contextBridge.exposeInMainWorld('ipcSend', (channel, ...args) => {ipcRenderer.send(channel, ...args)})
-contextBridge.exposeInMainWorld('ipcInvoke', (channel, ...args) => {return ipcRenderer.invoke(channel, ...args)})
+contextBridge.exposeInMainWorld('ipcInvoke', (channel, ...args) => { return ipcRenderer.invoke(channel, ...args)})
 
 
 // Save Window

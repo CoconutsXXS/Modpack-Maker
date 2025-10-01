@@ -83,7 +83,7 @@ async function updateLoaderVersionSelector()
     let loaderVersionSelect = loaderVersionSelector;
     let versionList = [];
 
-    loaderVersionSelect.style.display = 'inline-block';
+    loaderVersionSelect.style.display = 'block';
     switch(window.instance.loader.name)
     {
         case 'vanilla': { loaderVersionSelect.style.display = 'none'; break; }

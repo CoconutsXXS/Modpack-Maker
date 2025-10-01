@@ -9,7 +9,7 @@ window.setupTab(document.getElementById('center-panel').childNodes[1],
     {select: () => {document.getElementById('config-panel').style.display = 'grid';}, deselect: () => {document.getElementById('config-panel').style.display = 'none';}},
     {select: () => {document.getElementById('saves-panel').style.display = 'grid';}, deselect: () => {document.getElementById('saves-panel').style.display = 'none';}},
     {select: () => {document.getElementById('content-editor').style.display = 'flex';}, deselect: () => {document.getElementById('content-editor').style.display = 'none';}},
-]);
+], 1);
 
 window.setupTab(document.getElementById('browse-panel').childNodes[1],
 [

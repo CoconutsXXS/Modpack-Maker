@@ -11,7 +11,11 @@
     <script type="importmap">
     {
         "imports": {
-        "cdn/": "https://esm.sh/"
+            "cdn/": "https://esm.sh/",
+            "three": "https://esm.sh/three",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three/examples/jsm/",
+            "realism-effects": "https://cdn.jsdelivr.net/npm/realism-effects/+esm",
+            "postprocessing": "https://esm.sh/postprocessing"
         }
     }
     </script>
@@ -77,7 +81,7 @@
     </div>
 
     <div id="center-panel">
-        <div class="tab" anchor-left><button>Game</button><button>Console</button><button>Class</button><button>Web</button><button>Youtube</button><button>Config</button><button>Collections</button><button>Content</button></div>
+        <div class="tab"><button>Game</button><button>Console</button><button style="display: none">Class</button><button>Web</button><button>Youtube</button><button style="display: none;">Config</button><button>Collections</button><button>Content</button></div>
         <video id="game-window" autoplay muted></video>
         <div id="console-window"></div>
         <div id="class-window">
@@ -190,19 +194,34 @@
             </div>
         </div>
         <div id="content-editor">
+            <div id="content-element-selector">
+                <table>
+                    <caption></caption>
+                    <thead>
+                        <tr>
+                            <th scope="col"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>  
+            </div>
             <div id="mod-content-editor">
                 <button>Compile</button>
                 <!-- Mod Selection -->
                 <div class="content-explorer-section">
-                    <h3>Content</h3>
+                    <div><img><h3>Content</h3></div>
                 </div>
                 <button class="unexpend"><</button>
             </div>
+            <div id="multiple-source"><div></div></div>
             <div id="code-editor">
-                <div class="exit-options"><button>Save</button><button>Exit</button></div>
+                <div class="exit-options"><button class="three">Open as 3D Model</button><button class="save">Save</button><button class="exit">Exit</button></div>
             </div>
             <div id="nbt-editor">
                 <button>Open in Minecraft</button>
+                <p></p>
+                <button>Save into Mod</button>
                 <br><p>Dimensions x: 0, y: 0, z: 0</p>
 
                 <br><p>Entities:</p>
@@ -232,15 +251,18 @@
                 <canvas id="content-image-canvas"></canvas>
 
                 <div>
-                    <button hover-info="Draw"></button><input type="color">
-                    <button hover-info="Erase"></button><input type="color">
-                    <button hover-info="Color"></button><input type="color">
-                    <button hover-info="Lock Transparency"></button><input type="color">
-                    <button hover-info="Lock Opacity"></button><input type="color">
-                    <button hover-info="Hue"></button><input type="color">
+                    <button hover-info="Draw"></button>
+                    <button hover-info="Erase"></button>
+                    <button hover-info="Color"></button>
+                    <button hover-info="Lock Transparency"></button>
+                    <button hover-info="Lock Opacity"></button>
+                    <button hover-info="Hue"></button>
+                    <input value="#333399" type="color">
                     <input hover-info="Size" type="range" value="1" step="1" min="1" max="5">
-                    <input value="333399" type="color">
                 </div>
+            </div>
+            <div id="three-editor">
+                <canvas id="three-file-canvas"></canvas>
             </div>
             <div id="no-editor">
                 <div>
@@ -267,6 +289,14 @@
         </div> -->
     </div>
     <div id="right-panel" class="side-panel">
+        <div id="mod-info-panel">
+            <div><img><h2>Mod</h2></div>
+            <p>Mod description will be displayed here.</p>
+            <p>version: </p>
+            <div class="content-slider"></div>
+            <div id="supporting"><img src="./resources/client.png"><img src="./resources/server.png"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
+            <div id="actions"><button style="display: none;" config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button><button config hover-info="Edit"></button></div>
+        </div>
         <div id="general-settings">
             <div>
                 <input id="instance-name" type="text" placeholder="Instance Name">
@@ -274,26 +304,20 @@
             <div>
                 <textarea id="instance-description" placeholder="Instance description..." rows="4" cols="50"></textarea>
             </div>
-            <label><select id="minecraft-version" name="version"></select> Minecraft Version</label>
-            <label>
-                <select id="minecraft-loader" name="version">
-                    <option value="vanilla">Vanilla</option>
-                    <option value="forge">Forge</option>
-                    <option value="fabric">Fabric</option>
-                    <option value="neoforge">Neoforge</option>
-                    <option value="quilt">Quilt</option>
-                </select> Loader
-            </label>
-            <label><select id="minecraft-loader-version" name="version"></select> Loader Version</label>
+            <div>
+                <label>Minecraft Version<select id="minecraft-version" name="version"></select></label>
+                <label>Loader
+                    <select id="minecraft-loader" name="version">
+                        <option value="vanilla">Vanilla</option>
+                        <option value="forge">Forge</option>
+                        <option value="fabric">Fabric</option>
+                        <option value="neoforge">Neoforge</option>
+                        <option value="quilt">Quilt</option>
+                    </select>
+                </label>
+                <label>Loader Version<select id="minecraft-loader-version" name="version"></select></label>
+            </div>
             <label style="padding-left: 27px;">Sinytra Connector <p style="opacity: 0.5; margin-left: 0;">(allow forge to run fabric mods)</p><input id="sinytra" type="checkbox"><span></span></label>
-        </div>
-        <div id="mod-info-panel">
-            <div><img><h2>Mod</h2></div>
-            <p>Mod description will be displayed here.</p>
-            <p>version: </p>
-            <div class="content-slider"></div>
-            <div id="supporting"><img src="./resources/client.png"><img src="./resources/server.png"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
-            <div id="actions"><button config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button><button edit hover-info="Edit"></button></div>
         </div>
     </div>
     <div id="top-panel" class="side-panel">
@@ -316,13 +340,13 @@
             <div id="shaders-explorer" class="folder-content"></div>
 
             <div id="browse-panel">
-                <div class="tab" anchor-bottom fill-width>
+                <div class="tab" anchor-top fill-width>
                     <label style="padding-left: 27px;">Filter Version<input id="filter-version-browsing" type="checkbox" checked><span></span></label>
                     <button>Mods</button><button>Resourcepacks</button><button>Shaders</button>
                 </div>
                 <div id="mods-settings" class="item-settings">
+                    <div id="mod-browser-filter" class="tab item-browser-filter" anchor-bottom><button>Modrinth</button><button>Curseforge</button></div>
                     <input type="text" placeholder="Shearch a mod...">
-                    <div id="mod-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button current="false" disabled>Planet Minecraft</button><button disabled current="false">MinecraftMods</button></div>
                     <div class="item-download-list" id="mod-download-list">
                         <div>
                             <img>
@@ -334,8 +358,8 @@
                     </div>
                 </div>
                 <div id="resourcepacks-settings" class="item-settings">
+                    <div id="resourcepack-browser-filter" class="tab item-browser-filter" anchor-bottom><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
                     <input type="text" placeholder="Shearch a resource pack...">
-                    <div id="resourcepack-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
                     <div class="item-download-list" id="resourcepack-download-list">
                         <div>
                             <img>
@@ -347,8 +371,8 @@
                     </div>
                 </div>
                 <div id="shaders-settings" class="item-settings">
+                    <div id="shader-browser-filter" class="tab item-browser-filter" anchor-bottom><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
                     <input type="text" placeholder="Shearch a shader...">
-                    <div id="shader-browser-filter" class="tab item-browser-filter" anchor-top fill-width><button>Modrinth</button><button>Curseforge</button><button>MinecraftShader</button></div>
                     <div class="item-download-list" id="shader-download-list">
                         <div>
                             <img>

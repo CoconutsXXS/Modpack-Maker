@@ -171,12 +171,12 @@ playButton.addEventListener('click', async () =>
                         if(m.modId==undefined){continue;}
                         for(let match of finalContent.matchAll(`${m.modId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`+`[a-z0-9/_\\-.]+`+`(?:\\.[a-z0-9]+)?`+`(?:-[a-z0-9_\\-.]+)?`))
                         {
-                            finalContent = finalContent.slice(0, match.index)+ `<b style="cursor:pointer;" onclick="window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.onmouseenter(); window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.click();">` + match[0] + '</b>'+finalContent.slice(match.index + match[0].length, finalContent.length)
+                            finalContent = finalContent.slice(0, match.index)+ `<span style="cursor:pointer; filter: brightness(2); color: #fff;" onclick="window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.onmouseenter(); window.modButtonList.find(m=>m.data.filename=='${m.filename}').element.click();">` + match[0] + '</span>'+finalContent.slice(match.index + match[0].length, finalContent.length)
                         }
                     }
                     for(let match of finalContent.matchAll(/minecraft:[a-z0-9/_\-.]+(?:\.[a-z0-9]+)?(?:-[a-z0-9_\-.]+)?/g))
                     {
-                        finalContent = finalContent.slice(0, match.index)+ '<b>' + match[0] + '</b>'+finalContent.slice(match.index + match[0].length, finalContent.length)
+                        finalContent = finalContent.slice(0, match.index)+ '<span style="filter: brightness(2); color: #fff;">' + match[0] + '</span>'+finalContent.slice(match.index + match[0].length, finalContent.length)
                     }
 
                     el.innerHTML = finalContent;
@@ -255,7 +255,7 @@ playButton.addEventListener('click', async () =>
 
                 stopButton.onclick = () => { closeGame(i); }
 
-                return;
+                // return;
 
                 // Resize
                 window.oncenterpanelresize(document.getElementById('center-panel').getBoundingClientRect())

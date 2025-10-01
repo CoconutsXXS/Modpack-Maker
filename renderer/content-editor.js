@@ -5,6 +5,744 @@ import { keymap } from "cdn/@codemirror/view";
 import { indentMore, indentLess } from "cdn/@codemirror/commands";
 import { indentUnit } from "cdn/@codemirror/language";
 
+import {StreamLanguage} from "cdn/@codemirror/language"
+import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
+import { parse, stringify } from "cdn/comment-json";
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as POSTPROCESSING from "postprocessing"
+import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
+
+import * as msgpack from "https://unpkg.com/@msgpack/msgpack/dist.esm/index.mjs";
+import * as lodash from "cdn/lodash"
+
+async function parseMinecraftModelToThree(modelJson, opts = {})
+{
+    const {
+        texturePathResolver = (ref) =>
+        {
+            if (!ref) return null;
+            if (ref.endsWith('.png') || ref.startsWith('http')) return ref;
+            // const cleaned = ref.replace(/^#/, '');
+            const cleaned = ref;
+            const parts = cleaned.split(':');
+            const mod = parts.length === 2 ? parts[0] : 'minecraft';
+            const path = parts.length === 2 ? parts[1] : cleaned;
+            return `/assets/${mod}/${path}.png`;
+        },
+        loader = new THREE.TextureLoader(),
+        scale = 1 / 16,
+        center = true,
+        defaultTextureSize = 64
+    } = opts;
+
+    const faceVertexIndicesMap = {
+        west: [0, 1, 2, 3],
+        east: [4, 5, 6, 7],
+        down: [0, 3, 4, 7],
+        up: [2, 1, 6, 5],
+        north: [7, 6, 1, 0],
+        south: [3, 2, 5, 4],
+    };
+
+    function buildRotationMatrix(angle, scaleVal, axis)
+    {
+        const a = Math.cos(angle) * scaleVal;
+        const b = Math.sin(angle) * scaleVal;
+        const m = new THREE.Matrix3();
+        if (axis === 'x')
+        {
+            m.set(
+                1, 0, 0,
+                0, a, -b,
+                0, b, a
+            );
+        }
+        else if (axis === 'y')
+        {
+            m.set(
+                a, 0, b,
+                0, 1, 0,
+                -b, 0, a
+            );
+        }
+        else
+        {
+            m.set(
+                a, -b, 0,
+                b, a, 0,
+                0, 0, 1
+            );
+        }
+        return m;
+    }
+
+    function rotateFaceVertexIndices(vertexIndices, angle)
+    {
+        const a = vertexIndices[0], b = vertexIndices[1], c = vertexIndices[2], d = vertexIndices[3];
+        const norm = ((angle % 360) + 360) % 360;
+        switch (norm)
+        {
+            case 0: return [a, b, c, d];
+            case 90: return [b, c, d, a];
+            case 180: return [c, d, a, b];
+            case 270: return [d, a, b, c];
+            default: return [a, b, c, d];
+        }
+    }
+
+    function getDefaultUVs(faceType, from, to)
+    {
+        const x1 = from[0], y1 = from[1], z1 = from[2];
+        const x2 = to[0], y2 = to[1], z2 = to[2];
+        switch (faceType)
+        {
+            case 'west': return [z1, 16 - y2, z2, 16 - y1];
+            case 'east': return [16 - z2, 16 - y2, 16 - z1, 16 - y1];
+            case 'down': return [x1, 16 - z2, x2, 16 - z1];
+            case 'up': return [x1, z1, x2, z2];
+            case 'north': return [16 - x2, 16 - y2, 16 - x1, 16 - y1];
+            case 'south': return [x1, 16 - y2, x2, 16 - y1];
+            default: return [0, 0, 16, 16];
+        }
+    }
+
+    function normalizedUVs(uvsArr)
+    {
+        const out = [];
+        for (let i = 0; i < 4; i++)
+        {
+            const coord = uvsArr[i];
+            if (i % 2 === 1)
+            {
+                out.push((16 - coord) / 16);
+            }
+            else
+            {
+                out.push(coord / 16);
+            }
+        }
+        return out;
+    }
+
+    function getCubeCornerVertices(from, to)
+    {
+        const x1 = from[0], y1 = from[1], z1 = from[2];
+        const x2 = to[0], y2 = to[1], z2 = to[2];
+        return [
+            new THREE.Vector3(x1, y1, z1),
+            new THREE.Vector3(x1, y2, z1),
+            new THREE.Vector3(x1, y2, z2),
+            new THREE.Vector3(x1, y1, z2),
+            new THREE.Vector3(x2, y1, z2),
+            new THREE.Vector3(x2, y2, z2),
+            new THREE.Vector3(x2, y2, z1),
+            new THREE.Vector3(x2, y1, z1),
+        ];
+    }
+
+    function rotateCubeCornerVertices(vertices, rotation)
+    {
+        const angle = (rotation.angle / 180) * Math.PI;
+        const scaleVal = rotation.rescale === true
+            ? Math.SQRT2 / Math.sqrt(Math.cos(angle || Math.PI / 4) ** 2 * 2)
+            : 1;
+        const rotationMatrix = buildRotationMatrix(angle, scaleVal, rotation.axis);
+        const origin = new THREE.Vector3().fromArray(rotation.origin);
+        return vertices.map((vertex) =>
+        {
+            return vertex.clone().sub(origin).applyMatrix3(rotationMatrix).add(origin);
+        });
+    }
+
+    function loadTextureAsync(url)
+    {
+        if (!url) return Promise.resolve(null);
+        return new Promise((resolve) =>
+        {
+            loader.load(
+                url,
+                (tex) =>
+                {
+                    tex.magFilter = THREE.NearestFilter;
+                    tex.minFilter = THREE.NearestFilter;
+                    tex.generateMipmaps = false;
+                    tex.wrapS = THREE.RepeatWrapping;
+                    tex.wrapT = THREE.RepeatWrapping;
+                    resolve(tex);
+                },
+                undefined,
+                () => resolve(null)
+            );
+        });
+    }
+
+    const texturesMap = modelJson.textures || {};
+    const textureVarToPath = {};
+    const resolvedPathsSet = new Set();
+    for (const key in texturesMap)
+    {
+        const raw = texturesMap[key];
+        const cleaned = raw ? raw.replace(/^#/, '') : raw;
+        const resolved = await texturePathResolver(raw);
+        textureVarToPath['#' + key] = resolved;
+        if (resolved) resolvedPathsSet.add(resolved);
+    }
+
+    const resolvedPaths = Array.from(resolvedPathsSet);
+    const textureCache = {};
+    await Promise.all(resolvedPaths.map(async (p) =>
+    {
+        const tex = await loadTextureAsync(p);
+        textureCache[p] = tex;
+    }));
+
+    const materialCache = {};
+    for (const p of resolvedPaths)
+    {
+        const tex = textureCache[p] || null;
+        const mat = new THREE.MeshPhysicalMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+        materialCache[p] = mat;
+    }
+
+    const materialGroups = {};
+    for (const p of resolvedPaths)
+    {
+        materialGroups[p] = { vertices: [], uvs: [], indices: [] };
+    }
+    const missingGroup = { vertices: [], uvs: [], indices: [] };
+    const textureVarToGroupMap = {};
+    for (const key in textureVarToPath)
+    {
+        const p = textureVarToPath[key];
+        textureVarToGroupMap[key] = materialGroups[p] || missingGroup;
+    }
+
+    const elements = modelJson.elements || [];
+    for (const elem of elements)
+    {
+        let cornerVertices = getCubeCornerVertices(elem.from, elem.to);
+        if (elem.rotation != null)
+        {
+            cornerVertices = rotateCubeCornerVertices(cornerVertices, elem.rotation);
+        }
+        for (const v of cornerVertices)
+        {
+            v.sub(new THREE.Vector3(8, 0, 8));
+        }
+        const faces = elem.faces || {};
+        for (const faceType in faces)
+        {
+            const face = faces[faceType];
+            if (face === undefined) continue;
+            const group = textureVarToGroupMap[face.texture] || missingGroup;
+            const i = group.vertices.length / 3;
+            group.indices.push(i, i + 2, i + 1);
+            group.indices.push(i, i + 3, i + 2);
+            const baseIndices = faceVertexIndicesMap[faceType];
+            const rotatedIndices = rotateFaceVertexIndices(baseIndices, face.rotation ?? 0);
+            for (const idx of rotatedIndices)
+            {
+                const v = cornerVertices[idx];
+                group.vertices.push(v.x * scale, v.y * scale, v.z * scale);
+            }
+            const faceUVs = (face.uv != null && face.uv.length === 4) ? face.uv.slice() : getDefaultUVs(faceType, elem.from, elem.to);
+            const [nu1, nv1, nu2, nv2] = normalizedUVs(faceUVs);
+            const u1 = nu1, v1 = nv1, u2 = nu2, v2 = nv2;
+            group.uvs.push(u1, v2);
+            group.uvs.push(u1, v1);
+            group.uvs.push(u2, v1);
+            group.uvs.push(u2, v2);
+        }
+    }
+
+    const parentGroup = new THREE.Group();
+    if (center)
+    {
+        parentGroup.position.set(0, 0, 0);
+    }
+
+    const materialEntries = Object.entries(materialGroups).sort();
+    for (const [path, group] of materialEntries)
+    {
+        if (group.vertices.length === 0) continue;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(group.vertices, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(group.uvs, 2));
+        geom.setIndex(new THREE.Uint16BufferAttribute(group.indices, 1));
+        const mat = materialCache[path] || new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geom, mat);
+        parentGroup.add(mesh);
+    }
+
+    if (missingGroup.vertices.length > 0)
+    {
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(missingGroup.vertices, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(missingGroup.uvs, 2));
+        geom.setIndex(new THREE.Uint16BufferAttribute(missingGroup.indices, 1));
+        const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geom, mat);
+        parentGroup.add(mesh);
+    }
+
+    return parentGroup;
+}
+
+// Elements
+let section = document.querySelector(".content-explorer-section").cloneNode(true); document.querySelector(".content-explorer-section").remove();
+let modEditor = document.getElementById("mod-content-editor"); modEditor.style.display = "none";
+
+let editors =
+{
+    codeEditor: document.getElementById("code-editor"),
+    nbtEditor: document.getElementById("nbt-editor"),
+    imgEditor: document.getElementById("image-editor"),
+    threeEditor: document.getElementById("three-editor"),
+    noEditor: document.getElementById("no-editor"),
+    sourceSelection: document.getElementById("multiple-source")
+}
+editors.codeEditor.style.display = "none"
+editors.nbtEditor.style.display = "none"; editors.nbtEditor.querySelectorAll("button")[1].style.display = "none";
+editors.noEditor.style.display = "none"
+editors.imgEditor.style.display = "none"
+editors.threeEditor.style.display = "none"
+
+// Jar Decompiler/Interpreter
+window.jarData =
+{
+    combined: {},
+    modified: [],
+    idList: []
+}
+
+window.addInstanceListener(async (i) => 
+{
+    // Full Combinaison
+    window.jarData.combined = msgpack.decode(await getCombined(i.name, i.version.number));
+    window.jarData.modified = [];
+    window.jarData.idList = [];
+
+    console.log(window.jarData.combined)
+
+    window.jarData.openExplorer = async function(path = "")
+    {
+        document.querySelector("#content-element-selector").style.display = "none";
+        modEditor.style.display = "flex"
+
+        explorer(window.jarData.combined, async (keys) =>
+        {
+            editors.sourceSelection.firstChild.innerHTML = '';
+            editors.sourceSelection.style.display = "none";
+            for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
+
+            keys = lodash.clone(keys);
+            let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
+
+            if(files.length == 0)
+            {
+                editors.sourceSelection.style.display = "block";
+                let p = document.createElement("p");
+                p.innerText = `${keys[keys.length-1]} not found...`;
+                return;
+            }
+
+            let selectedFile = files.length>1?await new Promise((resolve) =>
+            {
+                editors.sourceSelection.style.display = "block";
+                let p = document.createElement("p");
+                p.innerText = `${keys[keys.length-1]} is modified by multiple sources:`;
+                editors.sourceSelection.firstChild.appendChild(p);
+                for(let [i, f] of files.entries())
+                {
+                    let b = document.createElement("button");
+                    b.innerText = f.jarFile.slice(f.jarFile.lastIndexOf("/"))
+                    b.onclick = () =>
+                    {
+                        editors.sourceSelection.firstChild.innerHTML = '';
+                        editors.sourceSelection.style.display = "none";
+                        resolve(files[i])
+                    }
+                    editors.sourceSelection.firstChild.appendChild(b);
+                }
+            }):files[0];
+
+            fileEditor(selectedFile.value, keys[keys.length-1], (value) =>
+            {
+                setProp(window.jarData.combined, keys, value);
+                if(window.jarData.modified.find(m => m.keys==keys))
+                {
+                    window.jarData.modified[window.jarData.modified.findIndex(m => m.keys==keys)] = {origin: selectedFile.jarFile, keys, value}
+                }
+                else
+                {
+                    window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
+                }
+            }, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, async () =>
+            {
+                let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
+                return files[files.length-1].value;
+            }, async (keys) =>
+            {
+                let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
+                return files[files.length-1].value;
+            })
+        }, {name: "idk"}, [], 0, [...path.split("/")])
+    }
+
+    window.jarData.openExplorer()
+
+    let modsMetadata = [];
+    let elementGroupMetadata = [];
+
+    let dataCopy = lodash.clone(window.jarData.combined.data); Object.assign(dataCopy, window.jarData.combined.assets)
+    let combinedEntrie = Object.entries(dataCopy).filter(([e,v]) => lodash.isObject(v) && e != ".mcassetsroot");
+    for(let [e, v] of combinedEntrie)
+    {
+        if(window.jarData.combined.data[e])
+        {
+            v = lodash.clone(window.jarData.combined.data[e])
+            Object.assign(v, window.jarData.combined.assets[e])
+        }
+        else
+        {
+            v = window.jarData.combined.assets[e];
+        }
+
+        let el = document.createElement("th");
+        el.scope = "col"; el.innerHTML = e;
+        document.querySelector("#content-element-selector thead > tr").appendChild(el);
+        let tableIndex = Array.from(document.querySelector("#content-element-selector thead > tr").childNodes).filter(e=>e.nodeName=="TH").findIndex(e=>e==el)
+
+        let count = 0;
+        function recursiveSearch(p, preKeys = [])
+        {
+            for(let [key, v] of Object.entries(p))
+            {
+                let keys = [...preKeys];
+                keys.push(key);
+
+                if(key.includes("."))
+                {
+                    if(keys.length <= 1){continue;}
+                    keys[keys.length-1] = keys[keys.length-1].replace(/\.[^/.]+$/, "");
+                    let path = "";
+                    for(let k of keys){path+=k+"/"}
+                    path = path.slice(0, path.length-1)
+
+                    window.jarData.idList.push(`${e}:${path}`);
+
+                    // Metadata
+                    let shortFilename = path.slice(path.lastIndexOf("/"));
+                    let shortPath = path.slice(0, path.indexOf("/"))
+
+                    count++;
+                    if(elementGroupMetadata.find(g=>g.path==shortPath))
+                    {
+                        elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].count++;
+                        elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].elements.push({p: shortPath, f: shortFilename});
+                    }
+                    else
+                    {
+                        elementGroupMetadata.push
+                        ({
+                            path: shortPath,
+                            count: 1,
+                            elements: [{p: shortPath, f: shortFilename}]
+                        })
+                    }
+
+                    // Display
+                    let parent = Array.from(document.querySelectorAll("#content-element-selector tbody > tr")).find(tr => tr.querySelector(":scope > th").innerText == shortPath);
+                    if(!parent)
+                    {
+                        parent = document.createElement("tr");
+                        document.querySelector("#content-element-selector tbody").appendChild(parent);
+                        let titleEl = document.createElement("th");
+                        titleEl.scope = "row"; titleEl.innerText = shortPath;
+                        parent.appendChild(titleEl);
+                    }
+                    else if (parent.childElementCount > 100){continue;}
+
+                    while(!parent.childNodes.item(tableIndex) || !parent.childNodes.item(combinedEntrie.length))
+                    {
+                        let el = document.createElement("th");
+                        el.scope = "row";
+                        parent.appendChild(el);
+                    }
+
+                    if(!isNaN(Number(parent.childNodes.item(tableIndex).innerText))) { parent.childNodes.item(tableIndex).innerText = (Number(parent.childNodes.item(tableIndex).innerText)+1); }
+                    else { parent.childNodes.item(tableIndex).innerText = "1"; }
+
+                    // Open
+                    parent.childNodes.item(tableIndex).onclick = () =>
+                    {
+                        let isAsset = getProp(window.jarData.combined, ["assets", e, ...shortPath.split("/")])!=undefined;
+                        window.jarData.openExplorer((isAsset?"assets":"data")+"/"+e+"/"+shortPath)
+                    }
+                }
+                else if(lodash.isObject(v))
+                {
+                    recursiveSearch(v, keys);
+                }
+            }
+        }
+        recursiveSearch(v);
+
+        modsMetadata.push
+        ({
+            id: e,
+            count
+        })
+    }
+
+    // SORTING
+    {
+        // Columns
+        for (let i = 0; i < document.querySelectorAll("#content-element-selector thead > tr > th").length; i++)
+        {
+            let c = 0;
+            for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
+            {
+                c += Number(child.childNodes[i].innerText)
+            }
+
+            for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
+            {
+                child.childNodes[i].setAttribute("total", c)
+            }
+            document.querySelectorAll("#content-element-selector thead > tr > th")[i].setAttribute("total", c)
+        }
+
+        for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
+        {
+            [...document.querySelectorAll("#content-element-selector tbody > tr").item(i).childNodes]
+            .sort((a, b) =>
+            {
+                if(a.nodeType != 1){return -1;}
+                if(b.nodeType != 1){return 1;}
+                return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
+            })
+            .forEach(node => document.querySelectorAll("#content-element-selector tbody > tr").item(i).appendChild(node));
+        }
+
+        [...document.querySelector("#content-element-selector thead > tr").childNodes]
+        .sort((a, b) =>
+        {
+            if(a.nodeType != 1){return -1;}
+            if(b.nodeType != 1){return 1;}
+            return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
+        })
+        .forEach(node => document.querySelector("#content-element-selector thead > tr").appendChild(node));
+
+        // Rows
+        for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
+        {
+            let c = 0;
+            for(let child of document.querySelectorAll("#content-element-selector tbody > tr")[i].querySelectorAll(":scope > th"))
+            {
+                if(isNaN(Number(child.innerText))){continue}
+                c += Number(child.innerText)
+            }
+
+            document.querySelectorAll("#content-element-selector tbody > tr")[i].setAttribute("total", c)
+        }
+
+        [...document.querySelector("#content-element-selector tbody").childNodes]
+        .sort((a, b) =>
+        {
+            if(a.nodeType != 1){return -1;}
+            if(b.nodeType != 1){return 1;}
+
+            let ca=0;
+            for(let child of a.querySelectorAll(":scope > th"))
+            {
+                if(isNaN(Number(child.innerText))){continue}
+                ca += Number(child.innerText)
+            }
+
+            let cb=0;
+            for(let child of b.querySelectorAll(":scope > th"))
+            {
+                if(isNaN(Number(child.innerText))){continue}
+                cb += Number(child.innerText)
+            }
+
+            return cb-ca;
+        })
+        .forEach(node => document.querySelector("#content-element-selector tbody").appendChild(node));
+    }
+
+    modsMetadata = modsMetadata.sort((a,b) => b.count - a.count)
+    elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
+
+    console.log(window.jarData);
+    console.log(modsMetadata, elementGroupMetadata);
+})
+
+// Three Setup
+let loadModel;
+window.addInstanceListener(async (i) => 
+{
+    // Setup
+    const renderer = new THREE.WebGLRenderer({alpha: true, canvas: document.getElementById("three-file-canvas")});
+    document.body.appendChild( renderer.domElement );
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+    const resizeElement = () =>
+    {
+        camera.aspect = renderer.domElement.parentNode.getBoundingClientRect().width / renderer.domElement.parentNode.getBoundingClientRect().height;
+        renderer.setSize(renderer.domElement.parentNode.getBoundingClientRect().width, renderer.domElement.parentNode.getBoundingClientRect().height);
+        camera.updateProjectionMatrix();
+    }
+    renderer.domElement.parentNode.onresize = resizeElement;
+    let observer = new ResizeObserver(resizeElement);
+    observer.observe(renderer.domElement)
+
+    editors.threeEditor.appendChild(renderer.domElement);
+    resizeElement();
+
+    const light = new THREE.DirectionalLight(0xffffff, 3);
+    // light.rotateX(Math.PI/2);
+    scene.add( light );
+    scene.add(new THREE.AmbientLight(0xffffff, 1))
+
+    camera.position.z = 5;
+
+    {
+        // // Post
+        // const composer = new POSTPROCESSING.EffectComposer(renderer)
+
+        // console.log(camera.constructor.name)
+        // camera.constructor.name = "PerspectiveCamera"
+        // const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera)
+        // composer.addPass(velocityDepthNormalPass)
+
+        // // SSGI
+        // const ssgiEffect = new SSGIEffect(scene, camera, velocityDepthNormalPass)
+
+        // // TRAA
+        // const traaEffect = new TRAAEffect(scene, camera, velocityDepthNormalPass)
+
+        // // Motion Blur
+        // const motionBlurEffect = new MotionBlurEffect(velocityDepthNormalPass)
+
+        // // SSAO
+        // const ssaoEffect = new SSAOEffect(composer, camera, scene)
+
+        // // HBAO
+        // const hbaoEffect = new HBAOEffect(composer, camera, scene)
+
+        // const effectPass = new POSTPROCESSING.EffectPass(camera, ssgiEffect, hbaoEffect, ssaoEffect, traaEffect, motionBlur)
+
+        // composer.addPass(effectPass)
+    }
+
+    const resolveTexture = async (ref, getFile = (k) => {}, json) =>
+    {
+        if (!ref) return null;
+        if (ref.includes('http') || ref.endsWith('.png')) return ref;
+
+        if(ref.startsWith("#"))
+        { return await resolveTexture(json["textures"][ref.replace(/^#/, '')], getFile, json); }
+
+        let cleaned = ref.replace(/^#/, '');
+        let keys = [];
+        if (cleaned.includes(':'))
+        {
+            let [mod, path] = cleaned.split(':');
+            path = path.split("/");
+            path[path.length-1] = path[path.length-1]+".png"
+
+            keys = ['assets', mod, 'textures'].concat(path);
+        }
+        else
+        {
+            cleaned = cleaned.split("/");
+            cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".png"
+
+            keys = ['assets', "minecraft", 'textures'].concat(cleaned);
+        }
+
+        let targetObject = await getFile(keys);
+        if(targetObject)
+        {
+            return "data:image/png;base64,"+targetObject.url;
+        }
+        return "data:image/png;base64,0";
+    };
+    const resolveModel = async (ref, getFile = (k) => {}) =>
+    {
+        if (!ref) return null;
+        if (ref.includes('http') || ref.endsWith('.png')) return ref;
+        let cleaned = ref.replace(/^#/, '');
+        let keys = [];
+        if (cleaned.includes(':'))
+        {
+            let [mod, path] = cleaned.split(':');
+            path = path.split("/");
+            path[path.length-1] = path[path.length-1]+".json"
+
+            keys = ['assets', mod, 'models'].concat(path);
+        }
+        else
+        {
+            cleaned = cleaned.split("/");
+            cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".json"
+
+            keys = ['assets', "minecraft", 'models'].concat(cleaned);
+        }
+
+        let targetObject = await getFile(keys);
+        if(targetObject)
+        {
+            return JSON.parse(targetObject);
+        }
+        return {};
+    };
+    
+    let lastModel = null;
+    loadModel = async (json, getFile = (k) => {}) =>
+    {
+        resizeElement();
+
+        if(lastModel){scene.remove(lastModel)}
+
+        // Parent
+        while(json.parent != undefined)
+        {
+            let parent = json.parent;
+            let parentObj = await resolveModel(parent, getFile);
+            let nextParent = parentObj.parent;
+
+            json = lodash.merge(parentObj, json);
+
+            if(parent == nextParent) { json.parent = undefined }
+            else { json.parent = nextParent; }
+        }
+
+        lastModel = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {return await resolveTexture(ref, getFile, json)}, scale: 1, center: true});
+        lastModel.position.setY(-0.5)
+        scene.add(lastModel);
+    }
+
+    // Camera Control
+    const controls = new OrbitControls( camera, renderer.domElement );
+    camera.position.set( 0, 20, 100 );
+    controls.update();
+
+    // Render Loop
+    function animate()
+    {
+        controls.update();
+        renderer.render( scene, camera );
+    }
+    renderer.setAnimationLoop( animate );
+});
+
 // Core Functions
 let editorTheme = EditorView.theme
 ({
@@ -21,14 +759,8 @@ let editorTheme = EditorView.theme
     }
 }, {dark: true})
 
-// Elements
-let section = document.querySelector(".content-explorer-section").cloneNode(true); document.querySelector(".content-explorer-section").remove();
-let codeEditor = document.getElementById("code-editor"); codeEditor.style.display = "none";
-
-let modEditor = document.getElementById("mod-content-editor"); modEditor.style.display = "none";
-let nbtEditor = document.getElementById("nbt-editor"); document.getElementById("nbt-editor").style.display = "none";
-let noEditor = document.getElementById("no-editor"); noEditor.style.display = "none";
-let imgEditor = document.getElementById("image-editor"); imgEditor.style.display = "none";
+let nbtEditorOpened = false;
+let nbtEditorIndex = -1;
 
 // Expend/Unexpend
 document.querySelector("#content-editor .unexpend").onclick = () =>
@@ -44,31 +776,52 @@ document.querySelector("#content-editor .expend").onclick = () =>
 }
 
 // Core Functions
-function explorer(o, open, keysPath = [], iteration = 0)
+function explorer(o, open, display, keysPath = [], iteration = 0, startingPath = [], max = 6)
 {
     let s = null;
     if(modEditor.querySelectorAll(".content-explorer-section")[iteration])
     {
         s = modEditor.querySelectorAll(".content-explorer-section")[iteration];
         while(modEditor.querySelectorAll(".content-explorer-section")[iteration+1]){modEditor.querySelectorAll(".content-explorer-section")[iteration+1].remove();}
+        // while(modEditor.querySelectorAll(".content-explorer-section").length > max){modEditor.querySelectorAll(".content-explorer-section")[0].remove();}
         while(s.querySelector("button")){s.querySelector("button").remove();}
     }
-    else
-    {
-        s = section.cloneNode(true);
-        s.querySelector("h3").innerText = ""
-        modEditor.appendChild(s)
-    }
+    else { s = section.cloneNode(true); modEditor.appendChild(s); }
+    s.querySelector("h3").innerText = display.name
 
-    for(let [k, v] of Object.entries(o))
+    if(display.icon)
+    {
+        if(!s.querySelector("img")) {s.querySelector(":scope > div").insertBefore(document.createElement("img"), s.querySelector(":scope > div").firstChild)}
+        s.querySelector("img").src = display.icon; }
+    else if(s.querySelector("img")) { s.querySelector("img").remove(); }
+
+    for(let [k, v] of Object.entries(o).sort(([ka], [kb])=>ka.localeCompare(kb)))
     {
         let b = document.createElement("button");
-        b.innerText = k;
+        if(k.endsWith(".png") && v && v.url)
+        {
+            let i = document.createElement("img");
+            i.src = "data:image/png;base64,"+v.url;
+            b.appendChild(i);
+
+            let span = document.createElement("span");
+            span.innerText = k;
+            b.appendChild(span);
+        }
+        else
+        {
+            b.innerText = k;
+        }
         s.appendChild(b)
+
+        if(!/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k) && (v==undefined || Object.entries(v).length == 0))
+        {
+            b.disabled = true;
+        }
 
         b.onclick = () =>
         {
-            let path = JSON.parse(JSON.stringify(keysPath));
+            let path = lodash.clone(keysPath);
             path.push(k);
 
             if(/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k))
@@ -77,25 +830,31 @@ function explorer(o, open, keysPath = [], iteration = 0)
 
                 let directoryPath = path;
                 directoryPath.pop();
-                explorer(o, open, directoryPath, iteration);
+                explorer(o, open, {name: path[path.length-1]}, directoryPath, iteration);
             }
             else
             {
-                explorer(v, open, path, iteration+1);
+                explorer(v, open, {name: path[path.length-1]}, path, iteration+1, startingPath[iteration]==k?startingPath:[]);
             }
         }
+
+        if(startingPath[iteration] == k){b.onclick(); startingPath = []; }
     }
 }
 
 let closeEditor = () => {};
-async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {})
-{
+async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {}, reload = () => {}, getFile = (k) => {})
+{    
+    for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
     closeEditor();
     if(filename.endsWith(".json") || filename.endsWith(".mcmeta"))
     {
-        codeEditor.style.display = "block";
+        editors.codeEditor.style.display = "block";
 
-        let value = JSON.stringify(data, null, 4);
+        let value = data;
+        // Beautiful Indent
+        value = stringify(parse(value, undefined, true), null, 4);
+
         let editor = new EditorView
         ({
             doc: value,
@@ -120,15 +879,15 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                     { key: "Shift-Tab", run: indentLess }
                 ])
             ],
-            parent: codeEditor
+            parent: editors.codeEditor
         })
                     
-        codeEditor.appendChild(codeEditor.querySelector(".exit-options"))
-        codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () =>
+        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
+        editors.codeEditor.querySelector(".exit-options > button.save").onclick = () =>
         {
             try
             {
-                onChange(JSON.parse(value))
+                onChange(value)
             }
             catch(err)
             {
@@ -139,15 +898,79 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
         closeEditor = () =>
         {
-            codeEditor.style.display = "none"
+            editors.codeEditor.style.display = "none";
+            editors.threeEditor.style.display = "none";
             editor.dom.remove();
             onExit();
         }
-        codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
+        editors.codeEditor.querySelector(".exit-options > button.exit").onclick = closeEditor
+
+        editors.codeEditor.querySelector(".exit-options > button.three").onclick = () =>
+        {
+            if(!loadModel){return}
+            editors.codeEditor.style.display = "none";
+            editors.threeEditor.style.display = "block";
+
+            loadModel(JSON.parse(value), getFile);
+        }
     }
-    else if(filename.endsWith(".mcfunction"))
+    else if(filename.endsWith(".toml"))
     {
-        codeEditor.style.display = "block";
+        editors.codeEditor.style.display = "block";
+
+        let value = data;
+        let editor = new EditorView
+        ({
+            doc: value.raw,
+            extensions:
+            [
+                basicSetup,
+                StreamLanguage.define(toml),
+                editorTheme,
+                oneDark,
+                indentUnit.of("    "),
+                EditorView.updateListener.of(update =>
+                {
+                    if (update.docChanged)
+                    {
+                        const doc = update.state.doc;
+                        value.raw = doc.toString()
+                    }
+                }),
+                keymap.of
+                ([
+                    { key: "Tab", run: indentMore },
+                    { key: "Shift-Tab", run: indentLess }
+                ])
+            ],
+            parent: editors.codeEditor
+        })
+                    
+        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
+        editors.codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () =>
+        {
+            try
+            {
+                onChange(value)
+            }
+            catch(err)
+            {
+                console.warn(err)
+                // TODO: Error invalid json
+            }
+        }
+
+        closeEditor = () =>
+        {
+            editors.codeEditor.style.display = "none"
+            editor.dom.remove();
+            onExit();
+        }
+        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
+    }
+    else if(filename.endsWith(".mcfunction") || filename.endsWith(".MF") || filename.endsWith(".properties") || filename.endsWith(".txt"))
+    {
+        editors.codeEditor.style.display = "block";
 
         let editor = new EditorView
         ({
@@ -172,34 +995,34 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                     { key: "Shift-Tab", run: indentLess }
                 ])
             ],
-            parent: codeEditor
+            parent: editors.codeEditor
         })
                     
-        codeEditor.appendChild(codeEditor.querySelector(".exit-options"))
-        codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () => {onChange(data)}
+        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
+        editors.codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () => {onChange(data)}
 
         closeEditor = () =>
         {
-            codeEditor.style.display = "none"
+            editors.codeEditor.style.display = "none"
             editor.dom.remove();
             onExit();
         }
-        codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
+        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
     }
     else if(filename.endsWith(".nbt"))
     {
-        nbtEditor.style.display = "block";
+        editors.nbtEditor.style.display = "block";
 
-        closeEditor = () => { nbtEditor.style.display = "none"; onExit(); }
+        closeEditor = () => { editors.nbtEditor.style.display = "none"; onExit(); }
 
-        nbtEditor.querySelector("p").innerText = `Dimensions x: ${data.parsed.size[0]}, y: ${data.parsed.size[1]}, z: ${data.parsed.size[2]}`
+        editors.nbtEditor.querySelectorAll("p")[1].innerText = `Dimensions x: ${data.parsed.size[0]}, y: ${data.parsed.size[1]}, z: ${data.parsed.size[2]}`
 
-        nbtEditor.querySelector("caption").innerText = filename;
-        while(nbtEditor.querySelector("tbody").firstChild){nbtEditor.querySelector("tbody").firstChild.remove();}
+        editors.nbtEditor.querySelector("caption").innerText = filename;
+        while(editors.nbtEditor.querySelector("tbody").firstChild){editors.nbtEditor.querySelector("tbody").firstChild.remove();}
         for(let [i, p] of data.parsed.palette.entries())
         {
             let c = document.createElement("tr");
-            nbtEditor.querySelector("tbody").appendChild(c);
+            editors.nbtEditor.querySelector("tbody").appendChild(c);
 
             c.appendChild(document.createElement("td"));
             c.querySelector("td:last-of-type").innerText = data.parsed.blocks.filter(b=>b.state==i).length
@@ -212,50 +1035,74 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             c.querySelector("td:last-of-type").style.textAlign = "start"
         }
 
-        while(nbtEditor.querySelector("ul").firstChild){nbtEditor.querySelector("ul").firstChild.remove();}
+        while(editors.nbtEditor.querySelector("ul").firstChild){editors.nbtEditor.querySelector("ul").firstChild.remove();}
         for(let entity of data.parsed.entities)
         {
             let e = document.createElement("li");
             e.innerText = entity.nbt.id;
-            nbtEditor.querySelector("ul").appendChild(e);
+            editors.nbtEditor.querySelector("ul").appendChild(e);
         }
-        console.log(data)
 
-        nbtEditor.querySelector("button").onclick = async () =>
+        editors.nbtEditor.querySelectorAll("button")[0].disabled = false
+        editors.nbtEditor.querySelectorAll("button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Open in Minecraft"
+
+        editors.nbtEditor.querySelectorAll("button")[1].innerText = "Save into "+filename;
+        editors.nbtEditor.querySelectorAll("button")[1].onclick = async () => 
         {
-            await ipcInvoke("addEditionWorld", window.instance.name);
-            await launch(
-                window.instance.name,
-                {
-                    log: (t, c) => {},
-                    close: async c =>
+            // Save
+            let data =
+            {
+                parsed: await ipcInvoke("readFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt'),
+                buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt')
+            };
+            await onChange(data);
+
+            data = await reload();
+
+        }
+        editors.nbtEditor.querySelectorAll("button")[0].onclick = async () =>
+        {
+            nbtEditorIndex++;
+            if(!nbtEditorOpened)
+            {
+                nbtEditorOpened = true;
+                await ipcInvoke("addEditionWorld", window.instance.name);
+                await launch(
+                    window.instance.name,
                     {
-                        // Save
-                        let data =
+                        log: (t, c) => {},
+                        close: async c =>
                         {
-                            parsed: await ipcInvoke("readFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure.nbt'),
-                            buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure.nbt')
-                        };
-                        onChange(data)
+                            closeEditor();
+                            nbtEditorOpened = false;
+                            editors.nbtEditor.querySelectorAll("button")[0].innerText = "Open in Minecraft"
+                            editors.nbtEditor.querySelectorAll("button")[0].disabled = false
+                            editors.nbtEditor.querySelectorAll("p")[0].innerHTML = "";
+                            editors.nbtEditor.querySelectorAll("button")[1].style.display = "none"
 
-                        ipcInvoke('deleteFolder', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/');
-
-                        closeEditor();
+                            ipcInvoke('deleteFolder', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/');
+                        },
+                        network: (i, c) => {},
+                        windowOpen: async (w, i) => {},
                     },
-                    network: (i, c) => {},
-                    windowOpen: async (w, i) => {},
-                },
-                {type: "singleplayer", identifier: ".Structure Edition"}
-            )
+                    {type: "singleplayer", identifier: ".Structure Edition"}
+                )
+                editors.nbtEditor.querySelectorAll("button")[0].innerText = "Minecraft launched"
+                editors.nbtEditor.querySelectorAll("button")[0].disabled = true
+                editors.nbtEditor.querySelectorAll("button")[1].style.display = "block"
+                editors.nbtEditor.querySelectorAll("p")[0].style.opacity = '0.8';
+                editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
+            }
 
-            ipcInvoke('writeBuffer', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure.nbt', data.buffer);
+            ipcInvoke('writeBuffer', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', data.buffer);
+            editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
         }
     }
     else if(filename.endsWith(".png"))
     {
         console.log(data)
-        closeEditor = () => { imgEditor.style.display = "none"; onExit(); }
-        imgEditor.style.display = "block";
+        closeEditor = () => { editors.imgEditor.style.display = "none"; onExit(); }
+        editors.imgEditor.style.display = "block";
 
         // External
         document.getElementById("image-editor").querySelector(".download").onclick = async () =>
@@ -291,7 +1138,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
         {
             canvas.width = img.width
             canvas.height = img.height
-            if(canvas.width * imgEditor.getBoundingClientRect().height < canvas.height * imgEditor.getBoundingClientRect().width) { canvas.style.height = "calc(80% - 32px)"; canvas.style.width = "unset"; }
+            if(canvas.width * editors.imgEditor.getBoundingClientRect().height < canvas.height * editors.imgEditor.getBoundingClientRect().width) { canvas.style.height = "calc(80% - 32px)"; canvas.style.width = "unset"; }
             else { canvas.style.width = "calc(80% - 32px)"; canvas.style.height = "unset"; }
             ctx.drawImage(img, 0, 0);
         }
@@ -626,9 +1473,9 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
     }
     else
     {
-        closeEditor = () => { noEditor.style.display = "none"; onExit(); }
-        noEditor.style.display = "block";
-        document.getElementById("no-editor").querySelector("p").innerText = filename.split("/")[filename.split("/").length-1] + "\n" + document.getElementById("no-editor").querySelector("p").innerText;
+        closeEditor = () => { editors.noEditor.style.display = "none"; onExit(); }
+        editors.noEditor.style.display = "block";
+        document.getElementById("no-editor").querySelector("p").innerText = filename.split("/")[filename.split("/").length-1] + "\nFormat not supported... You can download it and/or replace it with another file to modify it externally.";
         
         document.getElementById("no-editor").querySelector("button:first-of-type").onclick = async () =>
         {
@@ -650,30 +1497,114 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
 window.openModContent = async function(path)
 {
-    let data = await ipcInvoke("readModContent", "instances/"+window.instance.name +"/minecraft/"+path+".jar")
+    closeEditor();
+    let fullPath = "instances/"+window.instance.name +"/minecraft/"+path+".jar";
+    let data = await ipcInvoke("getJar", fullPath, true)
 
     modEditor.style.display = "flex";
-    // Mods
-    let s = section.cloneNode(true);
-    s.querySelector("h3").innerText = "Mod Data"
-    modEditor.appendChild(s)
+
+    // Icon
+    let icon = null;
+    let modData = await ipcInvoke("extractFileByPath", fullPath, "META-INF/mods.toml");
+    for(let m of modData.parsed.mods)
+    {
+        if(m.logoFile)
+        {
+            let logoData = await ipcInvoke("extractFileByPath", fullPath, m.logoFile);
+            if(logoData) { icon = "data:image/png;base64,"+logoData.url; }
+        }
+    }
+
+    explorer(data, async (keys) =>
+    {
+        editors.sourceSelection.firstChild.innerHTML = '';
+        editors.sourceSelection.style.display = "none";
+
+        keys = lodash.clone(keys);
+        let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+
+        if(files.length == 0)
+        {
+            editors.sourceSelection.style.display = "block";
+            let p = document.createElement("p");
+            p.innerText = `${keys[keys.length-1]} not found...`;
+            return;
+        }
+
+        let selectedFile = files.find(f=>f.jarFile.endsWith(fullPath));
+
+        if(!selectedFile)
+        {
+            editors.sourceSelection.style.display = "block";
+            let p = document.createElement("p");
+            p.innerText = `${keys[keys.length-1]} is not modified by ${path.slice(path.lastIndexOf("/"))}...`;
+            return;
+        }
+
+        fileEditor(selectedFile.value, keys[keys.length-1], (value) =>
+        {
+            setProp(window.jarData.combined, keys, value);
+            if(window.jarData.modified.find(m => m.keys==keys))
+            {
+                window.jarData.modified[window.jarData.modified.findIndex(m => m.keys==keys)] = {origin: selectedFile.jarFile, keys, value}
+            }
+            else
+            {
+                window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
+            }
+        }, () => { modEditor.style.display = "flex"; }, async () =>
+        {
+            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+            return files[files.length-1].value;
+        }, async (keys) =>
+        {
+            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+            console.log(files)
+            return files[files.length-1].value;
+        })
+    }, {name: path.slice(path.lastIndexOf("/")), icon: icon})
+
+
+    return;
     
     for(let [i, m] of data.mods.entries())
     {
         let b = document.createElement("button");
-        b.innerText = m.name;
+        if(m.icon)
+        {
+            let i = document.createElement("img");
+            i.src = m.icon
+            b.appendChild(i);
+        }
+        let span = document.createElement("span");
+        span.innerText = m.name;
+        b.appendChild(span);
         s.appendChild(b)
 
         b.onclick = () =>
         {
             let o = {assets: data.mods[i].assets, data: data.mods[i].data, classes: data.mods[i].classes};
             closeEditor();
-            while(modEditor.querySelector(".content-explorer-section")){modEditor.querySelector(".content-explorer-section").remove();}
             explorer(o, (keys) =>
             {
-                keys = JSON.parse(JSON.stringify(keys))
-                fileEditor(getProp(data.mods[i], keys), keys[keys.length-1], (value) => { console.log(keys, value); setProp(data.mods[i], keys, value) }, () => { modEditor.style.display = "flex"; codeEditor.style.display = "none"; })
-            })
+                keys = lodash.clone(keys)
+                fileEditor(getProp(data.mods[i], keys), keys[keys.length-1], (value) => { console.log(keys, value); setProp(data.mods[i], keys, value) }, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.mods[i], keys)})
+            }, {name: m.name, icon: m.icon})
+        }
+    }
+    // Ressource Packs
+    {
+        let b = document.createElement("button");
+        b.innerText = "Ressource Packs";
+        s.appendChild(b)
+
+        b.onclick = () =>
+        {
+            closeEditor();
+            explorer(data.resourcepacks, (keys) =>
+            {
+                fileEditor(getProp(data.resourcepacks, keys), keys[keys.length-1], (value) => {setProp(data.resourcepacks, keys, value)}, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.resourcepacks, keys)})
+            }, {name: "Ressource Packs"})
         }
     }
     // Other Data
@@ -685,11 +1616,10 @@ window.openModContent = async function(path)
         b.onclick = () =>
         {
             closeEditor();
-            while(modEditor.querySelector(".content-explorer-section")){modEditor.querySelector(".content-explorer-section").remove();}
             explorer(data.data, (keys) =>
             {
-                fileEditor(getProp(data.data, keys), keys[keys.length-1], (value) => {setProp(data.data, keys, value)}, () => { modEditor.style.display = "flex"; codeEditor.style.display = "none"; })
-            })
+                fileEditor(getProp(data.data, keys), keys[keys.length-1], (value) => {setProp(data.data, keys, value)}, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.data, keys)})
+            }, {name: "Other Files"})
         }
     }
 

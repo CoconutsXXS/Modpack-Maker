@@ -2,6 +2,7 @@ const fs = require('fs')
 const { unzip, ZipEntry } = require('unzipit');
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
+const toml = require('toml');
 const minecraftData = require('minecraft-data')
 const jarReader = require('./jar-reader');
 const similarity = require('similarity');
@@ -9,6 +10,11 @@ const javaParser = require("./java-parser");
 const JSZip = require("jszip");
 const mcFunction = require("@spyglassmc/mcfunction");
 const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
+const lodash = require("lodash")
+const path = require("path")
+var chokidar = require('chokidar');
+
+const config = require('./config');
 
 function toNBT(value)
 {
@@ -80,7 +86,9 @@ function toNBT(value)
 // Parsing
 async function readZipEntry(path, value)
 {
-    if(path.endsWith(".json") || path.endsWith(".mcmeta")) { return await value.json(); }
+    if(!value){return value;}
+
+    if(path.endsWith(".json") || path.endsWith(".mcmeta")) { return await value.text(); }
     else if(path.endsWith(".nbt")) { return {parsed: await jarReader.parseNbt(Buffer.from(await value.arrayBuffer())), buffer: Buffer.from(await value.arrayBuffer())}; }
     else if(path.endsWith(".class"))
     {
@@ -91,7 +99,7 @@ async function readZipEntry(path, value)
         }
         catch(err) { return {data: Buffer.from(await value.arrayBuffer()).toString(), buffer: Buffer.from(await value.arrayBuffer())} }
     }
-    else if(path.endsWith(".mcfunction"))
+    else if(path.endsWith(".mcfunction") || path.endsWith(".MF") || path.endsWith('.properties') || path.endsWith('.txt'))
     {
         return await value.text();
     }
@@ -102,7 +110,15 @@ async function readZipEntry(path, value)
             url: Buffer.from(await value.arrayBuffer()).toString('base64')
         }
     }
-    else if(!path.endsWith("/")){value = Buffer.from(await value.arrayBuffer());}
+    else if(path.endsWith(".toml"))
+    {
+        value = await value.text();
+        return {
+            raw: value,
+            parsed: toml.parse(value.replaceAll(/^([ \t]*)([A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+)([ \t]*)=/gm, (match, indent, key, space) => `${indent}"${key}"${space}=`))
+        }
+    }
+    else if(!path.endsWith("/") && value.arrayBuffer){value = Buffer.from(await value.arrayBuffer());}
 
     return value;
 }
@@ -112,7 +128,7 @@ async function toBuffer(path, value, fail = false)
     {
         if(value.constructor.name == "Object" && (path[path.length-1].endsWith(".json") || path[path.length-1].endsWith(".mcmeta")))
         {
-            value = Buffer.from(JSON.stringify(value));
+            value = Buffer.from(value);
         }
         else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".nbt"))
         {
@@ -139,7 +155,7 @@ async function toBuffer(path, value, fail = false)
             if(!Buffer.isBuffer(value))
             { try{value = Buffer.from(value)}catch(err){} }
         }
-        else if(value.constructor.name == "Object" && path[path.length-1].endsWith(".mcfunction"))
+        else if(value.constructor.name == "Object" && (path[path.length-1].endsWith(".mcfunction") || path[path.length-1].endsWith(".MF") || path[path.length-1].endsWith(".toml")) || path[path.length-1].endsWith(".properties") || path[path.length-1].endsWith(".txt"))
         {
             value = Buffer.from(value, "utf8")
         }
@@ -236,23 +252,104 @@ async function expandPaths(obj, modifyValue = (path, value) => {return value;})
     return result;
 }
 
+function setProp(obj, keys, value)
+{
+    let current = obj;
+    keys.slice(0, -1).forEach(k =>
+    {
+        if (!(k in current)) current[k] = {};
+        current = current[k];
+    });
+    current[keys[keys.length - 1]] = value;
+}
+function getProp(obj, keys)
+{
+    let current = obj;
+    keys.slice(0, -1).forEach(k =>
+    {
+        if (!(k in current)) return undefined;
+        current = current[k];
+    });
+    return current[keys[keys.length - 1]]
+}
+
+// Cache
+let jarList = [];
+async function getJar(path, expend = false)
+{
+    if(jarList.find(j=>j.path==path&&j.expend==expend))
+    {
+        return jarList.find(j=>j.path==path&&j.expend==expend).jar;
+    }
+
+    let jar = null;
+    try{jar = expend?await expandPaths((await unzip( fs.readFileSync(path))).entries, () => { return null; }):((await unzip( fs.readFileSync(path))).entries);}catch(err){return null;}
+    if(jar==null){return null;}
+
+    jarList.push({path, jar, expend})
+
+    let watcher = chokidar.watch(path, {persistent: true});
+    watcher.on('all', async (e, p, s) =>
+    {        
+        if(e=='unlink')
+        {
+            jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)] = null;
+            delete jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)];
+        }
+        else if(e==="change")
+        {
+            try
+            {
+                if(expend) { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = await expandPaths((await unzip( fs.readFileSync(p))).entries, () => { return null; }); }
+                else { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = (await unzip( fs.readFileSync(p))).entries; }
+            }
+            catch(err){}
+        }
+    })
+
+    return jar;
+}
 
 module.exports =
 {
-    modData: async (path) =>
+    getJar: getJar,
+    readZipEntry: readZipEntry,
+    fullModData: async (path) =>
     {
         let jar = await jarReader.jar(path, null, true);
 
         // Iterate Data per Mods
-        let modsId = [];
+        let registeredMods = [];
         for(let [k, v] of Object.entries(jar).filter(([k,v]) => (k.startsWith("data/") && k!="data/") || (k.startsWith("assets/") && k!="assets/")))
         {
-            if(modsId.includes(k.split("/")[1])){continue;}
+            if(registeredMods.find(m => m.id == k.split("/")[1]) != undefined){continue;}
 
-            modsId.push(k.split("/")[1]);
+            registeredMods.push({id: k.split("/")[1], displayName: k.split("/")[1]})
         }
-        let modsLongId = new Array(modsId.length);
-        for(let [p, d] of Object.entries(jar).filter(([k,v]) => !k.startsWith("META-INF/") && !k.startsWith("packs/") && !k.startsWith("assets/") && !k.startsWith("data/")))
+
+        // Retrive by File
+        if(jar["META-INF/mods.toml"])
+        {
+            let tomlText = (await readZipEntry("META-INF/mods.toml", jar["META-INF/mods.toml"])).replaceAll(/^([ \t]*)([A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+)([ \t]*)=/gm, (match, indent, key, space) => `${indent}"${key}"${space}=`);
+            let modsData = toml.parse(tomlText);
+            for(let m of modsData.mods)
+            {
+                let icon = null;
+                if(m.logoFile && jar[m.logoFile])
+                {
+                    icon = "data:image/png;base64,"+(await readZipEntry(m.logoFile, jar[m.logoFile])).url;
+                }
+
+                let d = {id: m.modId, displayName: m.displayName, description: m.description, icon};
+                if(registeredMods.find(e=>e.id==m.modId)!=undefined)
+                {
+                    registeredMods[registeredMods.findIndex(e=>e.id==m.modId)] = d;
+                }
+                else { registeredMods.push(d); }
+            }
+        }
+
+        for(let [p, d] of Object.entries(jar).filter(([k,v]) => !k.startsWith("META-INF/") && !k.startsWith("resourcepacks/") && !k.startsWith("packs/") && !k.startsWith("assets/") && !k.startsWith("data/")))
         {
             if(p.split("/").length >= 3 && p.split("/")[2].length > 0)
             {
@@ -261,47 +358,62 @@ module.exports =
                 {
                     i += (index==0?"":".")+p.split("/")[index];
                 }
-                if(modsLongId.includes(i)){continue;}
-                modsLongId[modsId.findIndex(m=> m == modsId.sort((a,b)=>similarity(b, p.split("/")[2])-similarity(a, p.split("/")[2]))[0] )] = i;
+                if(registeredMods.find(m=>m.longId==i)!=undefined){continue;}
+
+                // Find most similar id
+                let biggest = {index: -1, similarity: 0}
+                for (let i = 0; i < registeredMods.length; i++)
+                {
+                    let s = similarity(registeredMods[i].id, p.split("/")[2]);
+                    if(biggest.similarity < s)
+                    { biggest = {index: i, similarity: s}; }
+                }
+                if(biggest.index == -1){continue;}
+
+                registeredMods[biggest.index].longId = i;
             }
         }
 
         // Search & Parse Data
         let mods = [];
-        for(let [i, m] of modsId.entries())
+        for(let m of registeredMods)
         {
             // Data
-            let data = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("data/"+m+"/") && k!="data/"+m+"/")), async (path, value) => { return readZipEntry(path, value) }));
-            if(data.data){data = data.data[m]}
+            let data = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("data/"+m.id+"/") && k!="data/"+m.id+"/")), async (path, value) => { return readZipEntry(path, value) }));
+            if(data.data){data = data.data[m.id]}
 
             // Assets
-            let assets = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("assets/"+m+"/") && k!="assets/"+m+"/")), async (path, value) => { return readZipEntry(path, value) }));
-            if(assets.assets){assets = assets.assets[m]}
+            let assets = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("assets/"+m.id+"/") && k!="assets/"+m.id+"/")), async (path, value) => { return readZipEntry(path, value) }));
+            if(assets.assets){assets = assets.assets[m.id]}
 
             // Classes
             let classes = {};
-            if(modsLongId[i] != null)
+            if(m.longId != undefined)
             {
-                classes = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith(modsLongId[i].replaceAll(".", "/")))), async (path, value) => { return readZipEntry(path, value) }))[modsLongId[i].split(".")[0]][modsLongId[i].split(".")[1]][modsLongId[i].split(".")[2]];
+                classes = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith(m.longId.replaceAll(".", "/")))), async (path, value) => { return readZipEntry(path, value) }))[m.longId.split(".")[0]][m.longId.split(".")[1]][m.longId.split(".")[2]];
             }
 
             mods.push
             ({
-                name: m,
-                id: modsLongId[i],
+                name: m.displayName,
+                icon: m.icon,
+                description: m.description,
+                id: m.longId,
                 data,
                 assets,
                 classes
             })
         }
 
+        let resourcepacks = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("resourcepacks/"))), async (path, value) => { return readZipEntry(path, value) }));
+
         let otherData = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) =>
         {
-            for(let id of modsLongId) { if(id && id.split('.')[0] == k.split("/")[0]){return false;} }
+            for(let {id} of registeredMods) { if(id && id.split('.')[0] == k.split("/")[0]){return false;} }
             return !k.startsWith("data/") && !k.startsWith("assets/") && !k.startsWith("classes/")
         })), async (path, value) => { return readZipEntry(path, value) }));
 
-        return {mods, data: otherData};
+        return {mods, data: otherData, resourcepacks};
     },
     // modDataToDirectPathDirectoryObject: async (mods, path) =>
     // {
@@ -440,6 +552,28 @@ module.exports =
             }
         }
 
+        for(const [k, m] of Object.entries(mod.resourcepacks))
+        {
+            if(!jar.resourcepacks) { jar.resourcepacks = {}; }
+            
+            let buffer = await toBuffer([k], m, true);
+            if(buffer.failed && !/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k))
+            {
+                // Directory
+                jar.resourcepacks[k] = {};
+                await iterateDirectoryObject(m, [], async (p, v) =>
+                {
+                    // FILE
+                    setProp(jar.resourcepacks[k], p, await toBuffer(p, v));
+                });
+            }
+            else
+            {
+                // File
+                jar.resourcepacks[k] = buffer.result;
+            }
+        }
+
         return jar;
     },
     writeDirectoryObject: async (directoryObject, path) =>
@@ -476,6 +610,153 @@ module.exports =
 
         const content = await main.generateAsync({type:"arraybuffer"});
         fs.writeFileSync(path, Buffer.from(content))
+    },
+    combineMods: async (name, version, parseFiles = false) =>
+    {
+        let r = {};
+
+        // List every Jar including Minecraft
+        let sub = [];
+        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+
+        for(let p of sub)
+        {
+            let jar = await getJar(p);
+
+            if(p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+            {
+                for(let [p, v] of Object.entries(jar))
+                {
+                    if(p.endsWith(".class") && !p.includes("/")) { jar[p] = null; delete jar[p]; }
+                }
+            }
+
+            let content = await expandPaths(jar, async (path, value) => { return parseFiles?readZipEntry(path, value):null; });
+            r = lodash.merge(r, content)
+        }
+        return r;
+    },
+    retrieveModFileById: async (name, version, id = "minecraft:worldgen/placed_feature/basalt_blobs") =>
+    {
+        // List every Jar including Minecraft
+        let sub = [];
+        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+
+
+        let realPath = "/"+id.split(":")[0];
+        for(let part of id.split(":")[1].split("/")){realPath+="/"+part}
+
+        let result = [];
+
+        for(let p of sub)
+        {
+            let jar = await getJar(p);
+
+            for(let r of Object.entries(jar).filter(([k, v]) => k.startsWith("data"+realPath) || k.startsWith("assets"+realPath)))
+            {
+                result.push
+                ({
+                    jarFile: p,
+                    path: r[0],
+                    value: await readZipEntry(r[0], r[1]),
+                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                })
+            }
+        }
+
+        return result;
+    },
+    retrieveModFileByPath: async (name, version, truePath = "") =>
+    {
+        // List every Jar including Minecraft
+        let sub = [];
+        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+
+        let result = [];
+
+        for(let p of sub)
+        {
+            let jar = await getJar(p);
+
+            if(jar[truePath])
+            {
+                result.push
+                ({
+                    jarFile: p,
+                    path: truePath,
+                    value: await readZipEntry(truePath, jar[truePath]),
+                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                })
+            }
+        }
+
+        return result;
+    },
+    retrieveModFileByKeys: async (name, version, keys = []) =>
+    {
+        // List every Jar including Minecraft
+        let sub = [];
+        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+
+        let result = [];
+
+        for(let p of sub)
+        {
+            let jar = await getJar(p);
+
+            let truePath = "";
+            for(let k of keys) { truePath += k+"/"; }
+            truePath = truePath.slice(0, truePath.length-1)
+
+            if(jar[truePath])
+            {
+                result.push
+                ({
+                    jarFile: p,
+                    path: truePath,
+                    value: await readZipEntry(truePath, jar[truePath]),
+                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                })
+            }
+        }
+
+        return result;
+    },
+    extractFileByKeys: async (jarPath, keys = []) =>
+    {
+        let jar = await getJar(jarPath);
+
+        let truePath = "";
+        for(let k of keys) { truePath += k+"/"; }
+        truePath = truePath.slice(0, truePath.length-1)
+
+        return await readZipEntry(truePath, jar[truePath]);
+    },
+    extractFileByPath: async (jarPath, truePath) =>
+    {
+        let jar = await getJar(jarPath);
+
+        return await readZipEntry(truePath, jar[truePath]);
     },
 
     readZipEntry: readZipEntry,

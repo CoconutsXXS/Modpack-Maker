@@ -3,7 +3,10 @@ const path = require('node:path')
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
 const fetch = require('cross-fetch');
 const fs = require('fs')
+const fsPromise = require('fs/promises')
 const {unzip} = require('unzipit');
+const v8 = require('v8');
+const msgpack = require('@msgpack/msgpack');
 
 const config = require('./config');
 const Instance = require('./instance');
@@ -22,7 +25,9 @@ app.whenReady().then(async () =>
     // let data = await require("./content-modifier.js").modData("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar");
     // let directoryObject = await require("./content-modifier.js").modDataToDirectoryObject(data, "/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar")
     // await require("./content-modifier.js").writeDirectoryObject(directoryObject, "./Test.zip");
-    
+
+    // await contentModifier.combineMods("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/")
+
     // return;
     if(isSilent()){return;}
 
@@ -317,25 +322,7 @@ ipcMain.on('ephemeralLaunch', async (event, loader, version, mods) =>
     await Instance.ephemeralInstance(loader, version, mods);
 })
 
-// Content Edition
-ipcMain.handle('readModContent', async (event, p) =>
-{
-    return await contentModifier.modData(path.join(app.getPath('appData'), 'Modpack Maker', p));
-})
-ipcMain.handle('writeModContent', async (event, p, data) =>
-{
-    let directoryObject = await contentModifier.modDataToDirectoryObject(data)
-    await contentModifier.writeDirectoryObject(directoryObject, path.join(app.getPath('appData'), 'Modpack Maker', p));
-})
-ipcMain.handle('addEditionWorld', async (event, instanceName) =>
-{
-    if(!fs.existsSync(path.join(config.directories.instances, instanceName, "minecraft/saves"))) { fs.mkdirSync(path.join(config.directories.instances, instanceName, "minecraft/saves"), {recursive: true}) }
-    fs.cpSync("./.Structure Edition", path.join(config.directories.instances, instanceName, "minecraft/saves/.Structure Edition"), {recursive: true});
 
-    // TODO Rust integration to write data to .mca
-    // let reader = await WorldReader.create(path.join(config.directories.instances, instanceName, "minecraft/saves/.Structure Edition"));
-    // console.log(await reader.getRegionData(0, 0))
-})
 
 // Saves
 ipcMain.handle('packList', (event, minecraft, loader) =>
@@ -376,6 +363,44 @@ ipcMain.handle('savedList', (event) =>
 })
 ipcMain.handle('addSaved', (event, args) => { Saves.addSaved(args[0]) })
 ipcMain.handle('deleteSaved', (event, args) => { Saves.deleteSaved(args[0]) })
+
+
+// Content Edition
+ipcMain.handle('getJar', (event, p, expend = false) => { return contentModifier.getJar(path.join(app.getPath('appData'), 'Modpack Maker', p), expend); })
+ipcMain.handle('readZipEntry', (event, path, value) => { return contentModifier.readZipEntry(path, value); })
+ipcMain.handle('writeModContent', async (event, p, data) =>
+{
+    let directoryObject = await contentModifier.modDataToDirectoryObject(data)
+    await contentModifier.writeDirectoryObject(directoryObject, path.join(app.getPath('appData'), 'Modpack Maker', p));
+})
+ipcMain.handle('addEditionWorld', async (event, instanceName) =>
+{
+    if(!fs.existsSync(path.join(config.directories.instances, instanceName, "minecraft/saves"))) { fs.mkdirSync(path.join(config.directories.instances, instanceName, "minecraft/saves"), {recursive: true}) }
+    fs.cpSync("./.Structure Edition", path.join(config.directories.instances, instanceName, "minecraft/saves/.Structure Edition"), {recursive: true});
+})
+ipcMain.handle('getCombined', async (event, name, version) =>
+{
+    const combined = await contentModifier.combineMods(name, version);
+
+    const serialized = msgpack.encode(combined);
+    const totalSize = serialized.byteLength;
+    event.sender.send('shared-buffer-start', { totalSize });
+    
+    const chunkSize = 1024 * 1024; // 1 Mo
+    for (let i = 0; i < totalSize; i += chunkSize)
+    {
+        const end = Math.min(i + chunkSize, totalSize);
+        const chunk = serialized.slice(i, end);
+        event.sender.send('shared-buffer-chunk', { chunk, offset: i });
+    }
+
+    event.sender.send('shared-buffer-end');
+})
+ipcMain.handle('retrieveFileById', (event, name, version, id) => { return contentModifier.retrieveModFileById(name, version, id) })
+ipcMain.handle('retrieveFileByKeys', (event, name, version, keys) => { return contentModifier.retrieveModFileByKeys(name, version, keys) })
+ipcMain.handle('retrieveFileByPath', (event, name, version, path) => { return contentModifier.retrieveModFileByPath(name, version, path) })
+ipcMain.handle('extractFileByKeys', (event, jarPath, keys) => { return contentModifier.extractFileByKeys(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), keys) })
+ipcMain.handle('extractFileByPath', (event, jarPath, p) => { return contentModifier.extractFileByPath(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), p) })
 
 // Data
 const reader = require('./jar-reader.js');

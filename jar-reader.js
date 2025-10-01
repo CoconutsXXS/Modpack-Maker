@@ -90,7 +90,8 @@ module.exports =
         //     }
         // }
     },
-    parseNbt: parseNbt
+    parseNbt: parseNbt,
+    parseTomlWithComments: parseTomlWithComments
 }
 
 async function handleData(buffer, type)
@@ -112,6 +113,9 @@ async function handleData(buffer, type)
 async function parseNbt(buffer)
 {
     const data = nbt.simplify((await nbt.parse(buffer)).parsed);
+
+    if(!data.palette || !data.blocks){return {};}
+
     let blocks = [];
     for(let b of data.blocks)
     {
