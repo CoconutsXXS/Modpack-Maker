@@ -86,7 +86,6 @@ let videoId = new URL(window.location.href).searchParams.get("v");
 const linkElem = document.createElement('link');
 linkElem.setAttribute('rel', 'stylesheet');
 linkElem.setAttribute('href', browser.runtime.getURL('/youtube.css'));
-console.log(browser.runtime.getURL('/youtube.css'))
 document.body.appendChild(linkElem);
 
 
@@ -104,11 +103,6 @@ let gallery = null;
 
 async function modify()
 {
-    if(window.location.href != window.originalLocation)
-    {
-        description = null;
-    }
-
     // Clear
     if(modButton){modButton.remove();modButton=null;}
     if(modSaveButton){modSaveButton.remove();modSaveButton=null;}
@@ -131,8 +125,6 @@ async function modify()
         {
             chapters = [];
 
-            console.log(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes);
-            console.log(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes.length)
             for(let c of document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
             {
                 if(!c.querySelector("#endpoint")) { continue }
@@ -146,7 +138,6 @@ async function modify()
 
             if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters))
             {
-                console.log(JSON.stringify(lastScrappedChapter), JSON.stringify(chapters))
                 lastScrappedChapter = chapters;
                 // setTimeout(() => scrappedChapter = false, 3000);
 
@@ -275,9 +266,8 @@ async function modify()
 }
 
 
-function scrapDescription()
+function scrapDescription(change = (d)=>{})
 {
-    if(description!=null){return true;}
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")) { if(!document.querySelector("#description-interaction")){return false} document.querySelector("#description-interaction").click(); }
 
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")){return false;}
@@ -296,17 +286,23 @@ function scrapDescription()
     }
 
     document.querySelector("#description-inline-expander > #collapse.button.style-scope.ytd-text-inline-expander").click()
+
+    console.log("description != desc",description != desc)
     if(desc != '' && description != desc)
     {
         description = desc;
-        handleDescription();
+        change(description);
+
+        return true
     }
 
-    return true
+    return false
 }
 
 async function handleDescription()
 {
+    if(!description){ console.warn("No Description"); return;}
+
     let linkText = description.match(urlRegex)
     let nolinkText = description.split(urlRegex)
     let link = []
@@ -332,7 +328,6 @@ async function handleDescription()
         // Google Doc Scrapping
         if(url.hostname == 'docs.google.com' && url.pathname.startsWith('/document/d'))
         {
-            console.log(`https://docs.google.com/document/d/${url.pathname.split('/')[3]}/export?format=txt`)
             let doc = await (await fetch(`https://docs.google.com/document/d/${url.pathname.split('/')[3]}/export?format=txt`)).text();
 
             let linkText = doc.match(urlRegex)
@@ -437,14 +432,11 @@ async function handleDescription()
             finish = await setCurrentMod(l.url);
         }
     }
-
-    console.log("Links:",links)
 }
 
 
 async function setCurrentMod(baseUrl)
 {
-    console.log(baseUrl)
     let url = new URL(baseUrl);
     openFunction = function()
     {
@@ -458,7 +450,6 @@ async function setCurrentMod(baseUrl)
     {
         let i = [];
         let res = await fetch(`https://www.curseforge.com/minecraft/${url.pathname.split('/')[2]}/${url.pathname.split('/')[3]}/gallery`);
-        console.log(res.url, res.ok, res.status)
         if(!res.ok){return false;}
         let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
         if(galPage.querySelector('.images-gallery > ul:nth-child(1)'))
@@ -495,7 +486,6 @@ async function setCurrentMod(baseUrl)
         let i = [];
         
         let res = await fetch(`https://modrinth.com/${url.pathname.split('/')[1]}/${url.pathname.split('/')[2]}/gallery`);
-        console.log(res.url, res.ok, res.status)
         if(!res.ok){return false;}
         let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
         if(galPage.querySelector('.items'))
@@ -551,10 +541,8 @@ async function updateMod(url, name, icon, description, images)
 
     modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
 
-    console.log(modButton)
     modButton.onclick = () => {window.open(url, "blank")}
 
-    console.log(modSaveButton.onclick, "modSaveButton.onclick")
     modSaveButton.onclick = (ev) =>
     {
         ev.preventDefault();
@@ -602,7 +590,6 @@ function update()
         if(!currentChapter) { console.log('no chapter found, chapter =', chapters, 'time = ', time); }
         else
         {
-            console.log(currentChapter.name)
             let l  = links.sort((a,b) =>
             {
                 let ia = 0;
@@ -622,7 +609,6 @@ function update()
                 return Math.max(ib, similarity(np(b.before), np(currentChapter.name), {sensitive: true})) - Math.max(ia, similarity(np(a.before), np(currentChapter.name), {sensitive: true}));
             })[0];
 
-            console.log(l);
             if(!l){return;}
             setCurrentMod(l.url);
         }
@@ -635,48 +621,61 @@ let intervalFunction = () =>
 {
     let href = window.location.href;
 
-    scrapDescription();
-    if(description==null){return;}
+    let scapped = scrapDescription((d) =>
+    {
+        let hashtags = [...d.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
+        if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))))
+        { handleDescription() }
+    });
+    if(description==null || !scapped){return;}
+
     // Filter by #
-    if(description.includes("#moddedminecraft") || description.includes("#minecraftmods") || (description.includes("#minecraft") && (description.includes("#mods") || description.includes("#modding"))))
+    let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
+
+    clearInterval(interval);
+    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))))
     {
-        clearInterval(interval);return;
+        return;
     }
 
-    modify();
-    if(description!=null && modButton!=null && links.length>0 && chapters.length > 0)
+    let setupInterval = setInterval(() =>
     {
-        clearInterval(interval);
-        let subInterval = setInterval(() =>
+        modify();
+        if(description!=null && modButton!=null && links.length>0 && chapters.length > 0)
         {
-            if(href != window.location.href || !document.body.contains(modButton))
+            window.scrollTo(0, 0);
+            clearInterval(setupInterval);
+            clearInterval(interval);
+            let subInterval = setInterval(() =>
             {
-                if(modButton){modButton.remove();}
-                if(modSaveButton){modSaveButton.remove();}
-                if(gallery){gallery.remove();}
+                if(href != window.location.href || !document.body.contains(modButton))
+                {
+                    if(modButton){modButton.remove();}
+                    if(modSaveButton){modSaveButton.remove();}
+                    if(gallery){gallery.remove();}
 
-                description = null;
-                time = 0;
-                chapters = [];
-                currentChapter;
-                links = [];
+                    time = 0;
+                    chapters = [];
+                    currentChapter;
+                    links = [];
 
-                lastScrappedChapter = null;
-                modButton = null;
-                modSaveButton = null;
-                gallery = null;
+                    lastScrappedChapter = null;
+                    modButton = null;
+                    modSaveButton = null;
+                    gallery = null;
 
-                clearInterval(subInterval);
+                    clearInterval(subInterval);
 
-                if(!new URL(window.location.href).searchParams.has("v")){return;}
+                    if(!new URL(window.location.href).searchParams.has("v")){return;}
 
-                if(interval){clearInterval(interval)}
-                interval = setInterval(intervalFunction, 200);
-                return;
-            }
-            update();
-        }, 100)
-    }
+                    if(interval){clearInterval(interval)}
+                    interval = setInterval(intervalFunction, 200);
+                    return;
+                }
+                update();
+            }, 100)
+        }
+    }, 100)
 };
 
 let videoWait = setInterval(() =>
@@ -684,16 +683,28 @@ let videoWait = setInterval(() =>
     if(!document.querySelector(".video-stream")){return;}
     clearInterval(videoWait);
 
-    document.querySelector(".video-stream").onloadeddata = (ev) =>
+    let lastAttr = null;
+    let o = new MutationObserver((mutations) =>
+    {
+        for(let m of mutations)
+        {
+            if(m.attributeName == "src" && lastAttr != document.querySelector(".video-stream").getAttribute("src"))
+            { update() }
+        }
+    })
+    o.observe(document.querySelector(".video-stream"), {childList: true, characterData: true, attributes: true, subtree: true})
+
+    function update()
     {
         if(!new URL(window.location.href).searchParams.has("v")){return;}
+        lastAttr = document.querySelector(".video-stream").getAttribute("src")
+        console.log("VIDEO UPDATED")
         window.originalLocation = window.location.href;
 
         if(modButton){modButton.remove();}
         if(modSaveButton){modSaveButton.remove();}
         if(gallery){gallery.remove();}
 
-        description = null;
         time = 0;
         chapters = [];
         currentChapter;
@@ -707,5 +718,12 @@ let videoWait = setInterval(() =>
 
         if(interval){clearInterval(interval)}
         interval = setInterval(intervalFunction, 200);
+    }
+
+    document.querySelector(".video-stream").onloadeddata = (ev) =>
+    {
+        if(!new URL(window.location.href).searchParams.has("v")){return;}
+        update();
+        document.querySelector(".video-stream").onloadeddata = null;
     }
 }, 100);

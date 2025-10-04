@@ -13,6 +13,7 @@ const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
 const lodash = require("lodash")
 const path = require("path")
 var chokidar = require('chokidar');
+const decompiler = require("./decompiler")
 
 const config = require('./config');
 
@@ -89,10 +90,15 @@ async function readZipEntry(path, value)
     if(!value){return value;}
 
     if(path.endsWith(".json") || path.endsWith(".mcmeta")) { return await value.text(); }
-    else if(path.endsWith(".nbt")) { return {parsed: await jarReader.parseNbt(Buffer.from(await value.arrayBuffer())), buffer: Buffer.from(await value.arrayBuffer())}; }
+    else if(path.endsWith(".nbt"))
+    {
+        let buffer = Buffer.from(await value.arrayBuffer());
+        return {parsed: await jarReader.parseNbt(buffer), accurate: (await nbt.parse(buffer)).parsed, buffer};
+    }
     else if(path.endsWith(".class"))
     {
-        return {data: "TODO", buffer: Buffer.from(await value.arrayBuffer())}
+        let buffer = Buffer.from(await value.arrayBuffer());
+        return {raw: await decompiler.decompileClass(buffer), buffer}
         try
         {
             return {data: javaParser.parse(await value.arrayBuffer()), buffer: Buffer.from(await value.arrayBuffer())};
@@ -105,9 +111,10 @@ async function readZipEntry(path, value)
     }
     else if(path.endsWith(".png"))
     {
+        let buffer = Buffer.from(await value.arrayBuffer());
         return {
-            buffer: Buffer.from(await value.arrayBuffer()),
-            url: Buffer.from(await value.arrayBuffer()).toString('base64')
+            buffer,
+            url: buffer.toString('base64')
         }
     }
     else if(path.endsWith(".toml"))
@@ -290,11 +297,10 @@ async function getJar(path, expend = false)
 
     let watcher = chokidar.watch(path, {persistent: true});
     watcher.on('all', async (e, p, s) =>
-    {        
+    {
         if(e=='unlink')
         {
-            jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)] = null;
-            delete jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)];
+            jarList = jarList.splice(jarList.findIndex(j=>j.path==path&&j.expend==expend))
         }
         else if(e==="change")
         {
@@ -314,6 +320,7 @@ module.exports =
 {
     getJar: getJar,
     readZipEntry: readZipEntry,
+
     fullModData: async (path) =>
     {
         let jar = await jarReader.jar(path, null, true);
@@ -641,6 +648,7 @@ module.exports =
         }
         return r;
     },
+
     retrieveModFileById: async (name, version, id = "minecraft:worldgen/placed_feature/basalt_blobs") =>
     {
         // List every Jar including Minecraft
@@ -742,6 +750,7 @@ module.exports =
 
         return result;
     },
+
     extractFileByKeys: async (jarPath, keys = []) =>
     {
         let jar = await getJar(jarPath);
@@ -757,6 +766,54 @@ module.exports =
         let jar = await getJar(jarPath);
 
         return await readZipEntry(truePath, jar[truePath]);
+    },
+
+    writeJarPropertie: async (jarPath, properties) =>
+    {
+        let jar = await getJar(jarPath, false);
+
+        for(let p of properties)
+        {
+            let keyPath = "";
+            for(let k of p.keys){keyPath+="/"+k} keyPath = keyPath.slice(1);
+
+            jar[keyPath] = await toBuffer(p.keys, p.value)
+        }
+
+        const zip = new JSZip();
+        let main = zip.folder(jarPath.replace(/^.*[\\/]/, ''));
+
+        async function addToZip(zip, obj, currentPath = "")
+        {
+            if(!obj){return}
+            for (const [name, value] of Object.entries(obj))
+            {
+                const path = currentPath ? `${currentPath}/${name}` : name;
+
+                if (value instanceof Buffer || Buffer.isBuffer(value))
+                {
+                    zip.file(path, value);
+                }
+                else if(value.constructor.name == "ZipEntry")
+                {
+                    zip.file(path, Buffer.from(await value.arrayBuffer()));
+                }
+                else if(typeof(value) == "object")
+                {
+                    const folder = zip.folder(path);
+                    addToZip(folder, value);
+                }
+                else
+                {
+                    console.warn("Not Buffer and not Directory element. Ignoring...", path, value);
+                    // zip.file(path, Buffer.from(value));
+                }
+            }
+        }
+        await addToZip(main, jar)
+
+        const content = await main.generateAsync({type:"arraybuffer"});
+        fs.writeFileSync(jarPath, Buffer.from(content))
     },
 
     readZipEntry: readZipEntry,

@@ -5,8 +5,10 @@ port.onMessage.addListener(response =>
 });
 port.onDisconnect.addListener(() =>
 {
+    browser.tabs.create({ url: browser.runtime.getURL("modpack-maker-disconnected.html") });
+    
     console.error(browser.runtime.lastError);
-    if (browser.runtime.lastError) reject(browser.runtime.lastError);
+    if (browser.runtime.lastError) { reject(browser.runtime.lastError)};
 });
 
 

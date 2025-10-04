@@ -1,9 +1,9 @@
 {
 
-  "description": "View and save mods from different websites. Integrated with Modpack Maker.",
+  "description": "Integrated with Modpack Maker. View, save and test Minecraft mods from different websites. (youtube, modrinth, curseforge)",
   "manifest_version": 2,
   "name": "Modpack Maker",
-  "version": "1.0",
+  "version": "0.1.2",
 
   "permissions": [
     "tabs",
@@ -39,7 +39,7 @@
   },
 
   "icons": {
-    "64": "icon.png"
+    "2048": "icon.png"
   },
 
   "web_accessible_resources": ["icon.png"]

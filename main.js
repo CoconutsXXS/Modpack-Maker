@@ -28,7 +28,13 @@ app.whenReady().then(async () =>
 
     // await contentModifier.combineMods("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/")
 
+    // let r = await require("./decompiler.js").decompile(fs.readFileSync("/Users/coconuts/Downloads/Aether.class").buffer);
+
+    // let r = await require("./decompiler.js").decompile("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar");
+
+    // await require("./decompiler.js").compile("/Users/coconuts/Downloads/Aether.class", "com/aetherteam/aether/Aether.class", "/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/aether-1.20.1-1.5.2-neoforge.jar");
     // return;
+
     if(isSilent()){return;}
 
     selectWindow()
@@ -244,7 +250,6 @@ ipcMain.on('getInstance', (event, name) =>
 ipcMain.handle('setItemData', (event, item='mod', instanceName, data) =>
 {
     let fn = item=='mod'?'setModData':(item=='shader'?'setShaderData':'setRPData')
-    console.log(fn, data)
     if(loadedInstances.find(i => i.name == instanceName))
     {
         loadedInstances.find(i => i.name == instanceName).instance[fn](data);
@@ -401,6 +406,8 @@ ipcMain.handle('retrieveFileByKeys', (event, name, version, keys) => { return co
 ipcMain.handle('retrieveFileByPath', (event, name, version, path) => { return contentModifier.retrieveModFileByPath(name, version, path) })
 ipcMain.handle('extractFileByKeys', (event, jarPath, keys) => { return contentModifier.extractFileByKeys(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), keys) })
 ipcMain.handle('extractFileByPath', (event, jarPath, p) => { return contentModifier.extractFileByPath(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), p) })
+
+ipcMain.handle('writeJarPropertie', (event, jarPath, properties) => { return contentModifier.writeJarPropertie(jarPath, properties) })
 
 // Data
 const reader = require('./jar-reader.js');

@@ -1,5 +1,6 @@
 import {EditorView, basicSetup} from 'cdn/codemirror'
 import {json} from 'cdn/@codemirror/lang-json'
+import {java} from 'cdn/@codemirror/lang-java'
 import {oneDark} from 'cdn/@codemirror/theme-one-dark'
 import { keymap } from "cdn/@codemirror/view";
 import { indentMore, indentLess } from "cdn/@codemirror/commands";
@@ -8,6 +9,7 @@ import { indentUnit } from "cdn/@codemirror/language";
 import {StreamLanguage} from "cdn/@codemirror/language"
 import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
 import { parse, stringify } from "cdn/comment-json";
+import Frame from "cdn/canvas-to-buffer";
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -19,6 +21,7 @@ import * as lodash from "cdn/lodash"
 
 async function parseMinecraftModelToThree(modelJson, opts = {})
 {
+    // modelJson = lodash.clone(modelJson);
     const {
         texturePathResolver = (ref) =>
         {
@@ -202,7 +205,7 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
     for (const p of resolvedPaths)
     {
         const tex = textureCache[p] || null;
-        const mat = new THREE.MeshPhysicalMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true });
         materialCache[p] = mat;
     }
 
@@ -271,8 +274,10 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
         geom.setAttribute('position', new THREE.Float32BufferAttribute(group.vertices, 3));
         geom.setAttribute('uv', new THREE.Float32BufferAttribute(group.uvs, 2));
         geom.setIndex(new THREE.Uint16BufferAttribute(group.indices, 1));
-        const mat = materialCache[path] || new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const mat = materialCache[path] || new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         parentGroup.add(mesh);
     }
 
@@ -282,10 +287,21 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
         geom.setAttribute('position', new THREE.Float32BufferAttribute(missingGroup.vertices, 3));
         geom.setAttribute('uv', new THREE.Float32BufferAttribute(missingGroup.uvs, 2));
         geom.setIndex(new THREE.Uint16BufferAttribute(missingGroup.indices, 1));
-        const mat = new THREE.MeshBasicMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         parentGroup.add(mesh);
     }
+
+    // Normals
+    parentGroup.traverse((child) =>
+    {
+        if(child.geometry)
+        {
+            child.geometry.computeVertexNormals()
+        }
+    })
 
     return parentGroup;
 }
@@ -296,6 +312,7 @@ let modEditor = document.getElementById("mod-content-editor"); modEditor.style.d
 
 let editors =
 {
+    applyEditor: document.getElementById("apply-editor"),
     codeEditor: document.getElementById("code-editor"),
     nbtEditor: document.getElementById("nbt-editor"),
     imgEditor: document.getElementById("image-editor"),
@@ -303,8 +320,9 @@ let editors =
     noEditor: document.getElementById("no-editor"),
     sourceSelection: document.getElementById("multiple-source")
 }
+editors.applyEditor.style.display = "none"
 editors.codeEditor.style.display = "none"
-editors.nbtEditor.style.display = "none"; editors.nbtEditor.querySelectorAll("button")[1].style.display = "none";
+editors.nbtEditor.style.display = "none"; editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none";
 editors.noEditor.style.display = "none"
 editors.imgEditor.style.display = "none"
 editors.threeEditor.style.display = "none"
@@ -324,12 +342,84 @@ window.addInstanceListener(async (i) =>
     window.jarData.modified = [];
     window.jarData.idList = [];
 
-    console.log(window.jarData.combined)
+    // Apply
+    window.jarData.openApplier = async function()
+    {
+        for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
+        modEditor.style.display = "none";
+        editors.applyEditor.style.display = "block";
+
+        editors.applyEditor.querySelector(":scope > div:first-of-type").innerHTML = '';
+        for(let [i, m] of window.jarData.modified.entries())
+        {
+            let e = document.createElement("div");
+            e.appendChild(document.createElement("p"))
+            e.appendChild(document.createElement("button"))
+            e.appendChild(document.createElement("button"))
+
+            // Text
+            let keyPath = "";
+            for(let p of m.keys){keyPath+=p+"/";} keyPath = keyPath.slice(0, keyPath.length-1);
+            e.querySelector("p").innerText = keyPath;
+
+            // Buttons
+            e.querySelector("button:first-of-type").innerText = "apply";
+            e.querySelector("button:first-of-type").onclick = async () =>
+            {
+                await ipcInvoke("writeJarPropertie", m.origin, [m]);
+                window.instance.jarModifications.push(m)
+                window.jarData.modified.splice(i, 1)
+                e.remove();
+            }
+
+            e.querySelector("button:last-of-type").innerText = "revert";
+            e.querySelector("button:last-of-type").onclick = async () =>
+            {
+                window.jarData.modified.splice(i, 1)
+                e.remove();
+            }
+
+            editors.applyEditor.querySelector(":scope > div:first-of-type").appendChild(e)
+        }
+
+        editors.applyEditor.querySelector(":scope > div:last-of-type > button:first-of-type").onclick = async () =>
+        {
+            let groups = [];
+            for(let [i, m] of window.jarData.modified.entries)
+            {
+                if(groups.find(g=>g[0]?.origin==m.origin))
+                { groups[groups.findIndex(g=>g[0]?.origin==m.origin)].push(m); }
+                else { groups.push([m]) }
+
+                window.instance.jarModifications.push(m)
+                window.jarData.modified.splice(i, 1)
+            }
+            console.log(groups);
+            for(let g of groups) { window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
+
+            for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:first-of-type")) { b.remove(); }
+        }
+        editors.applyEditor.querySelector(":scope > div:last-of-type > button:last-of-type").onclick = async () =>
+        {
+            for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:last-of-type")) { b.remove(); }
+        }
+
+
+        editors.applyEditor.querySelector(":scope > button:last-of-type").onclick = () =>
+        {
+            editors.applyEditor.style.display = "none"
+            editors.applyEditor.querySelector(":scope > div:first-of-type").innerHTML = '';
+            document.querySelector('#content-editor > .tab > button:first-of-type').click();
+        }
+    }
+    modEditor.querySelector(":scope > button").onclick = window.jarData.openApplier;
 
     window.jarData.openExplorer = async function(path = "")
     {
+        let pathKeys = path;
+        if(typeof path == "string") { pathKeys = path.split("/"); }
+
         document.querySelector("#content-element-selector").style.display = "none";
-        modEditor.style.display = "flex"
 
         explorer(window.jarData.combined, async (keys) =>
         {
@@ -338,6 +428,8 @@ window.addInstanceListener(async (i) =>
             for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
 
             keys = lodash.clone(keys);
+
+            let selectedFile = null;
             let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
 
             if(files.length == 0)
@@ -348,7 +440,7 @@ window.addInstanceListener(async (i) =>
                 return;
             }
 
-            let selectedFile = files.length>1?await new Promise((resolve) =>
+            selectedFile = files.length>1?await new Promise((resolve) =>
             {
                 editors.sourceSelection.style.display = "block";
                 let p = document.createElement("p");
@@ -367,9 +459,13 @@ window.addInstanceListener(async (i) =>
                     editors.sourceSelection.firstChild.appendChild(b);
                 }
             }):files[0];
+            if(getProp(window.jarData.combined, keys)) { selectedFile.value = getProp(window.jarData.combined, keys); }
 
-            fileEditor(selectedFile.value, keys[keys.length-1], (value) =>
+            setProp(window.jarData.combined, keys, selectedFile.value);
+            fileEditor(lodash.clone(selectedFile.value), keys[keys.length-1], (value) =>
             {
+                if(lodash.isEqual(selectedFile.value, value)){return}
+                
                 setProp(window.jarData.combined, keys, value);
                 if(window.jarData.modified.find(m => m.keys==keys))
                 {
@@ -379,19 +475,23 @@ window.addInstanceListener(async (i) =>
                 {
                     window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
                 }
-            }, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, async () =>
+            }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, async () =>
             {
                 let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
                 return files[files.length-1].value;
             }, async (keys) =>
             {
-                let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
-                return files[files.length-1].value;
-            })
-        }, {name: "idk"}, [], 0, [...path.split("/")])
-    }
+                let value = null;
+                if(!getProp(window.jarData.combined, keys))
+                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+                else { value = getProp(window.jarData.combined, keys) }
 
-    window.jarData.openExplorer()
+                return value;
+            })
+        }, {name: ""}, [], 0, [...pathKeys])
+
+        document.querySelector('#content-editor > .tab > button:first-of-type').click()
+    }
 
     let modsMetadata = [];
     let elementGroupMetadata = [];
@@ -576,13 +676,11 @@ window.addInstanceListener(async (i) =>
 
     modsMetadata = modsMetadata.sort((a,b) => b.count - a.count)
     elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
-
-    console.log(window.jarData);
-    console.log(modsMetadata, elementGroupMetadata);
 })
 
 // Three Setup
 let loadModel;
+let loadStructure;
 window.addInstanceListener(async (i) => 
 {
     // Setup
@@ -600,15 +698,36 @@ window.addInstanceListener(async (i) =>
     }
     renderer.domElement.parentNode.onresize = resizeElement;
     let observer = new ResizeObserver(resizeElement);
-    observer.observe(renderer.domElement)
+    observer.observe(renderer.domElement.parentNode)
+
+    setInterval(() =>
+    {
+        if(renderer.domElement.parentNode.getBoundingClientRect().width!=renderer.domElement.getBoundingClientRect().width||renderer.domElement.parentNode.getBoundingClientRect().height!=renderer.domElement.getBoundingClientRect().height)
+        {resizeElement()}
+    }, 100/30)
 
     editors.threeEditor.appendChild(renderer.domElement);
     resizeElement();
 
-    const light = new THREE.DirectionalLight(0xffffff, 3);
-    // light.rotateX(Math.PI/2);
-    scene.add( light );
-    scene.add(new THREE.AmbientLight(0xffffff, 1))
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.castShadow = true;
+
+    light.shadow.camera.left = -500;
+    light.shadow.camera.right = 500;
+    light.shadow.camera.top = 500;
+    light.shadow.camera.bottom = -500;
+    light.shadow.camera.near = 3;
+    light.shadow.camera.far = camera.far;
+
+    light.shadow.mapSize.width = 2048;
+    light.shadow.mapSize.height = 2048;
+
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
+
+    light.position.set(50, 100, 50);
+    light.target.position.set(0, 0, 0); // pointer vers le centre de la scène
+    scene.add(light, light.target, new THREE.AmbientLight(0xffffff, 1));
 
     camera.position.z = 5;
 
@@ -711,6 +830,10 @@ window.addInstanceListener(async (i) =>
 
         if(lastModel){scene.remove(lastModel)}
 
+        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
+        editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").setAttribute("selected", "");
+        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '';
+
         // Parent
         while(json.parent != undefined)
         {
@@ -724,9 +847,244 @@ window.addInstanceListener(async (i) =>
             else { json.parent = nextParent; }
         }
 
-        lastModel = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {return await resolveTexture(ref, getFile, json)}, scale: 1, center: true});
+        let dependencies = []
+        lastModel = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {if(!ref.startsWith("#")){dependencies.push(ref)} return await resolveTexture(ref, getFile, json)}, scale: 1, center: true});
         lastModel.position.setY(-0.5)
         scene.add(lastModel);
+
+        editors.threeEditor.querySelector(":scope > div:first-of-type > select").value = ""
+        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '<option value="" disabled selected>Dependencies</option>'
+        for(let d of dependencies)
+        {
+            let e = document.createElement("option");
+            e.innerText = d;
+            e.value = d;
+            editors.threeEditor.querySelector(":scope > div:first-of-type > select").appendChild(e);
+        }
+
+        editors.threeEditor.querySelector(":scope > div:first-of-type > select").onchange = () =>
+        {
+            let cleaned = editors.threeEditor.querySelector(":scope > div:first-of-type > select").value.replace(/^#/, '');
+            let keys = [];
+            if (cleaned.includes(':'))
+            {
+                let [mod, path] = cleaned.split(':');
+                path = path.split("/");
+                path[path.length-1] = path[path.length-1]+".png"
+
+                keys = ['assets', mod, 'textures'].concat(path);
+            }
+            else
+            {
+                cleaned = cleaned.split("/");
+                cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".png"
+
+                keys = ['assets', "minecraft", 'textures'].concat(cleaned);
+            }
+
+            window.jarData.openExplorer(keys);
+            console.log(keys);
+        }
+    }
+
+    loadStructure = async (data, getFile = (k) => {}) => 
+    {
+        // Cleanup
+        resizeElement();
+
+        if(lastModel){scene.remove(lastModel)}
+
+        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
+        editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").setAttribute("selected", "");
+        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '';
+
+
+        // Load
+        let palette = [];
+        for(let [i, p] of data.palette.entries())
+        {
+            function idToKeys(id, preKeys = [])
+            {
+                let cleaned = id.replace(/^#/, '');
+                let keys = [];
+                if (cleaned.includes(':'))
+                {
+                    let [mod, path] = cleaned.split(':');
+                    path = path.split("/");
+                    path[path.length-1] = path[path.length-1]+".json"
+
+                    keys = ['assets', mod, ...preKeys].concat(path);
+                }
+                else
+                {
+                    cleaned = cleaned.split("/");
+                    cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".json"
+
+                    keys = ['assets', "minecraft", ...preKeys].concat(cleaned);
+                }
+                return keys;
+            }
+
+            let files = [];
+            // Properties
+            if(p.Properties || (p.Name && !(await getFile(idToKeys(p.Name, ['models']))) && !(await getFile(idToKeys(p.Name, ['models', 'block'])))))
+            {
+                if(!p.Properties){p.Properties={}}
+                let blockPropertiesString = Object.entries(p.Properties).map(([k, v]) => `${k}=${JSON.stringify(v).slice(1, JSON.stringify(v).length-1)}`).join(',');
+
+                let variantKeys = idToKeys(p.Name, ["blockstates"]);
+                
+                let blockstateJson = JSON.parse(await getFile(variantKeys));
+
+                if(blockstateJson.variants)
+                {
+                    let variantData = {};
+
+                    for(let [k, v] of Object.entries(blockstateJson.variants))
+                    {
+                        let valid = true;
+                        for(let part of k.split(','))
+                        {
+                            if(!blockPropertiesString.includes(part)){valid=false; break;}
+                        }
+                        if(!valid){continue}
+
+                        if(Array.isArray(v)){v=v[0]}
+                        variantData = lodash.merge(variantData, v)
+                    }
+
+                    console.log(p.Name, blockPropertiesString, 'from', blockstateJson.variants, '=', variantData)
+
+                    if((Object.entries(variantData).length == 0 || !variantData.model) && !blockstateJson.multipart) { files.push({model: p.Name}); }
+                    else { files.push(variantData) }
+                }
+                if(blockstateJson.multipart)
+                {
+                    let final = {};
+                    blockstateJson.multipart.reverse()
+                    for(let m of blockstateJson.multipart)
+                    {
+                        if(!m.when){continue;}
+                        let valid = true;
+                        for(let [k, v] of Object.entries(m.when))
+                        {
+                            if(!p.Properties[k] == v){valid = false; break;}
+                        }
+                        if(!valid){continue;}
+
+                        final = lodash.merge(final, m.apply)
+                        // files.push(m.apply)
+                    }
+                    for(let m of blockstateJson.multipart)
+                    {
+                        if(!m.model){continue}
+                        let finalCopy = lodash.clone(final);
+                        finalCopy.model = m.model;
+                        files.push(final);
+                    }
+                }
+
+                if(!blockstateJson.variants && !blockstateJson.multipart)
+                {
+                    console.log("NO VARIANT/MULTIPART", blockstateJson)
+                }
+            }
+            else { files.push({model: p.Name}); }
+
+            let final = new THREE.Group();
+            for(let f of files)
+            {
+                if(!f.model){ console.log(files, p); continue;}
+                let json = JSON.parse(await getFile(idToKeys(f.model, ['models'])));
+
+                if(!json){ json = JSON.parse(await getFile(idToKeys(f.model, ['models', 'block']))) }
+                if(!json){ continue; }
+
+                while(json.parent != undefined)
+                {
+                    let parent = json.parent;
+                    let parentObj = await resolveModel(parent, getFile);
+                    let nextParent = parentObj.parent;
+
+                    json = lodash.merge(parentObj, json);
+
+                    if(parent == nextParent) { json.parent = undefined }
+                    else { json.parent = nextParent; }
+                }
+                
+                let model = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {return await resolveTexture(ref, getFile, json)}, scale: 1/16, center: true});
+
+                for(let [i, c] of model.children.entries()){model.children[i].position.z-=0;model.children[i].position.y-=0.5;model.children[i].position.x-=0;}
+                
+                if(!f.x){f.x=0} if(!f.y){f.y=0;}
+                model.rotation.order = 'XYZ';
+                model.rotateY(THREE.MathUtils.degToRad(-f.y))
+                model.rotateX(THREE.MathUtils.degToRad(-f.x))
+
+                final.add(model);
+            }
+
+            palette.push(final);
+        }
+
+        lastModel = new THREE.Group();
+        for(let b of data.blocks)
+        {
+            if(!palette[b.state] || !palette[b.state]){continue;}
+            let m = palette[b.state].clone(true);
+            m.position.setX(b.pos[0]+0.5)
+            m.position.setY(b.pos[1]+0.5)
+            m.position.setZ(b.pos[2]+0.5)
+            lastModel.add(m);
+        }
+
+        controls.target.set(data.size[0]/2, data.size[1]/2, data.size[2]/2)
+
+        scene.add(lastModel)
+    }
+    
+    // Shading Select
+    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(1)").onclick = (ev) =>
+    {
+        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
+        ev.target.setAttribute("selected", "");
+        lastModel.traverse((child) =>
+        {
+            if(child.material)
+            {
+                let newMat = new THREE.MeshStandardMaterial({ map: child.material.map, color: 0xffffff, transparent: false, side: THREE.DoubleSide, wireframe: true, alphaMap: child.material.map })
+                child.castShadow = child.receiveShadow = true;
+                child.material = newMat;
+            }
+        })
+    }
+    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(2)").onclick = (ev) =>
+    {
+        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
+        ev.target.setAttribute("selected", "");
+        lastModel.traverse((child) =>
+        {
+            if(child.material)
+            {
+                let newMat = new THREE.MeshBasicMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5 })
+                child.castShadow = child.receiveShadow = true;
+                child.material = newMat;
+            }
+        })
+    }
+    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").onclick = (ev) =>
+    {
+        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
+        ev.target.setAttribute("selected", "");
+        lastModel.traverse((child) =>
+        {
+            if(child.material)
+            {
+                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5 });
+                child.castShadow = child.receiveShadow = true;
+                child.material = newMat;
+            }
+        })
     }
 
     // Camera Control
@@ -734,9 +1092,14 @@ window.addInstanceListener(async (i) =>
     camera.position.set( 0, 20, 100 );
     controls.update();
 
+    scene.add(new THREE.AxesHelper(1))
+
+    renderer.shadowMap.type=THREE.VSMShadowMap;
     // Render Loop
     function animate()
     {
+        if(!editors.threeEditor.checkVisibility()){return;}
+        light.rotateZ(0.1);
         controls.update();
         renderer.render( scene, camera );
     }
@@ -787,7 +1150,8 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
         while(s.querySelector("button")){s.querySelector("button").remove();}
     }
     else { s = section.cloneNode(true); modEditor.appendChild(s); }
-    s.querySelector("h3").innerText = display.name
+    if(!display.name) { s?.querySelector("h3")?.remove(); }
+    else if(s?.querySelector("h3")) { s.querySelector("h3").innerText = display.name }
 
     if(display.icon)
     {
@@ -824,25 +1188,37 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
             let path = lodash.clone(keysPath);
             path.push(k);
 
+            for(let s of b.parentNode.querySelectorAll("button")){s.removeAttribute("selected")}
+            b.setAttribute("selected", "")
+
             if(/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k))
             {
                 open(path)
 
                 let directoryPath = path;
                 directoryPath.pop();
-                explorer(o, open, {name: path[path.length-1]}, directoryPath, iteration);
+
+                let index = Array.from(b.parentNode.childNodes).indexOf(b)
+
+                explorer(o, open, {name: null}, directoryPath, iteration);
+
+                s.parentNode.querySelectorAll(":scope > div")[iteration].childNodes.item(index).setAttribute("selected", "")
+                // {name: path[path.length-1]}
             }
             else
             {
-                explorer(v, open, {name: path[path.length-1]}, path, iteration+1, startingPath[iteration]==k?startingPath:[]);
+                explorer(v, open, {name: null}, path, iteration+1, startingPath[iteration]==k?startingPath:[]);
             }
         }
 
         if(startingPath[iteration] == k){b.onclick(); startingPath = []; }
     }
+
+    document.getElementById("mod-content-editor").scrollTo(document.getElementById("mod-content-editor").scrollHeight, 0)
 }
 
 let closeEditor = () => {};
+let Drawers = {};
 async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {}, reload = () => {}, getFile = (k) => {})
 {    
     for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
@@ -914,6 +1290,63 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             loadModel(JSON.parse(value), getFile);
         }
     }
+    else if(filename.endsWith(".class"))
+    {
+        editors.codeEditor.style.display = "block";
+
+        let value = data;
+        let editor = new EditorView
+        ({
+            doc: value.raw.file,
+            extensions:
+            [
+                basicSetup,
+                java(),
+                editorTheme,
+                oneDark,
+                indentUnit.of("    "),
+                EditorView.updateListener.of(update =>
+                {
+                    if (update.docChanged)
+                    {
+                        const doc = update.state.doc;
+                        value.raw.file = doc.toString()
+                    }
+                }),
+                keymap.of
+                ([
+                    { key: "Tab", run: indentMore },
+                    { key: "Shift-Tab", run: indentLess }
+                ])
+            ],
+            parent: editors.codeEditor
+        })
+                    
+        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
+
+        editors.codeEditor.querySelector(".exit-options > button.three").disabled = editors.codeEditor.querySelector(".exit-options > button.save").disabled = true;
+        editors.codeEditor.querySelector(".exit-options > button.save").onclick = () =>
+        {
+            try
+            {
+                onChange(value)
+            }
+            catch(err)
+            {
+                console.warn(err)
+                // TODO: Error invalid json
+            }
+        }
+
+        closeEditor = () =>
+        {
+        editors.codeEditor.querySelector(".exit-options > button.three").disabled = editors.codeEditor.querySelector(".exit-options > button.save").disabled = false;
+            editors.codeEditor.style.display = "none"
+            editor.dom.remove();
+            onExit();
+        }
+        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
+    }
     else if(filename.endsWith(".toml"))
     {
         editors.codeEditor.style.display = "block";
@@ -947,7 +1380,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
         })
                     
         editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
-        editors.codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () =>
+        editors.codeEditor.querySelector(".exit-options > .save").onclick = () =>
         {
             try
             {
@@ -966,7 +1399,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             editor.dom.remove();
             onExit();
         }
-        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
+        editors.codeEditor.querySelector(".exit-options > .exit").onclick = closeEditor
     }
     else if(filename.endsWith(".mcfunction") || filename.endsWith(".MF") || filename.endsWith(".properties") || filename.endsWith(".txt"))
     {
@@ -1043,11 +1476,11 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             editors.nbtEditor.querySelector("ul").appendChild(e);
         }
 
-        editors.nbtEditor.querySelectorAll("button")[0].disabled = false
-        editors.nbtEditor.querySelectorAll("button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Open in Minecraft"
+        editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
+        editors.nbtEditor.querySelectorAll("div > button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Open in Minecraft"
 
-        editors.nbtEditor.querySelectorAll("button")[1].innerText = "Save into "+filename;
-        editors.nbtEditor.querySelectorAll("button")[1].onclick = async () => 
+        editors.nbtEditor.querySelectorAll(":scope > button")[0].innerText = "Save into "+filename;
+        editors.nbtEditor.querySelectorAll(":scope > button")[0].onclick = async () => 
         {
             // Save
             let data =
@@ -1060,7 +1493,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             data = await reload();
 
         }
-        editors.nbtEditor.querySelectorAll("button")[0].onclick = async () =>
+        editors.nbtEditor.querySelectorAll("div > button")[0].onclick = async () =>
         {
             nbtEditorIndex++;
             if(!nbtEditorOpened)
@@ -1075,10 +1508,10 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                         {
                             closeEditor();
                             nbtEditorOpened = false;
-                            editors.nbtEditor.querySelectorAll("button")[0].innerText = "Open in Minecraft"
-                            editors.nbtEditor.querySelectorAll("button")[0].disabled = false
+                            editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Open in Minecraft"
+                            editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
                             editors.nbtEditor.querySelectorAll("p")[0].innerHTML = "";
-                            editors.nbtEditor.querySelectorAll("button")[1].style.display = "none"
+                            editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none"
 
                             ipcInvoke('deleteFolder', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/');
                         },
@@ -1087,9 +1520,9 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                     },
                     {type: "singleplayer", identifier: ".Structure Edition"}
                 )
-                editors.nbtEditor.querySelectorAll("button")[0].innerText = "Minecraft launched"
-                editors.nbtEditor.querySelectorAll("button")[0].disabled = true
-                editors.nbtEditor.querySelectorAll("button")[1].style.display = "block"
+                editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Minecraft launched"
+                editors.nbtEditor.querySelectorAll("div > button")[0].disabled = true
+                editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "block"
                 editors.nbtEditor.querySelectorAll("p")[0].style.opacity = '0.8';
                 editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
             }
@@ -1097,11 +1530,18 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             ipcInvoke('writeBuffer', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', data.buffer);
             editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
         }
+
+        editors.nbtEditor.querySelectorAll("div > button")[1].onclick = async () =>
+        {
+            editors.nbtEditor.style.display = "none";
+            editors.threeEditor.style.display = "block";
+            loadStructure(data.parsed, getFile)
+        }
     }
     else if(filename.endsWith(".png"))
     {
-        console.log(data)
-        closeEditor = () => { editors.imgEditor.style.display = "none"; onExit(); }
+        let moving = false;
+        closeEditor = () => { editors.imgEditor.style.display = "none"; onExit(); moving = false; canvas.style.scale = '1'; }
         editors.imgEditor.style.display = "block";
 
         // External
@@ -1129,7 +1569,10 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
         document.getElementById("image-editor").querySelector(".save").onclick = async () =>
         {
-            data.buffer = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+            const buffer = new Frame(canvas, ["png"], 1).toBuffer();
+
+            if(!lodash.isEqual(data.buffer, buffer)){data.url = buffer.toString("base64")}
+            data.buffer = buffer;
             onChange(data);
         }
 
@@ -1141,6 +1584,8 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             if(canvas.width * editors.imgEditor.getBoundingClientRect().height < canvas.height * editors.imgEditor.getBoundingClientRect().width) { canvas.style.height = "calc(80% - 32px)"; canvas.style.width = "unset"; }
             else { canvas.style.width = "calc(80% - 32px)"; canvas.style.height = "unset"; }
             ctx.drawImage(img, 0, 0);
+
+            canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`
         }
         img.src = "data:image/png;base64,"+data.url;
 
@@ -1272,12 +1717,31 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             } : null;
         }
 
-        let Drawers = {};
+        // Zoom
+        document.getElementById("image-editor").onwheel = (event) =>
+        {
+            canvas.style.scale = Number((isNaN(Number(canvas.style.scale)) || Number(canvas.style.scale) == 0)?1:canvas.style.scale)*(1+event.deltaY/2500);
+            if(Number(canvas.style.scale) <= 0.1) { canvas.style.scale = "0.1" }
+        }
+        document.getElementById("image-editor").onmousedown = (event) => { if(event.button == 1){moving=true;} }
+        window.addEventListener("mouseup", (event) => { if(event.button == 1){moving=false;lastPos = null;} })
+        let lastPos = null;
+        window.addEventListener("mousemove", (event) =>
+        {
+            if(!moving){return;}
+            if(lastPos == null) { lastPos = {x: event.clientX, y: event.clientY} }
+            else
+            {
+                if(!canvas.style.translate.replaceAll("px","").split(" ")[0] || !canvas.style.translate.replaceAll("px","").split(" ")[1]){canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`}
+                canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])+(event.clientX-lastPos.x)*1.5) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)+(event.clientY-lastPos.y)*1.5) + "px";
+                lastPos = {x: event.clientX, y: event.clientY}
+            }
+        })
+
         initializeDrawer(document.getElementById("content-image-canvas"));
         function initializeDrawer(canvas)
         {
             let id = 0;
-            Drawers[id] = {};
 
             var ctx = canvas.getContext("2d");
 
@@ -1285,18 +1749,22 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             const buttonContainer = document.getElementById("image-editor").querySelector("div:last-child");
             let buttons = buttonContainer.querySelectorAll("button");
 
-            Drawers[id].size = 1;
-            Drawers[id].color = buttonContainer.querySelector("input").value;
-            Drawers[id].toolId = 0;
-            Drawers[id].alphaLock = false;
-            Drawers[id].onBack = false;
-            Drawers[id].hue = false;
+            if(!Drawers[id])
+            {
+                console.log("Init drawer")
+                Drawers[id] = {};
+                Drawers[id].size = 1;
+                Drawers[id].color = buttonContainer.querySelector("input").value;
+                Drawers[id].toolId = 0;
+                Drawers[id].alphaLock = false;
+                Drawers[id].onBack = false;
+                Drawers[id].hue = false;
+            }
             Drawers[id].canvas = canvas;
+
             Drawers[id].selectTool = function(element)
             {
                 var toolId = Array.from(buttons).indexOf(element);
-
-                console.log("toolId", toolId)
 
                 if(toolId > 1)
                 {
@@ -1353,31 +1821,32 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             }
 
             buttons[2].style.backgroundColor = Drawers[id].color;
-            buttonContainer.querySelector("input").addEventListener("change", (e) => {Drawers[id].color = e.target.value; buttons[2].style.backgroundColor = e.target.value});
+            buttonContainer.querySelector("input").onchange = (e) => {Drawers[id].color = e.target.value; buttons[2].style.backgroundColor = e.target.value};
             for (let index = 0; index < buttons.length; index++)
             {
                 const element = buttons[index];
 
-                element.addEventListener("click", (e) => Drawers[id].selectTool(e.currentTarget));
+                element.onclick = (e) => Drawers[id].selectTool(e.currentTarget);
             }
 
             Drawers[id].selectTool(buttons[0]);
 
             // Slider
-            document.getElementById("image-editor").querySelector("input[type='range']").addEventListener("input", (event) =>
+            document.getElementById("image-editor").querySelector("input[type='range']").oninput = (event) =>
             {
                 Drawers[id].size = event.currentTarget.value;
-            });
+            };
 
             // Draw on Canvas
             const oldCanvas = [];
             ctx.imageSmoothingEnabled= false;
 
             var press = false;
-            canvas.addEventListener("mousemove", (e) => drawEvent(e));
-            canvas.addEventListener("mousedown", (e) => drawEvent(e));
+            canvas.onmousemove = (e) => {drawEvent(e)};
+            canvas.onmousedown = (e) => {if(e.button != 0){return} drawEvent(e); press = true;};
             const drawEvent = function(event)
             {
+                if(event.button != 0){return}
                 var rect = event.target.getBoundingClientRect();
 
                 var x = Math.round(((event.clientX - rect.left)/canvas.getBoundingClientRect().width)*canvas.width - 0.5);
@@ -1422,7 +1891,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                     }
                 }
             };
-            canvas.addEventListener("click", (event) =>
+            canvas.onclick = (event) =>
             {
                 if(Drawers[id].toolId == -1)
                 {
@@ -1439,8 +1908,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
                     // buttonContainer.children.item(8).click();
                 }
-            });
-            canvas.onmousedown = function(event){ press = true; }
+            };
             window.onmouseup = async function(event) { press = false; oldCanvas.push(await canvas.toDataURL()); }
 
             document.onkeydown = async () =>
@@ -1501,7 +1969,7 @@ window.openModContent = async function(path)
     let fullPath = "instances/"+window.instance.name +"/minecraft/"+path+".jar";
     let data = await ipcInvoke("getJar", fullPath, true)
 
-    modEditor.style.display = "flex";
+    document.querySelector('#content-editor > .tab > button:first-of-type').click();
 
     // Icon
     let icon = null;
@@ -1521,28 +1989,41 @@ window.openModContent = async function(path)
         editors.sourceSelection.style.display = "none";
 
         keys = lodash.clone(keys);
-        let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+        let selectedFile = null;
 
-        if(files.length == 0)
+        if(!getProp(window.jarData.combined, keys))
         {
-            editors.sourceSelection.style.display = "block";
-            let p = document.createElement("p");
-            p.innerText = `${keys[keys.length-1]} not found...`;
-            return;
+            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+
+            if(files.length == 0)
+            {
+                editors.sourceSelection.style.display = "block";
+                let p = document.createElement("p");
+                p.innerText = `${keys[keys.length-1]} not found...`;
+                return;
+            }
+
+            selectedFile = files.find(f=>f.jarFile.endsWith(fullPath));
+
+            if(!selectedFile)
+            {
+                editors.sourceSelection.style.display = "block";
+                let p = document.createElement("p");
+                p.innerText = `${keys[keys.length-1]} is not modified by ${path.slice(path.lastIndexOf("/"))}...`;
+                return;
+            }
+        }
+        else
+        {
+            selectedFile = {value: getProp(window.jarData.combined, keys), keys: keys, jarFile: fullPath};
         }
 
-        let selectedFile = files.find(f=>f.jarFile.endsWith(fullPath));
 
-        if(!selectedFile)
+        setProp(window.jarData.combined, keys, selectedFile.value);
+        fileEditor(lodash.clone(selectedFile.value), keys[keys.length-1], (value) =>
         {
-            editors.sourceSelection.style.display = "block";
-            let p = document.createElement("p");
-            p.innerText = `${keys[keys.length-1]} is not modified by ${path.slice(path.lastIndexOf("/"))}...`;
-            return;
-        }
+            if(lodash.isEqual(selectedFile.value, value)){return}
 
-        fileEditor(selectedFile.value, keys[keys.length-1], (value) =>
-        {
             setProp(window.jarData.combined, keys, value);
             if(window.jarData.modified.find(m => m.keys==keys))
             {
@@ -1552,15 +2033,18 @@ window.openModContent = async function(path)
             {
                 window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
             }
-        }, () => { modEditor.style.display = "flex"; }, async () =>
+        }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); }, async () =>
         {
             let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
             return files[files.length-1].value;
         }, async (keys) =>
         {
-            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
-            console.log(files)
-            return files[files.length-1].value;
+            let value = null;
+            if(!getProp(window.jarData.combined, keys))
+            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+            else { value = getProp(window.jarData.combined, keys) }
+
+            return value;
         })
     }, {name: path.slice(path.lastIndexOf("/")), icon: icon})
 
@@ -1588,7 +2072,7 @@ window.openModContent = async function(path)
             explorer(o, (keys) =>
             {
                 keys = lodash.clone(keys)
-                fileEditor(getProp(data.mods[i], keys), keys[keys.length-1], (value) => { console.log(keys, value); setProp(data.mods[i], keys, value) }, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.mods[i], keys)})
+                fileEditor(getProp(data.mods[i], keys), keys[keys.length-1], (value) => { console.log(keys, value); setProp(data.mods[i], keys, value) }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.mods[i], keys)})
             }, {name: m.name, icon: m.icon})
         }
     }
@@ -1603,7 +2087,7 @@ window.openModContent = async function(path)
             closeEditor();
             explorer(data.resourcepacks, (keys) =>
             {
-                fileEditor(getProp(data.resourcepacks, keys), keys[keys.length-1], (value) => {setProp(data.resourcepacks, keys, value)}, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.resourcepacks, keys)})
+                fileEditor(getProp(data.resourcepacks, keys), keys[keys.length-1], (value) => {setProp(data.resourcepacks, keys, value)}, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.resourcepacks, keys)})
             }, {name: "Ressource Packs"})
         }
     }
@@ -1618,7 +2102,7 @@ window.openModContent = async function(path)
             closeEditor();
             explorer(data.data, (keys) =>
             {
-                fileEditor(getProp(data.data, keys), keys[keys.length-1], (value) => {setProp(data.data, keys, value)}, () => { modEditor.style.display = "flex"; editors.codeEditor.style.display = "none"; }, () => {return getProp(data.data, keys)})
+                fileEditor(getProp(data.data, keys), keys[keys.length-1], (value) => {setProp(data.data, keys, value)}, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.data, keys)})
             }, {name: "Other Files"})
         }
     }

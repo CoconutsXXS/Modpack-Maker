@@ -668,6 +668,8 @@ class Instance
     shaders = [];
     onShaderUpdate = (shaders) => {}
 
+    jarModifications = []
+
     onRequestUpdate = (list) => {}
 
     save()

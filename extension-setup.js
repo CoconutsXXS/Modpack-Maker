@@ -1,3 +1,4 @@
+const { exec } = require("child_process");
 const { app } = require('electron');
 const fs = require("fs");
 const path = require("path");
@@ -48,6 +49,16 @@ module.exports =
         };
 
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+        const addonPath = path.join(__dirname, "Firefox\ Extension/web-ext-artifacts/modpack_maker-0.1.2.xpi");
+
+        // Construct the "file://" URL (Firefox understands this)
+        const fileUrl = `file://${addonPath.replace(/\\/g, "/")}`;
+
+        exec(`${process.platform==="win32"?'start firefox':(process.platform=='darwin'?'open -a Firefox':'firefox')} "${fileUrl}"`, (err) =>
+        {
+            if(err) {console.error("Failed to open Firefox:", err)}
+        });
 
         // console.log("Installed Firefox host.");
     }
