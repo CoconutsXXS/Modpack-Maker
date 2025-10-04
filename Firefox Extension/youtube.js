@@ -440,7 +440,7 @@ async function setCurrentMod(baseUrl)
     let url = new URL(baseUrl);
     openFunction = function()
     {
-        document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
+        // document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
         window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), baseUrl)
         Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
     }
@@ -624,7 +624,7 @@ let intervalFunction = () =>
     let scapped = scrapDescription((d) =>
     {
         let hashtags = [...d.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
-        if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))))
+        if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
         { handleDescription() }
     });
     if(description==null || !scapped){return;}
@@ -633,7 +633,7 @@ let intervalFunction = () =>
     let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
 
     clearInterval(interval);
-    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))))
+    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
     {
         return;
     }

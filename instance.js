@@ -11,6 +11,7 @@ var chokidar = require('chokidar');
 const { unzip } = require('unzipit');
 const { XMLParser } = require("fast-xml-parser");
 const es = require('event-stream');
+const os = require("os");
 
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
@@ -22,6 +23,11 @@ const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
 const { setTimeout } = require('node:timers/promises');
 
+function rootPath()
+{
+  if(app.isPackaged) { return __dirname.slice(0, __dirname.lastIndexOf("/")) }
+  return __dirname;
+}
 
 class Instance
 {
@@ -1064,17 +1070,22 @@ class Instance
 
         //  Create temp instance directory + world
         // let p = path.join(config.directories.ephemeralInstances, new Date().toISOString())
-        let p = path.join("/tmp/ephemeral-instances/", "/minecraft")
+        // let p = path.join("/tmp/ephemeral-instances/", "/minecraft")
+        const p = await fs.mkdtempSync(path.join(os.tmpdir(), 'ephemeral-instances-'));
+
+        fs.writeFileSync("/tmp/text.txt", path.join(rootPath(), ".Test World"))
+        fs.writeFileSync("/tmp/text2.txt", path.join(__dirname, ".Test World"))
+
         if(fs.existsSync(p)){fs.rmSync(p, { recursive: true, force: true });}
         fs.mkdirSync(p, {recursive: true});
     
         // World
-        fs.cpSync("./.Test World", path.join(p, "saves/Test World"), {recursive: true});
+        try { fs.cpSync(path.join(rootPath(), ".Test World"), path.join(p, "saves/Test World"), {recursive: true}); }
+        catch(err){fs.writeFileSync("/tmp/err.txt", JSON.stringify(err)); return}
 
         // Install Mods
         for(let m of mods)
         {
-            console.log(m);
             if(!m.type){m.type="mods"}
             await Download.download(m.url, path.join(p, m.type, m.filename))
         }
@@ -1159,11 +1170,10 @@ class Instance
             forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
             quickPlay: {type: "singleplayer", identifier: "Test World"}
         }
-        console.log(options);
 
-        let process = await launcher.launch(options);
+        let childProcess = await launcher.launch(options);
 
-        if(!process) { console.error("Process is null..."); return; }
+        if(!childProcess) { console.error("Process is null..."); return; }
     }
 
     static instanceList()

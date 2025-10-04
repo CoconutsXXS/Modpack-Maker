@@ -17,7 +17,6 @@ const contentModifier = require("./content-modifier.js")
 ElectronBlocker.fromPrebuiltFull(fetch).then(b=>b.enableBlockingInSession(session.defaultSession))
 
 // Extension Host
-require("./extension-setup.js").firefox();
 const isSilent = require("./browser-request.js");
 
 app.whenReady().then(async () =>
@@ -37,6 +36,7 @@ app.whenReady().then(async () =>
 
     if(isSilent()){return;}
 
+    require("./extension-setup.js").firefox();
     selectWindow()
 })
 app.on('activate', async () =>
@@ -407,7 +407,7 @@ ipcMain.handle('retrieveFileByPath', (event, name, version, path) => { return co
 ipcMain.handle('extractFileByKeys', (event, jarPath, keys) => { return contentModifier.extractFileByKeys(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), keys) })
 ipcMain.handle('extractFileByPath', (event, jarPath, p) => { return contentModifier.extractFileByPath(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), p) })
 
-ipcMain.handle('writeJarPropertie', (event, jarPath, properties) => { return contentModifier.writeJarPropertie(jarPath, properties) })
+ipcMain.handle('writeJarPropertie', (event, jarPath, properties) => { if(!jarPath.startsWith(path.join(app.getPath('appData'), 'Modpack Maker'))){jarPath=path.join(app.getPath('appData'), 'Modpack Maker', jarPath)} return contentModifier.writeJarPropertie(jarPath, properties) })
 
 // Data
 const reader = require('./jar-reader.js');

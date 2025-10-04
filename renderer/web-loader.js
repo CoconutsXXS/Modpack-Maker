@@ -4,7 +4,7 @@ window.web =
 {
     loadModrinth: async function(webview, link)
     {
-        document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
+        // document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
 
         let url = new URL(link);
 
@@ -22,7 +22,7 @@ window.web =
         webview.src = link;
         let type = url.pathname.split('/')[1];
         let cleanType = type;
-        if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
+        if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'} if(cleanType=="datapack"){cleanType="mods"}
 
 
         const sourceCode = await (await fetch('renderer/modrinth-webview.js')).text();
@@ -39,13 +39,12 @@ window.web =
 
             webviewListener = async (event) =>
             {
-                console.log(event.channel)
-
                 switch(event.channel)
                 {
                     case 'download':
                     {
-                        await window.web.downloadModrinth(link, !document.getElementById("filter-version-browsing").checked);
+                        console.log(link)
+                        await window.web.downloadModrinth(link, !document.getElementById("filter-version-browsing").checked, event.args[0]);
                         break;
                         for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod', false, event.args[0]))
                         {
@@ -119,7 +118,7 @@ window.web =
                     }
                     case 'version-select':
                     {
-                        let versions = await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod', true);
+                        let versions = await findModrinthFile(link.split('/')[link.split('/').length-1], (type=='mod'||type=="datapack"), true);
                         console.log('window.versionSelect('+JSON.stringify(versions).replaceAll(`'`, `\\'`)+')')
                         webview.executeJavaScript('window.versionSelect('+JSON.stringify(versions).replaceAll(`'`, `\\'`)+')')
                     }
@@ -206,7 +205,7 @@ window.web =
     },
     loadCurseforge: async function(webview, link)
     {
-        document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
+        // document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
 
         webview.src = link;
 
@@ -242,7 +241,7 @@ window.web =
                 {
                     case 'download':
                     {
-                        await window.web.downloadCurseforge(link, !document.getElementById("filter-version-browsing").checked);
+                        await window.web.downloadCurseforge(link, !document.getElementById("filter-version-browsing").checked, event.args[0]);
                         break;
                         for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods', false, null, event.args[0]))
                         {
@@ -440,7 +439,7 @@ window.web =
         };
     },
 
-    downloadModrinth: async function(link, noVersionCheck = false)
+    downloadModrinth: async function(link, noVersionCheck = false, version = null)
     {
         // for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1]))
         // {
@@ -491,13 +490,13 @@ window.web =
         }
 
         let type = url.pathname.split('/')[1];
-        let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
+        let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'} if(cleanType=="datapack"){cleanType="mods"}
 
         let virtualPath = '';
         if(window.explorerTab==cleanType){virtualPath=window.explorerPath}
 
         let sinytra = link.split('/')[link.split('/').length-1]=='connector'&&cleanType=='mods'
-        for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], type=='mod', false, null, noVersionCheck))
+        for(var f of await findModrinthFile(link.split('/')[link.split('/').length-1], (type=='mod'||type=="datapack"), false, null, noVersionCheck, version))
         {
             console.log(f)
             if(!f.primary){continue}
@@ -511,7 +510,7 @@ window.web =
             let images = []; for(let i of meta.gallery){images.push(i.raw_url)}
 
             // Mods
-            if(type=='mod')
+            if((type=='mod'||type=="datapack"))
             {
                 let dependencies = []; for(let d of f.dependencies)
                 {
@@ -563,7 +562,7 @@ window.web =
             await download(f.url, window.instance.path+'/'+cleanType, f.filename);
         }
     },
-    downloadCurseforge: async function(link, noVersionCheck = false)
+    downloadCurseforge: async function(link, noVersionCheck = false, version = null)
     {
         // for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=6`)).json()).data[0].id))
         // {
@@ -617,7 +616,7 @@ window.web =
 
         let sinytra = link.split('/')[link.split('/').length-1]=='sinytra-connector'&&cleanType=='mods'
 
-        for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods', false, link, null, noVersionCheck))
+        for(var f of await findCurseforgeFile((await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${link.split('/')[link.split('/').length-1]}&classId=${classId}`)).json()).data[0].id, cleanType == 'mods', false, link, null, noVersionCheck, version))
         {
             if(!f.primary){continue}
 
@@ -690,7 +689,7 @@ window.web =
 
 
 
-async function findModrinthFile(slug, useLoader = true, list = false, versionNumber = null, noVersionCheck = false)
+async function findModrinthFile(slug, useLoader = true, list = false, versionNumber = null, noVersionCheck = false, version = null)
 {
     console.log(slug, 'https://api.modrinth.com/v2/project/'+slug+'/version')
     const versions = (await (await fetch('https://api.modrinth.com/v2/project/'+slug+'/version')).json())
@@ -700,6 +699,7 @@ async function findModrinthFile(slug, useLoader = true, list = false, versionNum
     {
         if(useLoader && !v.loaders.includes(window.instance.loader.name)){return false;}
         if(versionNumber != null && v.version_number != versionNumber){return false;}
+        if(version && v.version_number != version){return false}
         return v.game_versions.includes(window.instance.version.number) || noVersionCheck
     });
     if(!version || version.length==0)
@@ -710,6 +710,7 @@ async function findModrinthFile(slug, useLoader = true, list = false, versionNum
             {
                 if(useLoader && !v.loaders.includes(window.instance.loader.name) && !v.loaders.includes('fabric')){return false;}
                 if(versionNumber != null && v.version_number != versionNumber){return false;}
+                if(version && v.version_number != version){return false}
                 return v.game_versions.includes(window.instance.version.number || noVersionCheck)
             });
             if(!version || version.length==0) {  }
@@ -734,7 +735,7 @@ async function findModrinthFile(slug, useLoader = true, list = false, versionNum
 
     return files;
 }
-async function findCurseforgeFile(id, useLoader = true, list = false, originURL = null, name = null, noVersionCheck = false)
+async function findCurseforgeFile(id, useLoader = true, list = false, originURL = null, name = null, noVersionCheck = false, version = null)
 {
     // https://www.curseforge.com/api/v1/mods/1193072/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&gameVersionId=9990&removeAlphas=true
     let versions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=0&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
@@ -746,7 +747,6 @@ async function findCurseforgeFile(id, useLoader = true, list = false, originURL 
     {
         let newVersions = (await (await fetch(`https://www.curseforge.com/api/v1/mods/${id}/files?pageIndex=${i}&pageSize=60&sort=dateCreated&sortDescending=true&gameVersion=${window.instance.version.number}&removeAlphas=false`)).json()).data
         .sort((a,b) => { return new Date(b.dateModified	) - new Date(a.dateModified	); });
-        console.log(newVersions.length)
         if(newVersions.length == 0){break;}
 
         versions = versions.concat(newVersions);
@@ -761,6 +761,8 @@ async function findCurseforgeFile(id, useLoader = true, list = false, originURL 
         let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1));
         if(!valid && window.instance.loader.name == 'forge' && v.gameVersions.includes('NeoForge')) { valid = true; }
         if(!v.gameVersions.includes(window.instance.version.number) && !noVersionCheck) { valid = false; }
+        console.log(version, v);
+        if(version && v.fileName != version) { valid = false; }
         if(name != null && v.fileName != name){valid = false;}
         return valid;
     });
@@ -774,6 +776,7 @@ async function findCurseforgeFile(id, useLoader = true, list = false, originURL 
                 let valid = v.gameVersions.includes(window.instance.loader.name.charAt(0).toUpperCase() + window.instance.loader.name.slice(1)) || v.gameVersions.includes('Fabric');
                 if(!valid && window.instance.loader.name == 'fabric') { valid = true; }
                 if(!v.gameVersions.includes(window.instance.version.number) && !noVersionCheck) { valid = false; }
+                if(version && v.fileName != version) { valid = false; }
                 if(name != null && v.fileName != name){valid = false;}
                 return valid;
             });
@@ -933,7 +936,7 @@ async function findModrinthSlug(url)
     }
 
     let type = url.pathname.split('/')[1];
-    let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'}
+    let cleanType = type; if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'} if(cleanType=="datapack"){cleanType="mods"}
 
     return {slug: url.href.split('/')[url.href.split('/').length-1], type}
 }

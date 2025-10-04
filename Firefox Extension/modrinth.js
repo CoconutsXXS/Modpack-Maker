@@ -43,7 +43,7 @@ function parseXml(xml, arrayTags)
 var filterContainer;
 setInterval(async () =>
 {
-    if(!window.location.href.startsWith("https://modrinth.com/shaders") && !window.location.href.startsWith("https://modrinth.com/resourcepacks") && !window.location.href.startsWith("https://modrinth.com/mods")){return;}
+    if(!window.location.href.startsWith("https://modrinth.com/shaders") && !window.location.href.startsWith("https://modrinth.com/resourcepacks") && !window.location.href.startsWith("https://modrinth.com/mods") && !window.location.href.startsWith("https://modrinth.com/datapack")){return;}
     if(document.contains(filterContainer)){return;}
 
     filterContainer = document.querySelector("div.rounded-2xl:nth-child(3)").cloneNode(true);
@@ -681,7 +681,7 @@ setInterval(async () =>
                     icon: document.querySelector(".gap-x-8 > div:nth-child(1) > img:nth-child(1)").src,
                     url: cleanLink,
                     slug: window.location.pathname.split("/")[2],
-                    type: window.location.pathname.split("/")[1]=="mod"?"mods":(window.location.pathname.split("/")[1]=="shader"?"shaderpacks":"resourcepacks")
+                    type: (window.location.pathname.split("/")[1]=="mod"||window.location.pathname.split("/")[1]=="datapack")?"mods":(window.location.pathname.split("/")[1]=="shader"?"shaderpacks":"resourcepacks")
                 });
 
                 c.innerHTML='';

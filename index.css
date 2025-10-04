@@ -1128,6 +1128,13 @@ label:has(#filter-version-browsing)
 #content-editor { height: calc(100% - 25px); overflow: hidden; display: block; }
 #content-editor > div:last-of-type { width: 100%; height: calc(100% - 27px); overflow: hidden; display: flex; }
 #content-editor > div:last-of-type > div:last-of-type {width: 100%; height: 100%;}
+
+#editor-container > div
+{
+    height: 100%;
+    overflow-y: hidden;
+}
+
 #mod-content-editor { height: 100%; display: flex; max-width: 50%; display: none; min-width: 50%; overflow-x: auto; }
 #mod-content-editor > button
 {
@@ -1152,7 +1159,7 @@ label:has(#filter-version-browsing)
     overflow-y: auto;
     overflow-x:hidden;
 }
-.content-explorer-section:first-of-type { margin-left: -16px; }
+/* .content-explorer-section:first-of-type { margin-left: -16px; } */
 .content-explorer-section > div { display: flex; }
 .content-explorer-section > div > img
 {
@@ -1207,6 +1214,8 @@ label:has(#filter-version-browsing)
     overflow-x: hidden;
     padding: 8px;
     width: 100%;
+    height: 100%;
+    overflow-y: auto;
 }
 #nbt-editor > div { display: flex; }
 #nbt-editor button { margin-bottom: 8px; }

@@ -395,7 +395,7 @@ window.addInstanceListener(async (i) =>
                 window.jarData.modified.splice(i, 1)
             }
             console.log(groups);
-            for(let g of groups) { window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
+            for(let g of groups) { console.log("g", g); window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
 
             for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:first-of-type")) { b.remove(); }
         }
@@ -936,7 +936,7 @@ window.addInstanceListener(async (i) =>
                 
                 let blockstateJson = JSON.parse(await getFile(variantKeys));
 
-                if(blockstateJson.variants)
+                if(blockstateJson?.variants)
                 {
                     let variantData = {};
 
@@ -958,7 +958,7 @@ window.addInstanceListener(async (i) =>
                     if((Object.entries(variantData).length == 0 || !variantData.model) && !blockstateJson.multipart) { files.push({model: p.Name}); }
                     else { files.push(variantData) }
                 }
-                if(blockstateJson.multipart)
+                if(blockstateJson?.multipart)
                 {
                     let final = {};
                     blockstateJson.multipart.reverse()
@@ -984,7 +984,7 @@ window.addInstanceListener(async (i) =>
                     }
                 }
 
-                if(!blockstateJson.variants && !blockstateJson.multipart)
+                if(!blockstateJson?.variants && !blockstateJson?.multipart)
                 {
                     console.log("NO VARIANT/MULTIPART", blockstateJson)
                 }

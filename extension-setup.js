@@ -27,10 +27,14 @@ module.exports =
 
 
         // Host data
+        const version = "0.1.2";
         let hostData =
         {
-            appData: path.join(app.getPath('appData'), 'Modpack Maker')
+            appData: path.join(app.getPath('appData'), 'Modpack Maker'),
+            version
         }
+
+        let checkedVersion = JSON.parse(fs.readFileSync(path.join(config.directories.extension, "host.json"))).version == version;
         fs.writeFileSync(path.join(config.directories.extension, "host.json"), JSON.stringify(hostData), {recursive: true});
 
         // Manifest
@@ -50,7 +54,9 @@ module.exports =
 
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-        const addonPath = path.join(__dirname, "Firefox\ Extension/web-ext-artifacts/modpack_maker-0.1.2.xpi");
+        if(checkedVersion){return}
+
+        const addonPath = path.join(__dirname, "Firefox\ Extension/web-ext-artifacts/modpack_maker-"+version+".xpi");
 
         // Construct the "file://" URL (Firefox understands this)
         const fileUrl = `file://${addonPath.replace(/\\/g, "/")}`;

@@ -495,6 +495,12 @@ function parseXml(xml, arrayTags)
                     }
                 }
 
+                browser.runtime.sendMessage({ action: "app", content:
+                {
+                    name: "launch",
+                    value: {}
+                }});
+
                 let data = await browser.runtime.sendMessage({ action: "app", content:
                 {
                     name: "read",

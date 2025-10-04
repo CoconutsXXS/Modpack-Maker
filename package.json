@@ -52,13 +52,28 @@
   "build": {
     "appId": "fr.coconuts.modpackmaker",
     "productName": "Modpack Maker",
+    "asar": true,
     "files": [
       "**/*",
-      "!node_modules/.cache"
+      "!node_modules/.cache",
+      "!.gitignore",
+      "!immersion-intro/*"
+    ],
+    "extraResources": [
+      { "from": ".Structure Edition", "to": ".Structure Edition" },
+      { "from": ".Test World", "to": ".Test World" }
+    ],
+    "asarUnpack": [
+      ".Structure Edition/**",
+      ".Test World/**"
     ],
     "mac": {
       "target": "dmg",
       "icon": "icon/icon.icns"
+    },
+    "dmg": {
+      "format": "ULFO",
+      "title": "ModpackMaker"
     },
     "win": {
       "target": "nsis",

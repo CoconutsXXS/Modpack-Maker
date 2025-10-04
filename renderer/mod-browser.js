@@ -269,7 +269,7 @@ function displayResult()
             selected = e;
             e.setAttribute('selected', '');
 
-            document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
+            // document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
             switch(m.source)
             {
                 case 'modrinth':

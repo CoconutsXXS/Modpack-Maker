@@ -229,6 +229,8 @@ function setProp(obj, keys, value)
 
 async function expandPaths(obj, modifyValue = (path, value) => {return value;})
 {
+    if(!obj){return;}
+
     const result = {};
 
     for (let [path, value] of Object.entries(obj))
@@ -669,6 +671,8 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+            if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
             for(let r of Object.entries(jar).filter(([k, v]) => k.startsWith("data"+realPath) || k.startsWith("assets"+realPath)))
             {
@@ -700,6 +704,8 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+            if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
             if(jar[truePath])
             {
@@ -731,6 +737,8 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+            if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
             let truePath = "";
             for(let k of keys) { truePath += k+"/"; }
@@ -754,6 +762,8 @@ module.exports =
     extractFileByKeys: async (jarPath, keys = []) =>
     {
         let jar = await getJar(jarPath);
+        if(!jar){jar = await getJar(jarPath.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+        if(!jar){console.error("Invalid .jar path:", jarPath)}
 
         let truePath = "";
         for(let k of keys) { truePath += k+"/"; }
@@ -764,18 +774,25 @@ module.exports =
     extractFileByPath: async (jarPath, truePath) =>
     {
         let jar = await getJar(jarPath);
+        if(!jar){jar = await getJar(jarPath.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+        if(!jar){console.error("Invalid .jar path:", jarPath)}
 
         return await readZipEntry(truePath, jar[truePath]);
     },
 
     writeJarPropertie: async (jarPath, properties) =>
     {
-        let jar = await getJar(jarPath, false);
+        let jar = await getJar(jarPath);
+        if(!jar){jar = await getJar(jarPath.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+        if(!jar){console.error("Invalid .jar path:", jarPath)}
 
         for(let p of properties)
         {
             let keyPath = "";
             for(let k of p.keys){keyPath+="/"+k} keyPath = keyPath.slice(1);
+
+            console.log("jar",jar)
+            console.log(jarPath, properties)
 
             jar[keyPath] = await toBuffer(p.keys, p.value)
         }

@@ -23,11 +23,12 @@ watcher.on('all', (e, p, s) =>
         {
             (async () =>
             {
+                console.log("Browser request:",r.type)
                 switch(r.type)
                 {
                     case "ephemeral-instance":
                     {
-                        await Instance.ephemeralInstance(r.loader, r.version, r.mods);
+                        Instance.ephemeralInstance(r.loader, r.version, r.mods);
                         break;
                     }
                     case "silent":
@@ -35,7 +36,7 @@ watcher.on('all', (e, p, s) =>
                         isSilent = true
                         break;
                     }
-                    default: {break;}
+                    default: { console.warn("Unrecognized browser request:",r); break;}
                 }
             })()
             fs.writeFileSync(config.directories.browserRequests, "[]", {recursive: true});

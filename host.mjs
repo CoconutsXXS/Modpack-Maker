@@ -69,16 +69,8 @@ async function launchApp(silent = true)
 			}
 			else
 			{
-				// Linux ou appli Win32 classique
 				spawn(path, [], { detached: true, stdio: 'ignore' }).unref();
 			}
-
-			const child = spawn(path, ['--silent', 'test'],
-			{
-				detached: true,
-				stdio: 'ignore',
-			});
-			child.unref();
 		}
 		else console.log("App not found");
 	});
@@ -234,8 +226,9 @@ while (true)
 		{
 			console.log("start")
 			let r = await listeners[message.name](message.value);
-			console.log("send", typeof(r), r.length)
+			console.log("send", typeof(r), r?.length)
 			if(r!=undefined && r!=null){await sendLargeMessage(r);}
+			else { await sendLargeMessage(''); }
 			console.log("end")
 		}
 		catch(err){console.error(err)}
