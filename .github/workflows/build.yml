@@ -1,4 +1,4 @@
-name: Modpack Maker
+name: Build Windows
 
 on:
   push:
