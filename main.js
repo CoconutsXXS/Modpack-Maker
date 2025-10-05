@@ -130,8 +130,7 @@ async function mainWindow()
 
     win.loadFile('index.html')
 
-    win.webContents.openDevTools();
-
+    // win.webContents.openDevTools();
     // win.once('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
 
     return win;

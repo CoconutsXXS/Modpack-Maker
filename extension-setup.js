@@ -34,7 +34,10 @@ module.exports =
             version
         }
 
-        let checkedVersion = JSON.parse(fs.readFileSync(path.join(config.directories.extension, "host.json"))).version == version;
+        if(!fs.existsSync(config.directories.extension)){fs.mkdirSync(config.directories.extension, {recursive: true})}
+
+        let checkedVersion = false;
+        if(fs.existsSync(path.join(config.directories.extension, "host.json"))) {checkedVersion = JSON.parse(fs.readFileSync(path.join(config.directories.extension, "host.json"))).version == version};
         fs.writeFileSync(path.join(config.directories.extension, "host.json"), JSON.stringify(hostData), {recursive: true});
 
         // Manifest
