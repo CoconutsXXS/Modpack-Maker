@@ -10,8 +10,12 @@ module.exports =
 {
     jar: async function(p, dataPath=null, normalPath=false)
     {
-        let entries = (await unzip( fs.readFileSync(path.join(normalPath?'':app.getPath('appData'), p)) )).entries;
+        if(!fs.existsSync(path.join(normalPath?'':app.getPath('appData'), p))){return '';}
+        let entries = []
 
+        try { entries = (await unzip( fs.readFileSync(path.join(normalPath?'':app.getPath('appData'), p)) )).entries; }
+        catch(err){return '';}
+        
         if(dataPath==null){return entries;}
 
         try { return await entries[dataPath].json() }

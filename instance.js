@@ -12,6 +12,7 @@ const { unzip } = require('unzipit');
 const { XMLParser } = require("fast-xml-parser");
 const es = require('event-stream');
 const os = require("os");
+const _ = require("lodash")
 
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
@@ -38,7 +39,6 @@ class Instance
         if(!fs.existsSync(this.path)) { fs.mkdirSync(this.path, {recursive:true}); }
         if(data == {} || this.name==''){return this;}
 
-        // Everything :)
         for(let k of Object.keys(data))
         {
             if(this[k] == undefined) { this[k] = data[k]; }
@@ -63,11 +63,15 @@ class Instance
         if(!fs.existsSync(path.join(this.path, 'mods'))) { fs.mkdirSync(path.join(this.path, 'mods'), {recursive:true}); }
         
         let modWatcher = chokidar.watch(path.join(this.path, 'mods'), {persistent: true});
+
+        let modCount = 0;
         modWatcher.on('all', (e, p, s) =>
         {
             if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
-            let ogMods = JSON.stringify(this.mods);
             let f = p.split('/')[p.split('/').length-1];
+
+            modCount++;
+            if(modCount<this.mods.length && this.mods.findIndex(m => m.filename==Instance.cleanModName(f))){return}
             
             // Delete
             if(e=='unlink')
@@ -81,7 +85,7 @@ class Instance
                 }
             }
             // Add (or init)
-            if(e==='add')
+            else if(e==='add')
             {
                 let i = this.mods.findIndex(m => m.filename==Instance.cleanModName(f));
                 if(i>=0)
@@ -94,11 +98,10 @@ class Instance
                     this.setModData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
                 }
             }
+            else { return; }
 
-            if(ogMods != JSON.stringify(this.mods) || e==='add' || e=='unlink')
-            {
-                this.onModUpdate(this.mods)
-            }
+
+            this.onModUpdate(this.mods)
         })
 
         // Resourcepack Files
@@ -120,13 +123,16 @@ class Instance
         if(!fs.existsSync(path.join(this.path, 'resourcepacks'))) { fs.mkdirSync(path.join(this.path, 'resourcepacks'), {recursive:true}); }
         
         let rpWatcher = chokidar.watch(path.join(this.path, 'resourcepacks'), {persistent: true});
+        let rpCount = 0;
         rpWatcher.on('all', (e, p, s) =>
         {
-            let ogRP = JSON.stringify(this.rp);
             let f = p.split('/')[p.split('/').length-1];
 
             if(p.substring(path.join(this.path, 'resourcepacks').length+1, p.length).includes('/')){return}
             
+            rpCount++;
+            if(rpCount<this.rp.length && this.rp.findIndex(m => m.filename==Instance.cleanModName(f))){return}
+
             // Delete
             if(e=='unlink')
             {
@@ -139,7 +145,7 @@ class Instance
                 }
             }
             // Add (or init)
-            if(e==='add')
+            else if(e==='add')
             {
                 let i = this.rp.findIndex(m => m.filename==Instance.cleanShaderName(f));
                 if(i>=0)
@@ -152,11 +158,9 @@ class Instance
                     this.setRPData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
                 }
             }
+            else { return; }
 
-            if(ogRP != JSON.stringify(this.rp) || e==='add' || e=='unlink')
-            {
-                this.onRPUpdate(this.rp)
-            }
+            this.onRPUpdate(this.rp)
         })
 
         // Shader Files
@@ -178,13 +182,16 @@ class Instance
         if(!fs.existsSync(path.join(this.path, 'shaderpacks'))) { fs.mkdirSync(path.join(this.path, 'shaderpacks'), {recursive:true}); }
         
         let shaderWatcher = chokidar.watch(path.join(this.path, 'shaderpacks'), {persistent: true});
+        let shaderCount = 0;
         shaderWatcher.on('all', (e, p, s) =>
         {
-            let ogShaders = JSON.stringify(this.shaders);
             let f = p.split('/')[p.split('/').length-1];
 
             if(p.substring(path.join(this.path, 'shaderpacks').length+1, p.length).includes('/')){return}
             
+            shaderCount++;
+            if(shaderCount<this.rp.length && this.shaders.findIndex(m => m.filename==Instance.cleanModName(f))){return}
+
             // Delete
             if(e=='unlink')
             {
@@ -197,7 +204,7 @@ class Instance
                 }
             }
             // Add (or init)
-            if(e==='add')
+            else if(e==='add')
             {
                 let i = this.shaders.findIndex(m => Instance.cleanShaderName(m.filename)==Instance.cleanShaderName(f));
                 if(i>=0)
@@ -207,15 +214,12 @@ class Instance
                 }
                 else 
                 {
-                    console.log('setShaderData', {filename: f, missing: false, disabled: f.endsWith('.disabled')})
                     this.setShaderData({filename: f, missing: false, disabled: f.endsWith('.disabled')}, true)
                 }
             }
+            else { return; }
 
-            if(ogShaders != JSON.stringify(this.shaders) || e==='add' || e=='unlink')
-            {
-                this.onShaderUpdate(this.shaders)
-            }
+            this.onShaderUpdate(this.shaders)
         })
 
 
@@ -232,6 +236,16 @@ class Instance
                 this.onRequestUpdate(r);
             }
             fs.writeFileSync(p, '[]');
+        });
+
+        // Loadings
+        if(!fs.existsSync(path.join(config.directories.instances, this.name, '.loadings.json')))
+        { fs.writeFileSync(path.join(config.directories.instances, this.name, '.loadings.json'), '[]'); }
+        let loadingsWatcher = chokidar.watch(path.join(config.directories.instances, this.name, '.loadings.json'), {persistent: true});
+        loadingsWatcher.on('all', (e, p, s) =>
+        {
+            if(p != path.join(config.directories.instances, this.name, '.loadings.json') || !fs.existsSync(p)){return;}
+            this.onLoadingUpdate(JSON.parse(fs.readFileSync(p)));
         });
 
         return this;
@@ -274,6 +288,9 @@ class Instance
 
         // Install Loader
         this.version.custom = await installLoader(this.path, this.loader, this.version, listeners)
+
+        if(this.version.custom == undefined && this.loader.name != "vanilla")
+        { console.error("Custom Version Failed!"); return; }
 
         // Resource Path (download optimization)
         let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
@@ -326,13 +343,16 @@ class Instance
 
         // Launch
         let process = await launcher.launch(options);
+        let pid = process?.pid;
         let windowSource = null;
+
+        if(!process) { console.error("No process, crashed") }
 
         // Crashlog
         let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
         crashLogWatcher.on('add', (p) =>
         {
-            if(p.split('/')[p.split('/').length-1] != `hs_err_pid${process.pid}.log`){return}
+            if(p.split('/')[p.split('/').length-1] != `hs_err_pid${pid}.log`){return}
 
             let s = fs.createReadStream(p)
             .pipe(es.split())
@@ -390,7 +410,7 @@ class Instance
             {
                 for(let win of windowManager.getWindows())
                 {
-                    if(win.processId != process.pid){continue;}
+                    if(win.processId != pid){continue;}
     
                     win.hide();
                 }
@@ -404,6 +424,7 @@ class Instance
             {
                 let listener = async (w) =>
                 {
+                    if(!process){resolve(); return;}
                     if(w.processId == process.pid)
                     {
                         windowManager.removeListener('window-activated', listener);
@@ -456,7 +477,7 @@ class Instance
             })
         }
 
-        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == process.pid), windowSource, () => {process.kill('SIGINT')});
+        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {process.kill('SIGINT')});
     }
     // async launch(listeners =
     //     {
@@ -666,6 +687,10 @@ class Instance
     loader = {name: 'vanilla', version: ''}
     path = path.join(config.directories.instances, this.name, "minecraft")
 
+
+    loading = [];
+    onLoadingUpdate = (loadings) => {}
+
     virtualDirectories = [];
     mods = [];
     onModUpdate = (mods) => {}
@@ -758,76 +783,83 @@ class Instance
         {
             this.analyseModJar = async function (r)
             {
-                return new Promise(async (resolve) =>
+                return new Promise(async (resolve, reject) =>
                 {
                     if(r==null){resolve(); return;}
 
-                    // Jarjar true content
-                    for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar/')&&k!='META-INF/jarjar/'&&k.endsWith('.jar')))
+                    try
                     {
-                        let entries = (await unzip(await r[subJarKey].arrayBuffer())).entries;
-                        await this.analyseModJar(entries)
-                    }
-
-                    // META-INF
-                    if(r['META-INF/mods.toml']!=undefined)
-                    {
-                        // let metaTOML = jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()));
-                        let meta = jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()), 'toml');
-
-                        if(meta?.mods?.value[0]?.logoFile != undefined)
+                        // Jarjar true content
+                        for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar/')&&k!='META-INF/jarjar/'&&k.endsWith('.jar')))
                         {
-                            try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await r[meta.mods.value[0].logoFile]?.arrayBuffer()))}
-                            catch(err){console.warn(err)}
+                            let entries = (await unzip(await r[subJarKey].arrayBuffer())).entries;
+                            await this.analyseModJar(entries)
                         }
-                        this.mods[i].description = meta?.mods?.value[0]?.description;
-                        this.mods[i].title = meta?.mods?.value[0]?.displayName;
-                        this.mods[i].version = meta?.mods?.value[0]?.version;
-                        this.mods[i].modId = meta?.mods?.value[0]?.modId;
-                    }
-                    // Fabric JSON
-                    let fabricModJSON = await r['fabric.mod.json']?.json();
-                    if(fabricModJSON != undefined)
-                    {
-                        let meta = fabricModJSON;
-                        this.mods[i].fabricMeta = meta;
-                        if(!this.mods[i].title){this.mods[i].title=meta.name}
-                        if(this.mods[i].description=='No description...'){this.mods[i].description=meta.description}
-                        if(!this.mods[i].id){this.mods[i].id=meta.id}
-                        this.mods[i].clientRequired=meta.environment=='client'
-                        this.mods[i].serverRequired=meta.environment=='server'
-                        this.mods[i].version = meta.version;
-                        this.mods[i].modId = meta.id;
 
-                        let potentialIcon = await r[meta.icon]?.arrayBuffer();
-                        if(meta.icon && potentialIcon!=undefined)
+                        // META-INF
+                        if(r['META-INF/mods.toml']!=undefined)
                         {
-                            this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(potentialIcon));
-                        }
-                    }
-                    // Pack Mcmeta
-                    // let packMcmeta = await jarReader.jar(workingPath, 'pack.mcmeta', true);
-                    if(r['pack.mcmeta']!=undefined)
-                    {
-                        let meta = await r['pack.mcmeta'].json();
-                        if(typeof(meta.description)=='object') { this.mods[i].description = meta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
-                        else if(typeof(meta.description) == 'string') { this.mods[i].description = meta.description.replace(/§[0-9a-fk-or]/gi, ''); }
-                    }
+                            // let metaTOML = jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()));
+                            let meta = await jarReader.handleData(Buffer.from(await r['META-INF/mods.toml']?.arrayBuffer()), 'toml');
 
-                    // Icon
-                    if(this.mods[i].icon==undefined)
-                    {
-                        // let r = await jarReader.jar(workingPath, null, true)
-                        if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                            if(meta?.mods?.value[0]?.logoFile != undefined)
+                            {
+                                try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await r[meta.mods.value[0].logoFile]?.arrayBuffer()))}
+                                catch(err){}
+                            }
+                            this.mods[i].description = meta?.mods?.value[0]?.description;
+                            this.mods[i].title = meta?.mods?.value[0]?.displayName;
+                            this.mods[i].version = meta?.mods?.value[0]?.version;
+                            this.mods[i].modId = meta?.mods?.value[0]?.modId;
+                        }
+                        // Fabric JSON
+                        let fabricModJSON = await r['fabric.mod.json']?.json();
+                        if(fabricModJSON != undefined)
                         {
-                            this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
-                        }
-                    }
+                            let meta = fabricModJSON;
+                            this.mods[i].fabricMeta = meta;
+                            if(!this.mods[i].title){this.mods[i].title=meta.name}
+                            if(this.mods[i].description=='No description...'){this.mods[i].description=meta.description}
+                            if(!this.mods[i].id){this.mods[i].id=meta.id}
+                            this.mods[i].clientRequired=meta.environment=='client'
+                            this.mods[i].serverRequired=meta.environment=='server'
+                            this.mods[i].version = meta.version;
+                            this.mods[i].modId = meta.id;
 
-                    resolve();
+                            let potentialIcon = await r[meta.icon]?.arrayBuffer();
+                            if(meta.icon && potentialIcon!=undefined)
+                            {
+                                this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(potentialIcon));
+                            }
+                        }
+                        // Pack Mcmeta
+                        // let packMcmeta = await jarReader.jar(workingPath, 'pack.mcmeta', true);
+                        if(r['pack.mcmeta']!=undefined)
+                        {
+                            let meta = await r['pack.mcmeta'].json();
+                            if(typeof(meta.description)=='object') { this.mods[i].description = meta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                            else if(typeof(meta.description) == 'string') { this.mods[i].description = meta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                        }
+
+                        // Icon
+                        if(this.mods[i].icon==undefined)
+                        {
+                            // let r = await jarReader.jar(workingPath, null, true)
+                            if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                            {
+                                this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
+                            }
+                        }
+
+                        resolve();
+                    }
+                    catch(err){reject(err)}
                 })
             }
-            try{await jarReader.jar(workingPath, null, true).then(r => this.analyseModJar(r))}catch(err){console.warn(err)}
+            try
+            {
+                jarReader.jar(workingPath, null, true).then(r => this.analyseModJar(r))
+            }catch(err){}
 
             this.mods[i].fileVerified=true;
         }
@@ -919,20 +951,24 @@ class Instance
             {
                 new Promise(async (resolve) =>
                 {
-                    let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
-
-                    let packMcmeta = unziped['pack.mcmeta'];
-                    if(packMcmeta != undefined)
+                    try
                     {
-                        if(typeof(packMcmeta.description)=='object') { this.rp[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
-                        else if(typeof(packMcmeta.description) == 'string') { this.rp[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
-                    }
+                        let unziped = (await unzip( fs.readFileSync(workingPath) )).entries;
 
-                    let icon = unziped['pack.png'];
-                    if(icon != undefined)
-                    {
-                        this.rp[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
+                        let packMcmeta = unziped['pack.mcmeta'];
+                        if(packMcmeta != undefined)
+                        {
+                            if(typeof(packMcmeta.description)=='object') { this.rp[i].description = packMcmeta.description.fallback.replace(/§[0-9a-fk-or]/gi, ''); }
+                            else if(typeof(packMcmeta.description) == 'string') { this.rp[i].description = packMcmeta.description.replace(/§[0-9a-fk-or]/gi, ''); }
+                        }
+
+                        let icon = unziped['pack.png'];
+                        if(icon != undefined)
+                        {
+                            this.rp[i].icon = await bufferToDataUrl('image/png', Buffer.from(await icon.arrayBuffer()));
+                        }
                     }
+                    catch(err){}
 
                     resolve();
                 });
@@ -1061,6 +1097,23 @@ class Instance
             this.save();
             if(needUpdate) { this.onShaderUpdate(this.shaders); }
         }
+    }
+
+    // Download
+    setLoading(o)
+    {
+        if(this.loading.find(l=>l.index==o.index))
+        {
+            this.loading[this.loading.findIndex(l=>l.index==o.index)] = o;
+            fs.writeFileSync(path.join(config.directories.instances, this.name, ".loadings.json"), JSON.stringify(this.loading))
+        }
+        else
+        {
+            this.loading.index = this.loading.length;
+            this.loading.push(o);
+            fs.writeFileSync(path.join(config.directories.instances, this.name, ".loadings.json"), JSON.stringify(this.loading))
+        }
+        return this.loading.index;
     }
 
 
@@ -1197,9 +1250,13 @@ class Instance
         return list;
     }
 
-    static async importInstance(link, metadata, progress)
+    static async importInstance(link, metadata, ready = () => {})
     {
+        console.log("Importing Instance from",link)
         let url = new URL(link);
+
+        let i = new Instance({name: metadata.title});
+        i.icon = metadata?.icon;
 
         // Modrinth
         if(url.hostname == "modrinth.com")
@@ -1211,8 +1268,6 @@ class Instance
 
             // Metadata
             let meta = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
-            let i = new Instance({name: meta.title});
-            i.icon = metadata?.icon;
             i.description = meta.description;
             i.version.number = version.game_versions[0];
             i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
@@ -1241,6 +1296,8 @@ class Instance
             }
             i.save();
 
+            ready();
+
             let p = path.join(config.directories.instances, i.name);
             fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
 
@@ -1260,6 +1317,7 @@ class Instance
                 total += f.fileSize;
             }
             let loaded = 0;
+            let loadingIndex = i.setLoading({type: "instance-download", value: 0})
 
             // Mod Download or Transfert
             for(let f of data.files)
@@ -1276,6 +1334,9 @@ class Instance
 
                     await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path), false, false)
                 }
+
+                loaded+=f.fileSize;
+                i.setLoading({type: "instance-download", value: Math.round((loaded/total)*1000)/1000, index: loadingIndex})
             }
             // Other Files
             for(let e of Object.entries(entries))
@@ -1308,8 +1369,6 @@ class Instance
             var version = versions[0];
 
             // Metadata
-            let i = new Instance({name: meta.name});
-            i.icon = metadata?.icon;
             i.description = meta.summary;
             i.version.number = version.gameVersions[0];
             i.loader.name = version.gameVersions[1].toLowerCase();
@@ -1338,36 +1397,60 @@ class Instance
             }
             i.save();
 
+            ready();
+
             let p = path.join(config.directories.instances, i.name);
             fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
 
 
-            // Downlaod zip
+            // Download zip
+            if(fs.existsSync(path.join(p, 'original.zip'))){fs.unlinkSync(path.join(p, 'original.zip'))}
             await Download.download(decodeURI(`https://www.curseforge.com/api/v1/mods/${id}/files/${version.id}/download`), path.join(p, 'original.zip'))
             let zip = fs.readFileSync(path.join(p, 'original.zip'))
             const {entries} = await unzip(zip);
 
             const data = await entries['manifest.json'].json();
 
+            if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
+            if(!fs.existsSync(path.join(p, 'minecraft/resourcepacks'))){fs.mkdirSync(path.join(p, 'minecraft/resourcepacks'));}
+            if(!fs.existsSync(path.join(p, 'minecraft/shaderpacks'))){fs.mkdirSync(path.join(p, 'minecraft/shaderpacks'));}
+
+
             // Download content
             // Mod Download or Transfert
+            let loadingIndex = i.setLoading({type: "instance-download", value: 0})
             let downloaded = 0;
             for(let f of data.files)
             {
-                if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
-
-                Download.download(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`, path.join(p, 'minecraft/mods'), true, false)
-                .then(() => { downloaded++; console.log(downloaded+'/'+data.files.length) })
+                let dest = "mods"
+                let fileUrl = await getRedirectLocation(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`)
+                if(fileUrl.slice(0, fileUrl.lastIndexOf("?")).endsWith(".zip"))
+                {
+                    dest = "resourcepacks";
+                }
+                Download.download(fileUrl, path.join(p, 'minecraft', dest), true, false)
+                .then(async (r) =>
+                {
+                    if(dest == "resourcepacks")
+                    {
+                        const {entries} = await unzip(fs.readFileSync(r));
+                        if(entries["shaders/"]){ fs.renameSync(r, path.join(p, 'minecraft', "shaderpacks", r.slice(r.lastIndexOf("/")))) }
+                    }
+                    
+                    downloaded++;
+                    i.setLoading({type: "instance-download", value: Math.round((downloaded/data.files.length)*1000)/1000, index: loadingIndex})
+                })
             }
             // Other Files
             for(let e of Object.entries(entries))
             {
-                if(e[0].startsWith('overrides/') && e[0] != 'overrides/')
+                if(e[0].startsWith('overrides/') && e[0] != 'overrides/' && !e[0].endsWith("/"))
                 {
                     try
                     {
                         if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
                         { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+
                         fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
                     }
                     catch(err) { console.warn(err) }
@@ -1395,7 +1478,8 @@ async function installLoader(root, loader, version, listeners = null)
         }
         case 'forge':
         {
-            delete version.custom;
+            // delete version.custom;
+            version.custom = `forge-${version.number}-${loader.version}`;
 
             const targetPath = path.join(config.directories.resources, "versions", `forge-${version.number}-${loader.version}`);
             const targetName = `forge-${version.number}-${loader.version}.jar`;
@@ -1403,7 +1487,7 @@ async function installLoader(root, loader, version, listeners = null)
             file = path.join(targetPath, targetName);
             targetFile = path.join(root, 'versions', `forge-${version.number}-${loader.version}`, targetName);
 
-            if(fs.existsSync(path.join(targetPath, targetName))){break;}
+            if(fs.existsSync(path.join(targetPath, targetName))){ break; }
             if(!fs.existsSync(targetPath)){fs.mkdirSync(targetPath, {recursive:true});}
 
             let link = `https://maven.minecraftforge.net/net/minecraftforge/forge/${version.number}-${loader.version}/forge-${version.number}-${loader.version}`;
@@ -1414,6 +1498,14 @@ async function installLoader(root, loader, version, listeners = null)
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
+
+            if(!fs.existsSync(path.join(targetPath, targetName)))
+            {
+                console.warn("Unable to download:",link);
+                loader.version = "47.4.0";
+                return await installLoader(root, loader, version, listeners);
+            }
+
             break;
         }
         case 'neoforge':
@@ -1457,6 +1549,11 @@ async function installLoader(root, loader, version, listeners = null)
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
+            break;
+        }
+        default:
+        {
+            console.log("Unknown loader:", loader)
             break;
         }
     }
@@ -1560,6 +1657,26 @@ function fixJSONChar(jsonString)
   }
 
   return result;
+}
+
+async function getRedirectLocation(initialUrl)
+{
+    const response = await fetch(initialUrl,
+    {
+        method: 'HEAD',
+        redirect: 'manual'
+    });
+
+    if(response.status >= 300 && response.status < 400)
+    {
+        const location = response.headers.get('location');
+        const finalUrl = new URL(location, initialUrl).toString();
+        return finalUrl;
+    }
+    else
+    {
+        return initialUrl;
+    }
 }
 
 module.exports = Instance;

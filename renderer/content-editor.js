@@ -335,8 +335,13 @@ window.jarData =
     idList: []
 }
 
-window.addInstanceListener(async (i) => 
+window.addInstanceListener((i) => {jarAnalyseSetup(i)});
+async function jarAnalyseSetup(i)
 {
+    if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
+    document.getElementById("launch-required").style.display = "none";
+    document.getElementById("launch-required").querySelector("button").onclick = ()=>{jarAnalyseSetup(i)}
+
     // Full Combinaison
     window.jarData.combined = msgpack.decode(await getCombined(i.name, i.version.number));
     window.jarData.modified = [];
@@ -416,6 +421,9 @@ window.addInstanceListener(async (i) =>
 
     window.jarData.openExplorer = async function(path = "")
     {
+        if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
+        document.getElementById("launch-required").style.display = "none";
+
         let pathKeys = path;
         if(typeof path == "string") { pathKeys = path.split("/"); }
 
@@ -493,190 +501,204 @@ window.addInstanceListener(async (i) =>
         document.querySelector('#content-editor > .tab > button:first-of-type').click()
     }
 
-    let modsMetadata = [];
-    let elementGroupMetadata = [];
-
-    let dataCopy = lodash.clone(window.jarData.combined.data); Object.assign(dataCopy, window.jarData.combined.assets)
-    let combinedEntrie = Object.entries(dataCopy).filter(([e,v]) => lodash.isObject(v) && e != ".mcassetsroot");
-    for(let [e, v] of combinedEntrie)
+    let loadedTable = false;
+    window.jarData.loadTable = async function loadTable()
     {
-        if(window.jarData.combined.data[e])
-        {
-            v = lodash.clone(window.jarData.combined.data[e])
-            Object.assign(v, window.jarData.combined.assets[e])
-        }
-        else
-        {
-            v = window.jarData.combined.assets[e];
-        }
+        if(loadedTable){return}
+        loadedTable=true;
 
-        let el = document.createElement("th");
-        el.scope = "col"; el.innerHTML = e;
-        document.querySelector("#content-element-selector thead > tr").appendChild(el);
-        let tableIndex = Array.from(document.querySelector("#content-element-selector thead > tr").childNodes).filter(e=>e.nodeName=="TH").findIndex(e=>e==el)
+        document.querySelector("#content-element-selector > button").style.display = "none";
+        document.querySelector("#content-element-selector > table").style.display = "block";
+        
+        let modsMetadata = [];
+        let elementGroupMetadata = [];
 
-        let count = 0;
-        function recursiveSearch(p, preKeys = [])
+        let dataCopy = lodash.clone(window.jarData.combined.data); Object.assign(dataCopy, window.jarData.combined.assets)
+        let combinedEntrie = Object.entries(dataCopy).filter(([e,v]) => lodash.isObject(v) && e != ".mcassetsroot");
+        for(let [e, v] of combinedEntrie)
         {
-            for(let [key, v] of Object.entries(p))
+            if(window.jarData.combined.data[e])
             {
-                let keys = [...preKeys];
-                keys.push(key);
+                v = lodash.clone(window.jarData.combined.data[e])
+                Object.assign(v, window.jarData.combined.assets[e])
+            }
+            else
+            {
+                v = window.jarData.combined.assets[e];
+            }
 
-                if(key.includes("."))
+            let el = document.createElement("th");
+            el.scope = "col"; el.innerHTML = e;
+            document.querySelector("#content-element-selector thead > tr").appendChild(el);
+            let tableIndex = Array.from(document.querySelector("#content-element-selector thead > tr").childNodes).filter(e=>e.nodeName=="TH").findIndex(e=>e==el)
+
+            let count = 0;
+            async function recursiveSearch(p, preKeys = [])
+            {
+                for(let [key, v] of Object.entries(p))
                 {
-                    if(keys.length <= 1){continue;}
-                    keys[keys.length-1] = keys[keys.length-1].replace(/\.[^/.]+$/, "");
-                    let path = "";
-                    for(let k of keys){path+=k+"/"}
-                    path = path.slice(0, path.length-1)
+                    await new Promise(resolve => setTimeout(resolve, 0));
 
-                    window.jarData.idList.push(`${e}:${path}`);
+                    let keys = [...preKeys];
+                    keys.push(key);
 
-                    // Metadata
-                    let shortFilename = path.slice(path.lastIndexOf("/"));
-                    let shortPath = path.slice(0, path.indexOf("/"))
-
-                    count++;
-                    if(elementGroupMetadata.find(g=>g.path==shortPath))
+                    if(key.includes("."))
                     {
-                        elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].count++;
-                        elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].elements.push({p: shortPath, f: shortFilename});
+                        if(keys.length <= 1){continue;}
+                        keys[keys.length-1] = keys[keys.length-1].replace(/\.[^/.]+$/, "");
+                        let path = "";
+                        for(let k of keys){path+=k+"/"}
+                        path = path.slice(0, path.length-1)
+
+                        window.jarData.idList.push(`${e}:${path}`);
+
+                        // Metadata
+                        let shortFilename = path.slice(path.lastIndexOf("/"));
+                        let shortPath = path.slice(0, path.indexOf("/"))
+
+                        count++;
+                        if(elementGroupMetadata.find(g=>g.path==shortPath))
+                        {
+                            elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].count++;
+                            elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].elements.push({p: shortPath, f: shortFilename});
+                        }
+                        else
+                        {
+                            elementGroupMetadata.push
+                            ({
+                                path: shortPath,
+                                count: 1,
+                                elements: [{p: shortPath, f: shortFilename}]
+                            })
+                        }
+
+                        // Display
+                        let parent = Array.from(document.querySelectorAll("#content-element-selector tbody > tr")).find(tr => tr.querySelector(":scope > th").innerText == shortPath);
+                        if(!parent)
+                        {
+                            parent = document.createElement("tr");
+                            document.querySelector("#content-element-selector tbody").appendChild(parent);
+                            let titleEl = document.createElement("th");
+                            titleEl.scope = "row"; titleEl.innerText = shortPath;
+                            parent.appendChild(titleEl);
+                        }
+                        // else if (parent.childElementCount > 100){continue;}
+
+                        while(!parent.childNodes.item(tableIndex) || !parent.childNodes.item(combinedEntrie.length))
+                        {
+                            let el = document.createElement("th");
+                            el.scope = "row";
+                            parent.appendChild(el);
+                        }
+
+                        if(!isNaN(Number(parent.childNodes.item(tableIndex).innerText))) { parent.childNodes.item(tableIndex).innerText = (Number(parent.childNodes.item(tableIndex).innerText)+1); }
+                        else { parent.childNodes.item(tableIndex).innerText = "1"; }
+
+                        // Open
+                        parent.childNodes.item(tableIndex).onclick = () =>
+                        {
+                            let isAsset = getProp(window.jarData.combined, ["assets", e, ...shortPath.split("/")])!=undefined;
+                            window.jarData.openExplorer((isAsset?"assets":"data")+"/"+e+"/"+shortPath)
+                        }
                     }
-                    else
+                    else if(lodash.isObject(v))
                     {
-                        elementGroupMetadata.push
-                        ({
-                            path: shortPath,
-                            count: 1,
-                            elements: [{p: shortPath, f: shortFilename}]
-                        })
-                    }
-
-                    // Display
-                    let parent = Array.from(document.querySelectorAll("#content-element-selector tbody > tr")).find(tr => tr.querySelector(":scope > th").innerText == shortPath);
-                    if(!parent)
-                    {
-                        parent = document.createElement("tr");
-                        document.querySelector("#content-element-selector tbody").appendChild(parent);
-                        let titleEl = document.createElement("th");
-                        titleEl.scope = "row"; titleEl.innerText = shortPath;
-                        parent.appendChild(titleEl);
-                    }
-                    else if (parent.childElementCount > 100){continue;}
-
-                    while(!parent.childNodes.item(tableIndex) || !parent.childNodes.item(combinedEntrie.length))
-                    {
-                        let el = document.createElement("th");
-                        el.scope = "row";
-                        parent.appendChild(el);
-                    }
-
-                    if(!isNaN(Number(parent.childNodes.item(tableIndex).innerText))) { parent.childNodes.item(tableIndex).innerText = (Number(parent.childNodes.item(tableIndex).innerText)+1); }
-                    else { parent.childNodes.item(tableIndex).innerText = "1"; }
-
-                    // Open
-                    parent.childNodes.item(tableIndex).onclick = () =>
-                    {
-                        let isAsset = getProp(window.jarData.combined, ["assets", e, ...shortPath.split("/")])!=undefined;
-                        window.jarData.openExplorer((isAsset?"assets":"data")+"/"+e+"/"+shortPath)
+                        recursiveSearch(v, keys);
                     }
                 }
-                else if(lodash.isObject(v))
+            }
+            await recursiveSearch(v);
+
+            modsMetadata.push
+            ({
+                id: e,
+                count
+            })
+        }
+
+        // SORTING
+        {
+            // Columns
+            for (let i = 0; i < document.querySelectorAll("#content-element-selector thead > tr > th").length; i++)
+            {
+                let c = 0;
+                for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
                 {
-                    recursiveSearch(v, keys);
+                    c += Number(child.childNodes[i].innerText)
                 }
+
+                for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
+                {
+                    child.childNodes[i].setAttribute("total", c)
+                }
+                document.querySelectorAll("#content-element-selector thead > tr > th")[i].setAttribute("total", c)
             }
-        }
-        recursiveSearch(v);
 
-        modsMetadata.push
-        ({
-            id: e,
-            count
-        })
-    }
-
-    // SORTING
-    {
-        // Columns
-        for (let i = 0; i < document.querySelectorAll("#content-element-selector thead > tr > th").length; i++)
-        {
-            let c = 0;
-            for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
+            for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
             {
-                c += Number(child.childNodes[i].innerText)
+                [...document.querySelectorAll("#content-element-selector tbody > tr").item(i).childNodes]
+                .sort((a, b) =>
+                {
+                    if(a.nodeType != 1){return -1;}
+                    if(b.nodeType != 1){return 1;}
+                    return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
+                })
+                .forEach(node => document.querySelectorAll("#content-element-selector tbody > tr").item(i).appendChild(node));
             }
 
-            for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
-            {
-                child.childNodes[i].setAttribute("total", c)
-            }
-            document.querySelectorAll("#content-element-selector thead > tr > th")[i].setAttribute("total", c)
-        }
-
-        for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
-        {
-            [...document.querySelectorAll("#content-element-selector tbody > tr").item(i).childNodes]
+            [...document.querySelector("#content-element-selector thead > tr").childNodes]
             .sort((a, b) =>
             {
                 if(a.nodeType != 1){return -1;}
                 if(b.nodeType != 1){return 1;}
                 return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
             })
-            .forEach(node => document.querySelectorAll("#content-element-selector tbody > tr").item(i).appendChild(node));
+            .forEach(node => document.querySelector("#content-element-selector thead > tr").appendChild(node));
+
+            // Rows
+            for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
+            {
+                let c = 0;
+                for(let child of document.querySelectorAll("#content-element-selector tbody > tr")[i].querySelectorAll(":scope > th"))
+                {
+                    if(isNaN(Number(child.innerText))){continue}
+                    c += Number(child.innerText)
+                }
+
+                document.querySelectorAll("#content-element-selector tbody > tr")[i].setAttribute("total", c)
+            }
+
+            [...document.querySelector("#content-element-selector tbody").childNodes]
+            .sort((a, b) =>
+            {
+                if(a.nodeType != 1){return -1;}
+                if(b.nodeType != 1){return 1;}
+
+                let ca=0;
+                for(let child of a.querySelectorAll(":scope > th"))
+                {
+                    if(isNaN(Number(child.innerText))){continue}
+                    ca += Number(child.innerText)
+                }
+
+                let cb=0;
+                for(let child of b.querySelectorAll(":scope > th"))
+                {
+                    if(isNaN(Number(child.innerText))){continue}
+                    cb += Number(child.innerText)
+                }
+
+                return cb-ca;
+            })
+            .forEach(node => document.querySelector("#content-element-selector tbody").appendChild(node));
         }
 
-        [...document.querySelector("#content-element-selector thead > tr").childNodes]
-        .sort((a, b) =>
-        {
-            if(a.nodeType != 1){return -1;}
-            if(b.nodeType != 1){return 1;}
-            return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
-        })
-        .forEach(node => document.querySelector("#content-element-selector thead > tr").appendChild(node));
-
-        // Rows
-        for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
-        {
-            let c = 0;
-            for(let child of document.querySelectorAll("#content-element-selector tbody > tr")[i].querySelectorAll(":scope > th"))
-            {
-                if(isNaN(Number(child.innerText))){continue}
-                c += Number(child.innerText)
-            }
-
-            document.querySelectorAll("#content-element-selector tbody > tr")[i].setAttribute("total", c)
-        }
-
-        [...document.querySelector("#content-element-selector tbody").childNodes]
-        .sort((a, b) =>
-        {
-            if(a.nodeType != 1){return -1;}
-            if(b.nodeType != 1){return 1;}
-
-            let ca=0;
-            for(let child of a.querySelectorAll(":scope > th"))
-            {
-                if(isNaN(Number(child.innerText))){continue}
-                ca += Number(child.innerText)
-            }
-
-            let cb=0;
-            for(let child of b.querySelectorAll(":scope > th"))
-            {
-                if(isNaN(Number(child.innerText))){continue}
-                cb += Number(child.innerText)
-            }
-
-            return cb-ca;
-        })
-        .forEach(node => document.querySelector("#content-element-selector tbody").appendChild(node));
+        modsMetadata = modsMetadata.sort((a,b) => b.count - a.count)
+        elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
     }
+    document.querySelector("#content-element-selector > button").onclick = window.jarData.loadTable;
+}
 
-    modsMetadata = modsMetadata.sort((a,b) => b.count - a.count)
-    elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
-})
 
 // Three Setup
 let loadModel;
@@ -1965,6 +1987,9 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
 window.openModContent = async function(path)
 {
+    if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
+    document.getElementById("launch-required").style.display = "none";
+
     closeEditor();
     let fullPath = "instances/"+window.instance.name +"/minecraft/"+path+".jar";
     let data = await ipcInvoke("getJar", fullPath, true)

@@ -20,8 +20,6 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
     function loadFolderContent(folderPath, erase = true)
     {
         folderPath = (folderPath.startsWith('/')||folderPath=='')?folderPath:('/'+folderPath);
-        console.log('loading '+folderPath)
-
 
         while(dirElements.length < folderPath.split('/').length)
         {
@@ -217,7 +215,6 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             // Press
             b.onmousedown = (e) =>
             {
-                console.log(e.target);
                 if(e.target != b){return;}
                 selected=true;
                 moving=false;
@@ -454,7 +451,6 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                     currentNewList[k].element = {};
                     if(JSON.stringify(currentOldList[k]) != JSON.stringify(currentNewList[k]))
                     {
-                        console.log(currentOldList[k], currentNewList[k])
                         changed = true;
                         break;
                     }

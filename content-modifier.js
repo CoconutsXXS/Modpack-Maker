@@ -1,4 +1,5 @@
 const fs = require('fs')
+const fsPromise = require('fs/promises')
 const { unzip, ZipEntry } = require('unzipit');
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
@@ -292,7 +293,7 @@ async function getJar(path, expend = false)
     }
 
     let jar = null;
-    try{jar = expend?await expandPaths((await unzip( fs.readFileSync(path))).entries, () => { return null; }):((await unzip( fs.readFileSync(path))).entries);}catch(err){return null;}
+    try{jar = expend?await expandPaths((await unzip( fs.readFileSync(path))).entries, () => { return null; }):((await unzip( await fsPromise.readFile(path))).entries);}catch(err){return null;}
     if(jar==null){return null;}
 
     jarList.push({path, jar, expend})
@@ -308,8 +309,8 @@ async function getJar(path, expend = false)
         {
             try
             {
-                if(expend) { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = await expandPaths((await unzip( fs.readFileSync(p))).entries, () => { return null; }); }
-                else { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = (await unzip( fs.readFileSync(p))).entries; }
+                if(expend) { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = await expandPaths((await unzip( await fsPromise.readFile(p))).entries, () => { return null; }); }
+                else { jarList[jarList.findIndex(j=>j.path==path&&j.expend==expend)].jar = (await unzip( await fsPromise.readFile(p))).entries; }
             }
             catch(err){}
         }
@@ -318,10 +319,23 @@ async function getJar(path, expend = false)
     return jar;
 }
 
+function minecraftVersion(name, version)
+{
+    if(fs.existsSync(path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar"))){return path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar")}
+    else if(fs.existsSync(path.join(config.directories.resources, "versions", version, version+".jar"))){return path.join(config.directories.resources, "versions", version, version+".jar")}
+    else { console.warn("Minecraft version not found for",name,version); return ""; }
+}
+
 module.exports =
 {
     getJar: getJar,
     readZipEntry: readZipEntry,
+
+    isMinecraftInstalled: async(name, version) =>
+    {
+        return fs.existsSync(path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar")) || fs.existsSync(path.join(config.directories.resources, "versions", version, version+".jar"));
+    },
+    minecraftVersion: minecraftVersion,
 
     fullModData: async (path) =>
     {
@@ -626,7 +640,7 @@ module.exports =
 
         // List every Jar including Minecraft
         let sub = [];
-        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        sub.push(minecraftVersion(name, version))
         for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
         {
             if(p == ".DS_Store"){continue;}
@@ -636,8 +650,15 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null)
+            {
+                if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
+                else { jar = await getJar(p+'.disasbled') }
+            }
+            if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
+            if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
-            if(p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+            if(p == minecraftVersion(name, version))
             {
                 for(let [p, v] of Object.entries(jar))
                 {
@@ -655,7 +676,7 @@ module.exports =
     {
         // List every Jar including Minecraft
         let sub = [];
-        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        sub.push(minecraftVersion(name, version))
         for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
         {
             if(p == ".DS_Store"){continue;}
@@ -671,6 +692,11 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null)
+            {
+                if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
+                else { jar = await getJar(p+'.disasbled') }
+            }
             if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
             if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
@@ -681,7 +707,7 @@ module.exports =
                     jarFile: p,
                     path: r[0],
                     value: await readZipEntry(r[0], r[1]),
-                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                    original: p == minecraftVersion(name, version)
                 })
             }
         }
@@ -692,7 +718,7 @@ module.exports =
     {
         // List every Jar including Minecraft
         let sub = [];
-        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        sub.push(minecraftVersion(name, version))
         for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
         {
             if(p == ".DS_Store"){continue;}
@@ -704,6 +730,11 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null)
+            {
+                if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
+                else { jar = await getJar(p+'.disasbled') }
+            }
             if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
             if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
@@ -714,7 +745,7 @@ module.exports =
                     jarFile: p,
                     path: truePath,
                     value: await readZipEntry(truePath, jar[truePath]),
-                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                    original: p == minecraftVersion(name, version)
                 })
             }
         }
@@ -725,7 +756,7 @@ module.exports =
     {
         // List every Jar including Minecraft
         let sub = [];
-        sub.push(path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar"))
+        sub.push(minecraftVersion(name, version))
         for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
         {
             if(p == ".DS_Store"){continue;}
@@ -737,6 +768,12 @@ module.exports =
         for(let p of sub)
         {
             let jar = await getJar(p);
+            if(!jar || jar == null)
+            {
+                console.log(p)
+                if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
+                else { jar = await getJar(p+'.disasbled') }
+            }
             if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
             if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
@@ -751,7 +788,7 @@ module.exports =
                     jarFile: p,
                     path: truePath,
                     value: await readZipEntry(truePath, jar[truePath]),
-                    original: p == path.join(config.directories.instances, name, "minecraft/versions/", version,version+".jar")
+                    original: p == minecraftVersion(name, version)
                 })
             }
         }

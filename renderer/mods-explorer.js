@@ -114,7 +114,6 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
             },
             onMove: (from, to, index)=>
             {
-                console.log(from, to, index)
                 mods[k].hierarchyIndex = index;
                 mods[k].virtualPath = to;
 

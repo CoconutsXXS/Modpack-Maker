@@ -71,7 +71,7 @@ class Instance
     save = function(d) { console.log(JSON.parse(JSON.stringify(d))); return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
 }
 
-contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}, onRequestUpdate = (i, m) => {}) =>
+contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}, onRequestUpdate = (i, m) => {}, onLoadingUpdate = (i, l) => {}) =>
 {
     ipcRenderer.send('getInstance', name)
     
@@ -111,11 +111,11 @@ contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m)
     });
     
     let instance = Object.assign(new Instance(), object);
-    ipcRenderer.on('modUpdate', (event, mods) => { console.log("mod update"); instance.mods = mods; onModUpdate(instance, mods); })
+    ipcRenderer.on('modUpdate', (event, mods) => { instance.mods = mods; onModUpdate(instance, mods); })
     ipcRenderer.on('RPUpdate', (event, rp) => { instance.rp = rp; onRPUpdate(instance, rp); })
     ipcRenderer.on('shaderUpdate', (event, shaders) => { instance.shaders = shaders; onShaderUpdate(instance, shaders); })
+    ipcRenderer.on('loadingUpdate', (event, l) => { instance.loading = l; onLoadingUpdate(instance, l); })
 
-    console.log('getInstance', instance)
     return instance;
 });
 contextBridge.exposeInMainWorld('importInstance', async (link, metadata) => { ipcRenderer.invoke('importInstance', link, metadata) })

@@ -130,6 +130,8 @@ async function mainWindow()
 
     win.loadFile('index.html')
 
+    win.webContents.openDevTools();
+
     // win.once('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
 
     return win;
@@ -229,6 +231,7 @@ ipcMain.on('getInstance', (event, name) =>
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
     i.onRPUpdate = (rp) => event.sender.isDestroyed()?null:event.sender.send('RPUpdate', rp);;
     i.onShaderUpdate = (shaders) => event.sender.isDestroyed()?null:event.sender.send('shaderUpdate', shaders);
+    i.onLoadingUpdate = (loadings) => event.sender.isDestroyed()?null:event.sender.send('loadingUpdate', loadings);
     i.onRequestUpdate = (list) => event.sender.isDestroyed()?null:event.sender.send('requestUpdate', list);
 
     const buffer = new TextEncoder().encode(JSON.stringify(i)).buffer.slice(0);
@@ -288,7 +291,11 @@ ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
 
 ipcMain.handle('importInstance', async (event, link, metadata) =>
 {
-    return await Instance.importInstance(link, metadata)
+    return await Instance.importInstance(link, metadata, async () =>
+    {
+        let win = await mainWindow();
+        win.webContents.send('openInstance', metadata.title);
+    });
 })
 
 let instanceIndex = 0;
@@ -401,6 +408,7 @@ ipcMain.handle('getCombined', async (event, name, version) =>
 
     event.sender.send('shared-buffer-end');
 })
+ipcMain.handle('isMinecraftInstalled', (event, name, version) => { return contentModifier.isMinecraftInstalled(name, version) })
 ipcMain.handle('retrieveFileById', (event, name, version, id) => { return contentModifier.retrieveModFileById(name, version, id) })
 ipcMain.handle('retrieveFileByKeys', (event, name, version, keys) => { return contentModifier.retrieveModFileByKeys(name, version, keys) })
 ipcMain.handle('retrieveFileByPath', (event, name, version, path) => { return contentModifier.retrieveModFileByPath(name, version, path) })

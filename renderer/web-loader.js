@@ -13,9 +13,7 @@ window.web =
         {
             let r = await fetch(link)
 
-            console.log(Array.from(r.headers.entries()))
             link = r.headers.get("Location") || r.headers.get("location") || r.url;
-            console.log("redirection:", link)
             url = new URL(link);
         }
 

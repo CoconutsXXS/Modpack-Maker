@@ -26,6 +26,7 @@
     <script src="./renderer/tab-setup.js" type="module"></script>
     <script src="./renderer/panels.js" type="module"></script>
     <script src="./renderer/horizontal-scroll.js" type="module"></script>
+    <script src="./renderer/loading.js" type="module"></script>
     <script src="./renderer/instance-properties.js" type="module"></script>
     <script src="./renderer/mod-browser.js" type="module"></script>
     <script src="./renderer/resourcepack-browser.js" type="module"></script>
@@ -70,6 +71,13 @@
             <div>
                 <button>Ok</button>
             </div>
+        </div>
+    </div>
+
+    <div id="loading-screen">
+        <div>
+            <h1>Loading</h1>
+            <div class="loading"></div>
         </div>
     </div>
 
@@ -197,6 +205,7 @@
             <div anchor-top class="tab"><button>Explorer</button><button>Content Table</button><button>Apply Manager</button></div>
             <div>
                 <div id="content-element-selector">
+                    <button>Load Modpack Content Table</button>
                     <table>
                         <caption></caption>
                         <thead>
@@ -229,6 +238,12 @@
                         <button>Revert All</button>
                     </div>
                     <button>Back</button>
+                </div>
+                <div id="launch-required">
+                    <div>
+                        <p>Minecraft is not installed yet. Please launch your modpack once and try again.</p>
+                        <button>Reload</button>
+                    </div>
                 </div>
 
                 <div id="editor-container">
