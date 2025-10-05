@@ -1,4 +1,4 @@
-name: Build Windows
+name: Build App
 
 on:
   push:
@@ -23,10 +23,11 @@ jobs:
         run: npx electron-builder --win --${{ matrix.arch }}
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: windows-build-${{ matrix.arch }}
-          path: dist/*.exe
+            name: windows-build-${{ matrix.arch }}
+            path: dist/*.exe
+
 
   build-mac:
     runs-on: macos-13
@@ -40,7 +41,8 @@ jobs:
       - name: Build macOS
         run: npx electron-builder --mac
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: macos-build
-          path: dist/*.dmg
+            name: macos-build
+            path: dist/*.dmg
+    
