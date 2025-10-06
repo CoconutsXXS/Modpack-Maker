@@ -7,37 +7,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: windows-2022
     strategy:
       matrix:
-        os: [windows-2022, macos-13]
         arch: [x64, arm64]
       fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Build Electron App
+      - name: Build Windows App
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          if [[ "${{ matrix.os }}" == "macos-13" ]]; then
-            npx electron-builder --mac --${{ matrix.arch }}
-          else
-            npx electron-builder --win --${{ matrix.arch }}
-          fi
-
-      - name: Upload Artifact
+        run: npx electron-builder --win --${{ matrix.arch }}
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}-build
+          name: windows-${{ matrix.arch }}-build
+          path: dist/
+          retention-days: 30
+
+  build-macos:
+    runs-on: macos-13
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build macOS App
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --mac --${{ matrix.arch }}
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}-build
           path: dist/
           retention-days: 30
