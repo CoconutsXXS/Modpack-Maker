@@ -1,12 +1,10 @@
-name: Build Electron App
+name: Build App
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build:
