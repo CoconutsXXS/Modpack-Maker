@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node
         with:
           node-version: 20
 
@@ -31,7 +31,7 @@ jobs:
           npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'mac' || 'linux'}} --${{ matrix.arch }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact
         with:
           name: "${{ matrix.os }}-${{ matrix.arch }}"
           path: dist/
