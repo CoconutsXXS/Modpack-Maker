@@ -1,6 +1,6 @@
 {
   "name": "modpack-maker",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Lightweight app to create and launch modpack. Easy debuging that let you combine hundred of mods together while keeping the game fluid.",
   "main": "main.js",
   "scripts": {
@@ -60,8 +60,14 @@
       "!immersion-intro/*"
     ],
     "extraResources": [
-      { "from": ".Structure Edition", "to": ".Structure Edition" },
-      { "from": ".Test World", "to": ".Test World" }
+      {
+        "from": ".Structure Edition",
+        "to": ".Structure Edition"
+      },
+      {
+        "from": ".Test World",
+        "to": ".Test World"
+      }
     ],
     "asarUnpack": [
       ".Structure Edition/**",
@@ -76,12 +82,19 @@
       "title": "ModpackMaker"
     },
     "win": {
-      "target": "nsis",
-      "icon": "icon/icon.png"
+      "target": "dir",
+      "icon": "icon/icon.png",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "icon/icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }

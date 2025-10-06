@@ -17,16 +17,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm ci
+
       - name: Build Electron App
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          npx electron-builder --${{ matrix.os == 'windows-2022' && 'win' || 'mac' }} --${{ matrix.arch }}
+          if [[ "${{ matrix.os }}" == "macos-13" ]]; then
+            npx electron-builder --mac --${{ matrix.arch }}
+          else
+            npx electron-builder --win --${{ matrix.arch }}
+          fi
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
