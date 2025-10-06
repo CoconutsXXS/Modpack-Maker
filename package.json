@@ -50,6 +50,7 @@
     "zlib": "^1.0.5"
   },
   "build": {
+    "electronVersion": "38.2.1",
     "appId": "fr.coconuts.modpackmaker",
     "productName": "ModpackMaker",
     "directories": {
@@ -62,19 +63,18 @@
     "asar": false,
     "mac": {
         "target": [
-        {"target":"dir"},
-        {"target":"zip"}
+          { "target": "dir" },
+          { "target": "zip" }
         ],
         "icon": "icon/icon.icns",
         "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "win": {
-        "target": [
-        {"target":"dir"},
-        {"target":"zip"}
-        ],
-        "icon": "icon/icon.png",
-        "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+      "target": [
+        { "target": "portable" }
+      ],
+      "icon": "icon/icon.png",
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "linux": {
         "target": ["AppImage"],
