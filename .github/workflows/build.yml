@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-windows:
+    name: Build Windows
     runs-on: windows-2022
     strategy:
       matrix:
@@ -15,17 +16,23 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm ci
-      - name: Build Windows App
+
+      - name: Build Windows (${ { matrix.arch } })
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npx electron-builder --win --${{ matrix.arch }}
-      - name: Upload Windows Artifact
+          GH_TOKEN: ${{ secrets.GH_TOKEN }} # facultatif si tu ne publies pas
+        run: npx electron-builder --win --${{ matrix.arch }} --publish never
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-build
@@ -33,6 +40,7 @@ jobs:
           retention-days: 30
 
   build-macos:
+    name: Build macOS
     runs-on: macos-13
     strategy:
       matrix:
@@ -40,17 +48,23 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+
       - name: Install dependencies
         run: npm ci
-      - name: Build macOS App
+
+      - name: Build macOS (${ { matrix.arch } })
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npx electron-builder --mac --${{ matrix.arch }}
-      - name: Upload macOS Artifact
+          GH_TOKEN: ${{ secrets.GH_TOKEN }} # facultatif
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}-build

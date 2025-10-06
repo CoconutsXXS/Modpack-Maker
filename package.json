@@ -51,50 +51,35 @@
   },
   "build": {
     "appId": "fr.coconuts.modpackmaker",
-    "productName": "Modpack Maker",
-    "asar": true,
-    "files": [
-      "**/*",
-      "!node_modules/.cache",
-      "!.gitignore",
-      "!immersion-intro/*"
-    ],
-    "extraResources": [
-      {
-        "from": ".Structure Edition",
-        "to": ".Structure Edition"
-      },
-      {
-        "from": ".Test World",
-        "to": ".Test World"
-      }
-    ],
-    "asarUnpack": [
-      ".Structure Edition/**",
-      ".Test World/**"
-    ],
-    "mac": {
-      "target": "dmg",
-      "icon": "icon/icon.icns"
+    "productName": "ModpackMaker",
+    "directories": {
+        "output": "dist"
     },
-    "dmg": {
-      "format": "ULFO",
-      "title": "ModpackMaker"
+    "files": [
+        "**/*",
+        "!node_modules/.cache"
+    ],
+    "asar": false,
+    "mac": {
+        "target": [
+        {"target":"dir"},
+        {"target":"zip"}
+        ],
+        "icon": "icon/icon.icns",
+        "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "win": {
-      "target": "dir",
-      "icon": "icon/icon.png",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+        "target": [
+        {"target":"dir"},
+        {"target":"zip"}
+        ],
+        "icon": "icon/icon.png",
+        "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "icon/icon.icns"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
+        "target": ["AppImage"],
+        "icon": "icon/icon.png",
+        "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     }
-  }
+    }
 }
