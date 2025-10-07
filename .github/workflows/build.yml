@@ -26,10 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build Electron app
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Build Electron app
         run: |
           npx electron-builder --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'mac' || 'linux'}} --${{ matrix.arch }}
 
