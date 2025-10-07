@@ -42,6 +42,7 @@
     "toml": "^3.0.0",
     "unzipit": "^1.4.3"
   },
+  "release:fix-windows-installer": "grep -qxF \"CRCCheck off\" node_modules/app-builder-lib/templates/nsis/common.nsh || echo \"\nCRCCheck off\n\" >> node_modules/app-builder-lib/templates/nsis/common.nsh",
   "build": {
     "electronVersion": "38.2.1",
     "appId": "fr.coconuts.modpackmaker",
