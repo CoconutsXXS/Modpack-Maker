@@ -44,10 +44,8 @@
   },
   "release:fix-windows-installer": "grep -qxF \"CRCCheck off\" node_modules/app-builder-lib/templates/nsis/common.nsh || echo \"\nCRCCheck off\n\" >> node_modules/app-builder-lib/templates/nsis/common.nsh",
   "build": {
-    "electronVersion": "38.2.1",
     "appId": "fr.coconuts.modpackmaker",
     "productName": "ModpackMaker",
-    "npmRebuild": false,
     "directories": {
       "output": "dist"
     },
@@ -55,31 +53,40 @@
       "**/*",
       "!node_modules/.cache"
     ],
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/**/*",
+      "assets/**/*"
+    ],
     "mac": {
       "target": [
-        {
-          "target": "dir"
-        },
-        {
-          "target": "zip"
-        }
+        "dmg",
+        "zip"
       ],
       "icon": "icon/icon.icns",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "identity": null
     },
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "icon/icon.png",
       "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "icon/icon.png",
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -89,24 +96,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ModpackMaker",
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "uninstallDisplayName": "ModpackMaker",
       "warningsAsErrors": false
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "icon": "icon/icon.png",
-      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     }
   },
   "optionalDependencies": {
     "fsevents": "^2.3.3"
-  },
-  "asar": true,
-  "asarUnpack": [
-    "node_modules/**/*",
-    "assets/**/*"
-  ]
+  }
 }
