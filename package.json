@@ -42,30 +42,18 @@
     "toml": "^3.0.0",
     "unzipit": "^1.4.3"
   },
-  "release:fix-windows-installer": "grep -qxF \"CRCCheck off\" node_modules/app-builder-lib/templates/nsis/common.nsh || echo \"\nCRCCheck off\n\" >> node_modules/app-builder-lib/templates/nsis/common.nsh",
   "build": {
     "appId": "fr.coconuts.modpackmaker",
     "productName": "ModpackMaker",
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "**/*",
-      "!node_modules/.cache"
-    ],
-    "asar": true,
-    "asarUnpack": [
-      "node_modules/**/*",
-      "assets/**/*"
-    ],
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "icon": "icon/icon.icns",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "identity": null
+      "icon": "icon/icon.icns"
     },
     "win": {
       "target": [
@@ -77,30 +65,14 @@
           ]
         }
       ],
-      "icon": "icon/icon.png",
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+      "icon": "icon/icon.png"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "icon/icon.png",
-      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": true,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "ModpackMaker",
-      "uninstallDisplayName": "ModpackMaker",
-      "warningsAsErrors": false
+      "icon": "icon/icon.png"
     }
-  },
-  "optionalDependencies": {
-    "fsevents": "^2.3.3"
   }
 }
