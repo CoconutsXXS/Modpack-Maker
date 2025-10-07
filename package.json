@@ -74,11 +74,20 @@
     "win": {
       "target": [
         {
-          "target": "nsis"
+          "target": "nsis",
+          "arch": ["x64", "arm64"]
         }
       ],
       "icon": "icon/icon.png",
       "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": true,
+      "killAppProcessesOnUninstall": true,
+      "closeAppBeforeInstall": true
     },
     "linux": {
       "target": [
@@ -90,5 +99,10 @@
   },
   "optionalDependencies": {
     "fsevents": "^2.3.3"
-  }
+  },
+  "asar": true,
+  "asarUnpack": [
+    "node_modules/**/*",
+    "assets/**/*"
+  ]
 }
