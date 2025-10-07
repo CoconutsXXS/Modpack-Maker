@@ -84,10 +84,14 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": false,
       "deleteAppDataOnUninstall": true,
-      "killAppProcessesOnUninstall": true,
-      "closeAppBeforeInstall": true
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ModpackMaker",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+      "uninstallDisplayName": "ModpackMaker",
+      "warningsAsErrors": false
     },
     "linux": {
       "target": [
