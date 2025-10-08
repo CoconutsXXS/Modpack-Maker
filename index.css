@@ -27,7 +27,6 @@ p{margin: 0;}
     color: #f3f3ff;
     background: var(--overline);
 }
-
 :is(h1, h2, h3, h4, h5, h6) { font-weight: 500; }
 
 /* Button */
