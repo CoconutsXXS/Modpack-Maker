@@ -8,95 +8,95 @@ on:
   #   branches: [ main, master ]
 
 jobs:
-  build-macos-arm64:
-    name: macOS (arm64)
-    runs-on: [self-hosted, macos, arm64]
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      ELECTRON_CACHE: ~/.cache/electron
-      ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+  # build-macos-arm64:
+  #   name: macOS (arm64)
+  #   runs-on: [self-hosted, macos, arm64]
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     ELECTRON_CACHE: ~/.cache/electron
+  #     ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+  #     - name: Install dependencies
+  #       run: npm ci
 
-      - name: Build macOS App (arm64)
-        run: |
-          npm run dist -- --mac --arm64 --publish=never
+  #     - name: Build macOS App (arm64)
+  #       run: |
+  #         npm run dist -- --mac --arm64 --publish=never
 
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-arm64
-          path: dist/
+  #     - name: Upload macOS artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: macOS-arm64
+  #         path: dist/
 
-  build-macos-x64:
-    name: macOS (x64)
-    runs-on: macos-15-intel
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      ELECTRON_CACHE: ~/.cache/electron
-      ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+  # build-macos-x64:
+  #   name: macOS (x64)
+  #   runs-on: macos-15-intel
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     ELECTRON_CACHE: ~/.cache/electron
+  #     ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+  #     - name: Install dependencies
+  #       run: npm ci
 
-      - name: Build macOS App (x64)
-        run: |
-          npm run dist -- --mac --x64 --publish=never
+  #     - name: Build macOS App (x64)
+  #       run: |
+  #         npm run dist -- --mac --x64 --publish=never
 
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-x64
-          path: dist/
+  #     - name: Upload macOS artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: macOS-x64
+  #         path: dist/
 
-  build-linux-x64:
-    name: linux (x64)
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      ELECTRON_CACHE: ~/.cache/electron
-      ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+  # build-linux-x64:
+  #   name: linux (x64)
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     ELECTRON_CACHE: ~/.cache/electron
+  #     ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+  #     - name: Install dependencies
+  #       run: npm ci
 
-      - name: Build linux App (x64)
-        run: |
-          npm run dist -- --linux --x64 --publish=never
+  #     - name: Build linux App (x64)
+  #       run: |
+  #         npm run dist -- --linux --x64 --publish=never
 
-      - name: Upload linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-x64
-          path: dist/
+  #     - name: Upload linux artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: linux-x64
+  #         path: dist/
 
   build-windows-x64:
     name: windows (x64)
@@ -120,7 +120,7 @@ jobs:
 
       - name: Build windows App (x64)
         run: |
-          npm run dist -- --win32 --x64 --publish=never
+          npm run dist -- --win --x64 --publish=never
 
       - name: Upload windows artifacts
         uses: actions/upload-artifact@v4
@@ -128,47 +128,47 @@ jobs:
           name: windows-x64
           path: dist/
 
-  build-linux-arm64:
-    name: Linux (arm64)
-    runs-on: ubuntu-22.04-arm
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      ELECTRON_CACHE: ~/.cache/electron
-      ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
-    steps:
-      - uses: actions/checkout@v4
+  # build-linux-arm64:
+  #   name: Linux (arm64)
+  #   runs-on: ubuntu-22.04-arm
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     ELECTRON_CACHE: ~/.cache/electron
+  #     ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Clean electron-builder fpm cache
-        run: rm -rf ~/.cache/electron-builder/fpm || true
+  #     - name: Clean electron-builder fpm cache
+  #       run: rm -rf ~/.cache/electron-builder/fpm || true
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            python3-distutils python3-dev python3-pip build-essential cmake pkg-config \
-            liblzma-dev p7zip-full fakeroot rpm dpkg-dev
+  #     - name: Install system deps
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y --no-install-recommends \
+  #           python3-distutils python3-dev python3-pip build-essential cmake pkg-config \
+  #           liblzma-dev p7zip-full fakeroot rpm dpkg-dev
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'npm'
 
-      - name: Install npm deps (force build-from-source)
-        run: |
-          export npm_config_build_from_source=true
-          npm ci
+  #     - name: Install npm deps (force build-from-source)
+  #       run: |
+  #         export npm_config_build_from_source=true
+  #         npm ci
 
-      - name: Rebuild native modules (sûr)
-        run: npx electron-rebuild --arch=arm64 || true
+  #     - name: Rebuild native modules (sûr)
+  #       run: npx electron-rebuild --arch=arm64 || true
 
-      - name: Build Linux App (AppImage, no publish)
-        run: npm run dist -- --linux --arm64 --publish=never
+  #     - name: Build Linux App (AppImage, no publish)
+  #       run: npm run dist -- --linux --arm64 --publish=never
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64
-          path: dist/
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: linux-arm64
+  #         path: dist/
 
   # build-windows-arm64:
   #   name: Windows (arm64)
