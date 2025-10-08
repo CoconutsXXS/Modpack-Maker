@@ -40,7 +40,7 @@ jobs:
 
   build-linux:
     name: Linux (arm64)
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
@@ -56,11 +56,27 @@ jobs:
           cache: 'npm'
 
       - name: Clean electron-builder cache
-        run: rm -rf ~/.cache/electron-builder/fpm
-
-      - name: Linux Build in Docker
         run: |
-          docker run --rm -v $PWD:/project -w /project electronuserland/builder:latest-arm64 \
+          rm -rf ~/.cache/electron-builder/fpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            rpm \
+            fakeroot \
+            dpkg \
+            ruby \
+            ruby-dev \
+            build-essential \
+            p7zip-full
+
+      - name: Build Linux App in Docker
+        run: |
+          docker run --rm -v $PWD:/project -w /project electronuserland/builder:20 \
           /bin/bash -c "npm ci && npm run dist -- --linux --arm64 --publish=never"
 
       - name: Upload Linux artifacts
