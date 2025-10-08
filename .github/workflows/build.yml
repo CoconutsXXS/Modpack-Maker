@@ -89,8 +89,6 @@ jobs:
       ELECTRON_BUILDER_CACHE: ~\AppData\Local\electron-builder\Cache
       VCPKG_ROOT: C:\vcpkg
       VCPKG_DEFAULT_TRIPLET: arm64-windows
-      npm_config_arch: arm64
-      npm_config_target_arch: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -99,109 +97,73 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Python 3.11 and Visual Studio Build Tools
+      - name: Install Python & CMake & Visual Studio Build Tools (with ARM64 components)
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           choco install -y python --version=3.11.8
           refreshenv
-          python -m pip install --upgrade pip setuptools wheel cmake
-          choco install -y visualstudio2022buildtools --package-parameters "--includeRecommended --includeOptional"
+          python -m pip install --upgrade pip setuptools wheel
+          # Install CMake via choco so cmake.exe is on PATH
+          choco install -y cmake --installargs '"ADD_CMAKE_TO_PATH=System"'
+          refreshenv
+          # Install VS Build Tools with ARM components (explicit)
+          choco install -y visualstudio2022buildtools --package-parameters '--add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041 --includeRecommended'
           refreshenv
 
-      - name: Bootstrap vcpkg and install xz (liblzma) for arm64
+      - name: Bootstrap vcpkg and install xz (liblzma) for arm64 - pwsh robust
         shell: pwsh
         run: |
-          set -e
-
-          Write-Host "=== Ensure C:\vcpkg is present and up to date ==="
-          if (-Not (Test-Path 'C:\vcpkg')) {
-            Write-Host "Cloning vcpkg (full clone, no --depth)..."
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'C:\vcpkg')) {
             git clone https://github.com/microsoft/vcpkg C:\vcpkg
           } else {
-            Write-Host "vcpkg exists - fetching latest and resetting to origin/master..."
             cd C:\vcpkg
             git fetch --all
             git reset --hard origin/master
           }
-
-          Write-Host "Contents of C:\vcpkg (top-level):"
-          Get-ChildItem C:\vcpkg -Force | Select-Object Name, Mode, LastWriteTime
-
-          Write-Host "Bootstrapping vcpkg (creates vcpkg.exe)..."
           cd C:\vcpkg
-          # bootstrap-vcpkg.bat will create vcpkg.exe
           .\bootstrap-vcpkg.bat
 
-          if (-Not (Test-Path '.\vcpkg.exe')) {
-            Write-Error "bootstrap-vcpkg.bat did not produce vcpkg.exe. Aborting."
-            exit 1
-          }
-
-          Write-Host "vcpkg.exe exists. Showing version:"
-          .\vcpkg.exe version
-
-          Write-Host "Listing ports folder (first-level):"
-          Get-ChildItem C:\vcpkg\ports | Select-Object Name | Out-String -Width 4096 | Write-Host
-
-          Write-Host "Searching for xz port via vcpkg search..."
-          .\vcpkg.exe search xz || true
-
-          # check explicitly for port folder
-          if (Test-Path 'C:\vcpkg\ports\xz') {
-            Write-Host "Port 'xz' found in C:\\vcpkg\\ports\\xz"
-          } else {
-            Write-Warning "Port 'xz' NOT found in C:\\vcpkg\\ports\\xz"
-            Write-Host "Listing the ports that seem related to 'lzma' or 'xz':"
-            Get-ChildItem C:\vcpkg\ports | Where-Object { $_.Name -match 'xz|lzma|liblzma' } | Select-Object Name | Out-String -Width 4096 | Write-Host
-            Write-Error "vcpkg port 'xz' is not present. The clone might be incomplete or the repo state is unexpected."
-            # do not exit yet — try to update vcpkg registry and retry install (best-effort)
-          }
-
-          Write-Host "Updating vcpkg registry and trying to install xz:arm64-windows..."
+          if (-not (Test-Path '.\vcpkg.exe')) { throw "vcpkg.exe missing" }
           .\vcpkg.exe update
-          $installExit = 0
-          try {
-            .\vcpkg.exe install xz:arm64-windows
-          } catch {
-            Write-Host "vcpkg install failed. Capturing error output and listing installed/ports..."
-            $installExit = 1
-            Get-ChildItem C:\vcpkg\ports | Select-Object Name | Out-String -Width 4096 | Write-Host
-            .\vcpkg.exe list | Out-String -Width 4096 | Write-Host
-          }
+          # Show a few ports for debug
+          Get-ChildItem C:\vcpkg\ports | Select-Object -First 80 Name | Format-Table -AutoSize
 
-          if ($installExit -ne 0) {
-            Write-Error "vcpkg install xz:arm64-windows failed. See logs above. As fallback, trying 'xz' via vcpkg manifest or alternative package names..."
-            # try alternate names (best-effort)
-            try {
-              .\vcpkg.exe search liblzma | Out-String -Width 4096 | Write-Host
-              .\vcpkg.exe search xzutils | Out-String -Width 4096 | Write-Host
-            } catch { }
+          # Try install; will throw on error and be displayed in logs
+          .\vcpkg.exe install xz:arm64-windows
 
-            Write-Error "If 'xz' is missing from ports, consider cloning vcpkg without depth, or use a self-hosted Windows ARM machine. Aborting."
-            exit 1
-          }
+          Write-Host "Installed libs under C:\vcpkg\installed\arm64-windows\lib"
+          Get-ChildItem C:\vcpkg\installed\arm64-windows\lib -Recurse | Select-Object Name,Length | Format-Table -AutoSize
 
-          Write-Host "vcpkg installed xz:arm64-windows successfully."
-          Write-Host "Setting environment variables (vcpkg toolchain file, include/lib paths) for subsequent build steps..."
+          # Export env
           Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"
           Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_TRIPLET=arm64-windows"
           Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
           Add-Content -Path $env:GITHUB_ENV -Value "INCLUDE=C:\vcpkg\installed\arm64-windows\include"
           Add-Content -Path $env:GITHUB_ENV -Value "LIB=C:\vcpkg\installed\arm64-windows\lib"
+          Add-Content -Path $env:GITHUB_ENV -Value "PATH=C:\vcpkg\installed\arm64-windows\bin;$env:PATH"
 
-          Write-Host "Done bootstrap & install attempt."
-      
+      - name: Force build-from-source and electron/native env (export for npm/node-gyp)
+        shell: pwsh
+        run: |
+          # compute electron target from package.json if available, fallback to 38.2.2
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $electronVer = $pkg.devDependencies.electron 2>$null -or $pkg.dependencies.electron 2>$null -or $pkg.engines.electron 2>$null
+          if (-not $electronVer) { $electronVer = '38.2.2' }
+          # strip ^ ~ if present
+          $eltarget = $electronVer -replace '^[\^~]'
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_build_from_source=true"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_runtime=electron"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_target=$eltarget"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_arch=arm64"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_disturl=https://electronjs.org/headers"
+
       - name: Clean workspace (avoid EBUSY artifacts)
         shell: pwsh
         run: |
-          git clean -ffdx
-
-      - name: Force build-from-source env vars
-        shell: pwsh
-        run: |
-          echo "npm_config_build_from_source=true" >> $env:GITHUB_ENV
-          echo "npm_config_target=38.2.2" >> $env:GITHUB_ENV   # set to your electron version if needed
-          echo "npm_config_arch=arm64" >> $env:GITHUB_ENV
+          git clean -ffdx || true
+          Start-Sleep -Seconds 2
 
       - name: Install dependencies (build native modules)
         shell: pwsh
@@ -211,7 +173,7 @@ jobs:
       - name: Rebuild native modules for Electron (ARM64)
         shell: pwsh
         run: |
-          npx electron-rebuild --version $(node -e "console.log(require('./package.json').engines && require('./package.json').engines.electron || require('./package.json').devDependencies && require('./package.json').devDependencies.electron || '')") --arch=arm64 || npx electron-rebuild --arch=arm64
+          npx electron-rebuild --arch=arm64 --force || true
 
       - name: Build Windows App (ARM64)
         shell: pwsh
