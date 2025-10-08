@@ -82,9 +82,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "YourAppName",
-      "closeAppBeforeInstall": true,
-      "allowElevation": true,
-      "runAfterFinish": true
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [
