@@ -8,7 +8,7 @@ window.addLoadingListeners = (f) => loadingListeners.push(f);
 
 window.loadInstance = async (name) =>
 {
-    if(name == '')
+    if(!name || name == '')
     {
         name = await window.popup('text', 'Name the new instance.');
         document.getElementById('instance-name').value = name;
@@ -74,10 +74,7 @@ window.loadInstance = async (name) =>
     })
 }
 
-if(instanceToLoad)
+document.addEventListener('DOMContentLoaded', () =>
 {
-    document.addEventListener('DOMContentLoaded', () =>
-    {
-        window.loadInstance(window.instanceToLoad)
-    })
-}
+    window.loadInstance(window.instanceToLoad)
+})

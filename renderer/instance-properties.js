@@ -5,9 +5,9 @@ let loaderVersionSelector = document.getElementById('minecraft-loader-version');
 let minecraftVersionSelector = document.getElementById('minecraft-version');
 let sinytraCheckbox = document.getElementById('sinytra');
 
-
 window.addInstanceListener((i) =>
 {
+    console.log("a")
     nameInput.value = i.name;
     descriptionInput.value = i.description;
     loaderSelector.value = i.loader?.name;

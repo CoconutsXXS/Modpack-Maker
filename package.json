@@ -83,7 +83,7 @@
         "nsis",
         "zip"
       ],
-      "icon": "icon/icon.png"
+      "icon": "icon/icon.ico"
     },
     "linux": {
       "maintainer": "CoconutsXXS <axel.ohresser47@gmail.com>",
