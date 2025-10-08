@@ -55,8 +55,25 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Clean electron-builder cache
+        run: |
+          rm -rf ~/.cache/electron-builder/fpm
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            rpm \
+            fakeroot \
+            dpkg \
+            ruby \
+            ruby-dev \
+            build-essential \
+            p7zip-full
+
 
       - name: Build Linux App
         run: |
