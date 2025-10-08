@@ -67,15 +67,23 @@
     "files": [
       "!immersion-intro"
     ],
-    "publish": [{
+    "publish": [
+      {
         "provider": "github",
         "owner": "CoconutsXXS",
         "repo": "Modpack-Maker"
-    }],
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "YourAppName",
+      "closeAppBeforeInstall": true,
+      "allowElevation": true,
       "runAfterFinish": true
     },
     "mac": {
@@ -90,7 +98,8 @@
         "nsis",
         "zip"
       ],
-      "icon": "icon/icon.ico"
+      "icon": "icon/icon.ico",
+      "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "linux": {
       "maintainer": "CoconutsXXS <axel.ohresser47@gmail.com>",
