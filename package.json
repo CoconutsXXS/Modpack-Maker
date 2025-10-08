@@ -1,21 +1,32 @@
 {
   "name": "modpack-maker",
   "version": "0.0.3",
+  "email": "axel.ohresser47@gmail.com",
   "description": "Lightweight app to create and launch modpack. Easy debuging that let you combine hundred of mods together while keeping the game fluid.",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "dist": "electron-builder"
   },
   "author": "Coconuts XXS",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^38.2.1",
-    "electron-builder": "^26.0.12"
-  },
-  "dependencies": {
+    "@electron-forge/cli": "^7.9.0",
+    "@electron-forge/maker-deb": "^7.9.0",
+    "@electron-forge/maker-dmg": "^7.9.0",
+    "@electron-forge/maker-rpm": "^7.9.0",
+    "@electron-forge/maker-squirrel": "^7.9.0",
+    "@electron-forge/maker-zip": "^7.9.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.9.0",
     "@electron-forge/plugin-fuses": "^7.9.0",
+    "@electron/fuses": "^1.8.0",
+    "electron": "^38.2.1",
+    "electron-rebuild": "^3.2.9"
+  },
+  "dependencies": {
     "@ghostery/adblocker-electron": "^2.12.3",
     "@msgpack/msgpack": "^3.1.2",
     "@nut-tree-fork/nut-js": "^4.2.6",
@@ -25,6 +36,7 @@
     "buffer-to-data-url": "^1.0.0",
     "chokidar": "^4.0.3",
     "cross-fetch": "^4.1.0",
+    "electron-squirrel-startup": "^1.0.1",
     "event-stream": "^4.0.1",
     "extract-zip": "^2.0.1",
     "fast-xml-parser": "^5.3.0",
@@ -48,6 +60,9 @@
     "directories": {
       "output": "dist"
     },
+    "files": [
+      "!immersion-intro"
+    ],
     "mac": {
       "target": [
         "dmg",
@@ -56,15 +71,7 @@
       "icon": "icon/icon.icns"
     },
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
+      "target": ["nsis", "zip"],
       "icon": "icon/icon.png"
     },
     "linux": {
