@@ -40,7 +40,7 @@ jobs:
 
   build-macos-x64:
     name: macOS (x64)
-    runs-on: [macos, x64]
+    runs-on: macos-15-intel
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
@@ -70,7 +70,7 @@ jobs:
 
   build-linux-x64:
     name: linux (x64)
-    runs-on: [linux, x64]
+    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
@@ -100,7 +100,7 @@ jobs:
 
   build-windows-x64:
     name: windows (x64)
-    runs-on: [windows, x64]
+    runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
