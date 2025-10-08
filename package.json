@@ -9,7 +9,7 @@
     "build": "electron-builder",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "dist": "electron-builder"
+    "dist": "electron-builder --publish=never"
   },
   "author": "Coconuts XXS",
   "license": "MIT",
