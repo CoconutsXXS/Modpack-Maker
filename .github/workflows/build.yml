@@ -12,7 +12,7 @@ jobs:
     name: macOS (arm64)
     runs-on: [self-hosted, macos, arm64]
     env:
-      GH_TOKEN: ""
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
     steps:
@@ -42,7 +42,7 @@ jobs:
     name: Linux (arm64)
     runs-on: ubuntu-22.04-arm
     env:
-      GH_TOKEN: ""
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
     steps:
@@ -72,7 +72,7 @@ jobs:
     name: Windows (arm64)
     runs-on: windows-11-arm
     env:
-      GH_TOKEN: ""
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~\AppData\Local\electron\Cache
       ELECTRON_BUILDER_CACHE: ~\AppData\Local\electron-builder\Cache
     steps:

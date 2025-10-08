@@ -66,6 +66,11 @@
     "files": [
       "!immersion-intro"
     ],
+    "publish": [{
+        "provider": "github",
+        "owner": "CoconutsXXS",
+        "repo": "Modpack-Maker"
+    }],
     "mac": {
       "target": [
         "dmg",
