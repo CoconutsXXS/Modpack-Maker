@@ -162,9 +162,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Rebuild native modules for Electron (x64)
+        run: |
+          npx electron-rebuild --arch=x64 --force
+
       - name: Build windows App (x64)
         run: |
-          npm run dist -- --win --x64 --force --publish=never --build-from-source
+          npm run dist -- --win --x64 --publish=never
 
       - name: Upload windows artifacts
         uses: actions/upload-artifact@v4
