@@ -88,8 +88,7 @@
     "linux": {
       "maintainer": "CoconutsXXS <axel.ohresser47@gmail.com>",
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "icon": "icon/icon.png"
     }

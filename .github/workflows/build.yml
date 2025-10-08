@@ -42,48 +42,42 @@ jobs:
     name: Linux (arm64)
     runs-on: ubuntu-22.04
     env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
+      - name: Clean electron-builder fpm cache (host)
+        run: rm -rf ~/.cache/electron-builder/fpm || true
 
-      - name: Clean electron-builder cache
+      - name: Linux Build in Docker (arm64) - install dev deps + build
         run: |
-          rm -rf ~/.cache/electron-builder/fpm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            rpm \
-            fakeroot \
-            dpkg \
-            ruby \
-            ruby-dev \
-            build-essential \
-            p7zip-full
-
-      - name: Build Linux App in Docker
-        run: |
-          docker run --rm -v $PWD:/project -w /project electronuserland/builder:20 \
-          /bin/bash -c "npm ci && npm run dist -- --linux --arm64 --publish=never"
+          docker run --rm --platform linux/arm64 -v $PWD:/project -w /project electronuserland/builder:20 \
+          /bin/bash -lc "\
+            set -euo pipefail && \
+            export DEBIAN_FRONTEND=noninteractive && \
+            apt-get update && \
+            apt-get install -y --no-install-recommends \
+              python3-distutils python3-dev python3-pip build-essential cmake pkg-config \
+              liblzma-dev p7zip-full rpm fakeroot dpkg-dev && \
+            # ensure pip/setuptools/wheel are present if needed by some modules \
+            python3 -m pip install --upgrade pip setuptools wheel || true && \
+            # force native builds if prebuilt binaries are absent; ensure ARM64 target \
+            export npm_config_build_from_source=true npm_config_arch=arm64 npm_config_target_arch=arm64 && \
+            npm ci && \
+            # optional: rebuild native modules for electron (safer) \
+            npx electron-rebuild --arch=arm64 || true && \
+            # build (override publish) \
+            npm run dist -- --linux --arm64 --publish=never \
+          "
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-arm64
+          name: linux-arm64
           path: dist/
+
 
   build-windows:
     name: Windows (arm64)
@@ -92,34 +86,68 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~\AppData\Local\electron\Cache
       ELECTRON_BUILDER_CACHE: ~\AppData\Local\electron-builder\Cache
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_DEFAULT_TRIPLET: arm64-windows
+      npm_config_arch: arm64
+      npm_config_target_arch: arm64
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Python and Visual Studio build tools
-        shell: pwsh
-        run: |
-          choco install python --version=3.11.8 -y
-          refreshenv
-          python -m pip install --upgrade pip setuptools wheel
-          # Visual Studio Build Tools - includes MSBuild/C++ toolchain
-          choco install visualstudio2022buildtools -y --includeRecommended --includeOptional
-          refreshenv
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install Python 3.11 and Visual Studio Build Tools
+        shell: pwsh
+        run: |
+          choco install -y python --version=3.11.8
+          refreshenv
+          python -m pip install --upgrade pip setuptools wheel cmake
+          choco install -y visualstudio2022buildtools --package-parameters "--includeRecommended --includeOptional"
+          refreshenv
 
-      - name: Rebuild native modules for ARM64
-        run: npx electron-rebuild --arch=arm64
+      - name: Bootstrap vcpkg and install xz (liblzma) for arm64
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path C:\vcpkg)) {
+            git clone https://github.com/microsoft/vcpkg C:\vcpkg
+            & C:\vcpkg\bootstrap-vcpkg.bat
+          }
+          C:\vcpkg\vcpkg.exe install xz:arm64-windows
+          # make vcpkg toolchain path available (used by CMake)
+          $env:CMAKE_TOOLCHAIN_FILE = "C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          echo "CMAKE_TOOLCHAIN_FILE=$env:CMAKE_TOOLCHAIN_FILE" >> $env:GITHUB_ENV
+
+      - name: Clean workspace (avoid EBUSY artifacts)
+        shell: pwsh
+        run: |
+          git clean -ffdx
+
+      - name: Force build-from-source env vars
+        shell: pwsh
+        run: |
+          echo "npm_config_build_from_source=true" >> $env:GITHUB_ENV
+          echo "npm_config_target=38.2.2" >> $env:GITHUB_ENV   # set to your electron version if needed
+          echo "npm_config_arch=arm64" >> $env:GITHUB_ENV
+
+      - name: Install dependencies (build native modules)
+        shell: pwsh
+        run: |
+          npm ci
+
+      - name: Rebuild native modules for Electron (ARM64)
+        shell: pwsh
+        run: |
+          npx electron-rebuild --version $(node -e "console.log(require('./package.json').engines && require('./package.json').engines.electron || require('./package.json').devDependencies && require('./package.json').devDependencies.electron || '')") --arch=arm64 || npx electron-rebuild --arch=arm64
 
       - name: Build Windows App (ARM64)
-        run: npm run dist -- --win --arm64 --publish=never
+        shell: pwsh
+        run: |
+          npm run dist -- --win --arm64 --publish=never
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: Windows-arm64
           path: dist/
