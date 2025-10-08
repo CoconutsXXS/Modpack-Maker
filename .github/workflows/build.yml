@@ -110,15 +110,86 @@ jobs:
       - name: Bootstrap vcpkg and install xz (liblzma) for arm64
         shell: pwsh
         run: |
-          if (-Not (Test-Path C:\vcpkg)) {
-            git clone https://github.com/microsoft/vcpkg C:\vcpkg
-            & C:\vcpkg\bootstrap-vcpkg.bat
-          }
-          C:\vcpkg\vcpkg.exe install xz:arm64-windows
-          # make vcpkg toolchain path available (used by CMake)
-          $env:CMAKE_TOOLCHAIN_FILE = "C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
-          echo "CMAKE_TOOLCHAIN_FILE=$env:CMAKE_TOOLCHAIN_FILE" >> $env:GITHUB_ENV
+          set -e
 
+          Write-Host "=== Ensure C:\vcpkg is present and up to date ==="
+          if (-Not (Test-Path 'C:\vcpkg')) {
+            Write-Host "Cloning vcpkg (full clone, no --depth)..."
+            git clone https://github.com/microsoft/vcpkg C:\vcpkg
+          } else {
+            Write-Host "vcpkg exists - fetching latest and resetting to origin/master..."
+            cd C:\vcpkg
+            git fetch --all
+            git reset --hard origin/master
+          }
+
+          Write-Host "Contents of C:\vcpkg (top-level):"
+          Get-ChildItem C:\vcpkg -Force | Select-Object Name, Mode, LastWriteTime
+
+          Write-Host "Bootstrapping vcpkg (creates vcpkg.exe)..."
+          cd C:\vcpkg
+          # bootstrap-vcpkg.bat will create vcpkg.exe
+          .\bootstrap-vcpkg.bat
+
+          if (-Not (Test-Path '.\vcpkg.exe')) {
+            Write-Error "bootstrap-vcpkg.bat did not produce vcpkg.exe. Aborting."
+            exit 1
+          }
+
+          Write-Host "vcpkg.exe exists. Showing version:"
+          .\vcpkg.exe version
+
+          Write-Host "Listing ports folder (first-level):"
+          Get-ChildItem C:\vcpkg\ports | Select-Object Name | Out-String -Width 4096 | Write-Host
+
+          Write-Host "Searching for xz port via vcpkg search..."
+          .\vcpkg.exe search xz || true
+
+          # check explicitly for port folder
+          if (Test-Path 'C:\vcpkg\ports\xz') {
+            Write-Host "Port 'xz' found in C:\\vcpkg\\ports\\xz"
+          } else {
+            Write-Warning "Port 'xz' NOT found in C:\\vcpkg\\ports\\xz"
+            Write-Host "Listing the ports that seem related to 'lzma' or 'xz':"
+            Get-ChildItem C:\vcpkg\ports | Where-Object { $_.Name -match 'xz|lzma|liblzma' } | Select-Object Name | Out-String -Width 4096 | Write-Host
+            Write-Error "vcpkg port 'xz' is not present. The clone might be incomplete or the repo state is unexpected."
+            # do not exit yet — try to update vcpkg registry and retry install (best-effort)
+          }
+
+          Write-Host "Updating vcpkg registry and trying to install xz:arm64-windows..."
+          .\vcpkg.exe update
+          $installExit = 0
+          try {
+            .\vcpkg.exe install xz:arm64-windows
+          } catch {
+            Write-Host "vcpkg install failed. Capturing error output and listing installed/ports..."
+            $installExit = 1
+            Get-ChildItem C:\vcpkg\ports | Select-Object Name | Out-String -Width 4096 | Write-Host
+            .\vcpkg.exe list | Out-String -Width 4096 | Write-Host
+          }
+
+          if ($installExit -ne 0) {
+            Write-Error "vcpkg install xz:arm64-windows failed. See logs above. As fallback, trying 'xz' via vcpkg manifest or alternative package names..."
+            # try alternate names (best-effort)
+            try {
+              .\vcpkg.exe search liblzma | Out-String -Width 4096 | Write-Host
+              .\vcpkg.exe search xzutils | Out-String -Width 4096 | Write-Host
+            } catch { }
+
+            Write-Error "If 'xz' is missing from ports, consider cloning vcpkg without depth, or use a self-hosted Windows ARM machine. Aborting."
+            exit 1
+          }
+
+          Write-Host "vcpkg installed xz:arm64-windows successfully."
+          Write-Host "Setting environment variables (vcpkg toolchain file, include/lib paths) for subsequent build steps..."
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_TRIPLET=arm64-windows"
+          Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          Add-Content -Path $env:GITHUB_ENV -Value "INCLUDE=C:\vcpkg\installed\arm64-windows\include"
+          Add-Content -Path $env:GITHUB_ENV -Value "LIB=C:\vcpkg\installed\arm64-windows\lib"
+
+          Write-Host "Done bootstrap & install attempt."
+      
       - name: Clean workspace (avoid EBUSY artifacts)
         shell: pwsh
         run: |
