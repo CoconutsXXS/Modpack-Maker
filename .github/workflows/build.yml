@@ -38,8 +38,8 @@ jobs:
           path: dist/
 
   build-linux:
-    name: Linux (x64)
-    runs-on: ubuntu-latest
+    name: Linux (arm64)
+    runs-on: ubuntu-22.04-arm
     env:
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
@@ -63,12 +63,12 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Linux-x64
+          name: Linux-arm64
           path: dist/
 
   build-windows:
-    name: Windows (x64)
-    runs-on: windows-latest
+    name: Windows (arm64)
+    runs-on: windows-11-arm
     env:
       ELECTRON_CACHE: ~\AppData\Local\electron\Cache
       ELECTRON_BUILDER_CACHE: ~\AppData\Local\electron-builder\Cache
@@ -92,5 +92,5 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-x64
+          name: Windows-arm64
           path: dist/
