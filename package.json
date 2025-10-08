@@ -61,7 +61,8 @@
     "appId": "fr.coconuts.modpackmaker",
     "productName": "ModpackMaker",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
       "!immersion-intro"
@@ -71,6 +72,12 @@
         "owner": "CoconutsXXS",
         "repo": "Modpack-Maker"
     }],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
+    },
     "mac": {
       "target": [
         "dmg",

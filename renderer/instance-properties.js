@@ -7,7 +7,6 @@ let sinytraCheckbox = document.getElementById('sinytra');
 
 window.addInstanceListener((i) =>
 {
-    console.log("a")
     nameInput.value = i.name;
     descriptionInput.value = i.description;
     loaderSelector.value = i.loader?.name;
@@ -42,6 +41,7 @@ window.addInstanceListener((i) =>
             lastG.appendChild(e);
         }
     
+        // if(!i.version.number){ i.version.number = data.result[0]; return}
         minecraftVersionSelector.value = i.version.number
     })
     

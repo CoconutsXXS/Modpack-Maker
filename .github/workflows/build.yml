@@ -105,6 +105,8 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+      npm_config_arch: x64
+      npm_config_target_arch: x64
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -120,7 +122,7 @@ jobs:
 
       - name: Build windows App (x64)
         run: |
-          npm run dist -- --win --x64 --publish=never
+          npm run dist -- --win --x64 --force --publish=never --build-from-source
 
       - name: Upload windows artifacts
         uses: actions/upload-artifact@v4
