@@ -26,7 +26,7 @@ function locateApp(cb)
 
 	if (p === "darwin")
 	{
-		exec(`mdfind "kMDItemCFBundleIdentifier == '${TARGET.mac}'"`, (err, out) => cb(err, out.trim() || null));
+		exec(`mdfind "kMDItemCFBundleIdentifier == '${TARGET.mac}'"`, (err, out) => cb(err, out.trim().split("\n")[0].trim() || null));
 	}
 	else if(p === "win32")
 	{
@@ -40,15 +40,15 @@ function locateApp(cb)
 }
 async function launchApp(silent = true)
 {
-	if(silent)
-	{
-		let data = JSON.parse(await fs.readFile(path.join(baseData.appData, ".browser-requests.json")));
-		data.push
-		({
-			type: "silent"
-		});
-		await fs.writeFile(path.join(baseData.appData, ".browser-requests.json"), JSON.stringify(data));
-	}
+	// if(silent)
+	// {
+	// 	let data = JSON.parse(await fs.readFile(path.join(baseData.appData, ".browser-requests.json")));
+	// 	data.push
+	// 	({
+	// 		type: "silent"
+	// 	});
+	// 	await fs.writeFile(path.join(baseData.appData, ".browser-requests.json"), JSON.stringify(data));
+	// }
 
 	locateApp((err, path) =>
 	{

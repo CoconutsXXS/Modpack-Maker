@@ -75,14 +75,12 @@
       }
     ],
     "nsis": {
+      "include": "build/installer.nsh",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "YourAppName",
-      "include": "build/installer.nsh"
+      "shortcutName": "ModpackMaker"
     },
     "mac": {
       "target": [

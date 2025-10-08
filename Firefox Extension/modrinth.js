@@ -142,7 +142,7 @@ setInterval(async () =>
 let downloadButton;
 setInterval(async () =>
 {
-    if(!window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
+    if(!window.location.href.startsWith("https://modrinth.com/datapack/") && !window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
     if(document.contains(downloadButton) || !document.querySelector(".gap-x-8 > div:nth-child(2) > div.hidden:nth-child(1)")){return;}
     
     downloadButton = document.querySelector(".gap-x-8 > div:nth-child(2) > div.hidden:nth-child(1)").cloneNode(true);
@@ -327,7 +327,7 @@ setInterval(async () =>
 let testButton;
 setInterval(async () =>
 {
-    if(!window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
+    if(!window.location.href.startsWith("https://modrinth.com/datapack/") && !window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
     if(document.contains(testButton) || !document.querySelector(".gap-x-8 > div:nth-child(2) > div.hidden:nth-child(1)")){return;}
     
     testButton = document.querySelector(".gap-x-8 > div:nth-child(2) > div.hidden:nth-child(1)").cloneNode(true);
@@ -439,17 +439,15 @@ setInterval(async () =>
 
             setTimeout(() => {testButton.querySelector("button").style.backgroundPositionX = "-3px"}, 1000);
 
-            browser.runtime.sendMessage({ action: "app", content:
-            {
-                name: "launch",
-                value: {}
-            }});
-
             let data = await browser.runtime.sendMessage({ action: "app", content:
             {
                 name: "read",
                 value: ".browser-requests.json"
             }});
+            data.push
+            ({
+                type: "silent"
+            });
             data.push
             ({
                 type: "ephemeral-instance",
@@ -465,10 +463,16 @@ setInterval(async () =>
                 },
                 mods
             });
-            await browser.runtime.sendMessage({ action: "app", content:
+            browser.runtime.sendMessage({ action: "app", content:
             {
                 name: "write",
                 value: {path: ".browser-requests.json", content: JSON.stringify(data)}
+            }});
+
+            browser.runtime.sendMessage({ action: "app", content:
+            {
+                name: "launch",
+                value: {}
             }});
         }
 
@@ -481,7 +485,7 @@ setInterval(async () =>
 let saveButton;
 setInterval(async () =>
 {
-    if(!window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
+    if(!window.location.href.startsWith("https://modrinth.com/datapack/") && !window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
     if(!document.contains(downloadButton) || document.contains(saveButton) || !document.querySelector(".gap-x-8 > div:nth-child(2) > div:nth-child(4)")){return;}
 
     saveButton = document.querySelector(".gap-x-8 > div:nth-child(2) > div:nth-child(4)").cloneNode(true);
@@ -540,7 +544,7 @@ let packButton;
 setInterval(async () =>
 {
     let target = document.querySelector(".gap-x-8 > div:nth-child(2) > div:nth-child(5)");
-    if(!window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
+    if(!window.location.href.startsWith("https://modrinth.com/datapack/") && !window.location.href.startsWith("https://modrinth.com/mod/") && !window.location.href.startsWith("https://modrinth.com/resourcepack/") && !window.location.href.startsWith("https://modrinth.com/shader/")){return;}
     if(!document.contains(downloadButton) || document.contains(packButton) || !target){return;}
 
     packButton = target.cloneNode(true);
@@ -756,7 +760,9 @@ async function allModrinthVersion(link)
 {
     let slug = link.split('/')[link.split('/').length-1];
     const versions = (await (await fetch('https://api.modrinth.com/v2/project/'+slug+'/version')).json())
-    .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); });
+    .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); }).filter(v=>!v.loaders.includes("datapack"));
+
+    console.log(versions)
 
     return versions;
 }

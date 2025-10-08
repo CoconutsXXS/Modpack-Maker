@@ -1468,6 +1468,13 @@ async function installLoader(root, loader, version, listeners = null)
     let file = null;
     let targetFile = null;
 
+    let win = BrowserWindow.getAllWindows()[0];
+    if(win==undefined)
+    {
+        win = selectorWindow = new BrowserWindow({});
+        win.hide();
+    }
+
     // Install Loader
     switch(loader.name)
     {
@@ -1494,7 +1501,7 @@ async function installLoader(root, loader, version, listeners = null)
             if(parseInt(version.number.split('.')[1]) <= 12 && (version.number.split('-')[0] !== '1.12.2' || (parseInt(version.number.split('.').pop()) <= 2847)))
             { link += '-universal.jar'; } else { link += '-installer.jar';  }
             
-            await download(BrowserWindow.getAllWindows()[0], link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
+            await download(win, link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
@@ -1524,7 +1531,7 @@ async function installLoader(root, loader, version, listeners = null)
             let link = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${loader.version}/neoforge-${loader.version}-installer.jar`;
             
             console.log(targetPath, targetName)
-            await download(BrowserWindow.getAllWindows()[0], link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
+            await download(win, link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
@@ -1545,7 +1552,7 @@ async function installLoader(root, loader, version, listeners = null)
 
             const link = `https://meta.fabricmc.net/v2/versions/loader/${version.number}/${loader.version}/profile/json`;
 
-            await download(BrowserWindow.getAllWindows()[0], link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
+            await download(win, link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
@@ -1563,6 +1570,8 @@ async function installLoader(root, loader, version, listeners = null)
         if(!fs.existsSync(targetFile.substring(0, targetFile.lastIndexOf('/')))){fs.mkdirSync(targetFile.substring(0, targetFile.lastIndexOf('/')), {recursive:true});}
         fs.copyFileSync(file, targetFile);
     }
+
+    win.close();
 
     return version.custom;
 }

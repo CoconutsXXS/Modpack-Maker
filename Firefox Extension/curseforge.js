@@ -495,17 +495,15 @@ function parseXml(xml, arrayTags)
                     }
                 }
 
-                browser.runtime.sendMessage({ action: "app", content:
-                {
-                    name: "launch",
-                    value: {}
-                }});
-
                 let data = await browser.runtime.sendMessage({ action: "app", content:
                 {
                     name: "read",
                     value: ".browser-requests.json"
                 }});
+                data.push
+                ({
+                    type: "silent"
+                });
                 data.push
                 ({
                     type: "ephemeral-instance",
@@ -525,6 +523,12 @@ function parseXml(xml, arrayTags)
                 {
                     name: "write",
                     value: {path: ".browser-requests.json", content: JSON.stringify(data)}
+                }});
+
+                browser.runtime.sendMessage({ action: "app", content:
+                {
+                    name: "launch",
+                    value: {}
                 }});
             }
         }

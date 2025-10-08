@@ -17,7 +17,7 @@ watcher.on('all', (e, p, s) =>
         
     }
     // Add (or init)
-    if(e==='add' || e==="change")
+    if(e=='add' || e=="change")
     {
         for(let r of JSON.parse(fs.readFileSync(config.directories.browserRequests)))
         {
