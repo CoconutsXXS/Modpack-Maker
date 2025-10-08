@@ -40,44 +40,44 @@ jobs:
 
   build-linux:
     name: Linux (arm64)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-arm
     env:
       ELECTRON_CACHE: ~/.cache/electron
       ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Clean electron-builder fpm cache (host)
+      - name: Clean electron-builder fpm cache
         run: rm -rf ~/.cache/electron-builder/fpm || true
 
-      - name: Linux Build in Docker (arm64) - install dev deps + build
+      - name: Install system deps
         run: |
-          docker run --rm --platform linux/arm64 -v $PWD:/project -w /project electronuserland/builder:20 \
-          /bin/bash -lc "\
-            set -euo pipefail && \
-            export DEBIAN_FRONTEND=noninteractive && \
-            apt-get update && \
-            apt-get install -y --no-install-recommends \
-              python3-distutils python3-dev python3-pip build-essential cmake pkg-config \
-              liblzma-dev p7zip-full rpm fakeroot dpkg-dev && \
-            # ensure pip/setuptools/wheel are present if needed by some modules \
-            python3 -m pip install --upgrade pip setuptools wheel || true && \
-            # force native builds if prebuilt binaries are absent; ensure ARM64 target \
-            export npm_config_build_from_source=true npm_config_arch=arm64 npm_config_target_arch=arm64 && \
-            npm ci && \
-            # optional: rebuild native modules for electron (safer) \
-            npx electron-rebuild --arch=arm64 || true && \
-            # build (override publish) \
-            npm run dist -- --linux --arm64 --publish=never \
-          "
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-distutils python3-dev python3-pip build-essential cmake pkg-config \
+            liblzma-dev p7zip-full fakeroot rpm dpkg-dev
 
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install npm deps (force build-from-source)
+        run: |
+          export npm_config_build_from_source=true
+          npm ci
+
+      - name: Rebuild native modules (sûr)
+        run: npx electron-rebuild --arch=arm64 || true
+
+      - name: Build Linux App (AppImage, no publish)
+        run: npm run dist -- --linux --arm64 --publish=never
+
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-arm64
           path: dist/
-
 
   build-windows:
     name: Windows (arm64)
