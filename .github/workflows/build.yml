@@ -111,32 +111,53 @@ jobs:
           choco install -y visualstudio2022buildtools --package-parameters '--add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041 --includeRecommended'
           refreshenv
 
-      - name: Bootstrap vcpkg and install xz (liblzma) for arm64 - pwsh robust
+      - name: Bootstrap vcpkg and install liblzma (liblzma provides liblzma/liblzma.lib)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          # clone/update vcpkg (full clone, avoid shallow)
           if (-not (Test-Path 'C:\vcpkg')) {
             git clone https://github.com/microsoft/vcpkg C:\vcpkg
           } else {
-            cd C:\vcpkg
+            Set-Location 'C:\vcpkg'
             git fetch --all
             git reset --hard origin/master
           }
-          cd C:\vcpkg
+
+          Set-Location 'C:\vcpkg'
+
+          # ensure cmake is available (bootstrap needs it)
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            choco install -y cmake --installargs '"ADD_CMAKE_TO_PATH=System"'
+            refreshenv
+          }
+
+          Write-Host "Bootstrapping vcpkg..."
           .\bootstrap-vcpkg.bat
 
-          if (-not (Test-Path '.\vcpkg.exe')) { throw "vcpkg.exe missing" }
+          if (-not (Test-Path '.\vcpkg.exe')) { throw "vcpkg.exe missing after bootstrap" }
+
+          Write-Host "vcpkg version:"
+          .\vcpkg.exe version
+
+          Write-Host "Searching for liblzma/xz ports (diagnostic):"
+          .\vcpkg.exe search liblzma || Write-Host "liblzma not found"
+          .\vcpkg.exe search xz || Write-Host "xz not found"
+
+          Write-Host "Installing liblzma for arm64..."
           .\vcpkg.exe update
-          # Show a few ports for debug
-          Get-ChildItem C:\vcpkg\ports | Select-Object -First 80 Name | Format-Table -AutoSize
+          .\vcpkg.exe install liblzma:arm64-windows
 
-          # Try install; will throw on error and be displayed in logs
-          .\vcpkg.exe install xz:arm64-windows
+          Write-Host "Installed libs under C:\vcpkg\installed\arm64-windows\lib (listing):"
+          if (Test-Path 'C:\vcpkg\installed\arm64-windows\lib') {
+            Get-ChildItem 'C:\vcpkg\installed\arm64-windows\lib' -Recurse | Select-Object Name,Length | Format-Table -AutoSize
+          } else {
+            Write-Error "C:\vcpkg\installed\arm64-windows\lib not found after install"
+            exit 1
+          }
 
-          Write-Host "Installed libs under C:\vcpkg\installed\arm64-windows\lib"
-          Get-ChildItem C:\vcpkg\installed\arm64-windows\lib -Recurse | Select-Object Name,Length | Format-Table -AutoSize
-
-          # Export env
+          # export env vars so MSBuild/node-gyp can find the libs/headers
           Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"
           Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_TRIPLET=arm64-windows"
           Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
@@ -144,26 +165,21 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "LIB=C:\vcpkg\installed\arm64-windows\lib"
           Add-Content -Path $env:GITHUB_ENV -Value "PATH=C:\vcpkg\installed\arm64-windows\bin;$env:PATH"
 
-      - name: Force build-from-source and electron/native env (export for npm/node-gyp)
-        shell: pwsh
-        run: |
-          # compute electron target from package.json if available, fallback to 38.2.2
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $electronVer = $pkg.devDependencies.electron 2>$null -or $pkg.dependencies.electron 2>$null -or $pkg.engines.electron 2>$null
-          if (-not $electronVer) { $electronVer = '38.2.2' }
-          # strip ^ ~ if present
-          $eltarget = $electronVer -replace '^[\^~]'
-          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_build_from_source=true"
-          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_runtime=electron"
-          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_target=$eltarget"
-          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_arch=arm64"
-          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_disturl=https://electronjs.org/headers"
-
+          Write-Host "vcpkg liblzma installation done."
       - name: Clean workspace (avoid EBUSY artifacts)
         shell: pwsh
         run: |
           git clean -ffdx || true
           Start-Sleep -Seconds 2
+
+      - name: Export npm/node-gyp env for electron ARM64
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_build_from_source=true"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_runtime=electron"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_target=38.2.2"   # adapte à ta version d'Electron si besoin
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_arch=arm64"
+          Add-Content -Path $env:GITHUB_ENV -Value "npm_config_disturl=https://electronjs.org/headers"
 
       - name: Install dependencies (build native modules)
         shell: pwsh
