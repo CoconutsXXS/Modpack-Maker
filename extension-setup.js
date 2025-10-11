@@ -5,7 +5,7 @@ const path = require("path");
 const os = require("os");
 const config = require('./config');
 
-const version = "0.1.21";
+const version = "0.1.22";
 
 module.exports = 
 {
@@ -60,7 +60,7 @@ module.exports =
 
         if(checkedVersion){return}
 
-        const addonPath = path.join(__dirname, "Firefox\ Extension/web-ext-artifacts/modpack_maker-"+version+".xpi");
+        const addonPath = path.join(__dirname, "modpack_maker.xpi");
 
         // Construct the "file://" URL (Firefox understands this)
         const fileUrl = `file://${addonPath.replace(/\\/g, "/")}`;

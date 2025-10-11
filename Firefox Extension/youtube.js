@@ -114,7 +114,7 @@ async function modify()
     // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button").click(); }
 
     // Chapter
-    if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click();}
+    if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
     if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
     {
         // if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
@@ -367,7 +367,7 @@ async function handleDescription()
             let doc = new DOMParser().parseFromString(await (await fetch(url.href)).text(), "text/html");;
             for(let c of doc.querySelector("#content").childNodes)
             {
-                if(c.nodeName != "DIV"){continue;}
+                if(c.nodeName != "DIV" || !c.querySelector("span") || !c.querySelector("a")){continue;}
                 c.querySelector("span").innerText
                 final.push
                 ({
@@ -633,7 +633,8 @@ let intervalFunction = () =>
     let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
 
     clearInterval(interval);
-    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
+
+    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && !(description.toLowerCase().includes("minecraft") && description.toLowerCase().includes(" mod")))
     {
         return;
     }

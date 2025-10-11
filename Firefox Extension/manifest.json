@@ -3,7 +3,7 @@
   "description": "Integrated with Modpack Maker. View, save and test Minecraft mods from different websites. (youtube, modrinth, curseforge)",
   "manifest_version": 2,
   "name": "Modpack Maker",
-  "version": "0.1.21",
+  "version": "0.1.22",
 
   "permissions": [
     "tabs",
