@@ -361,6 +361,8 @@ class Instance
 
         // Launch
         let process = await launcher.launch(options);
+        process.on("error", (e) => listeners.log('error', e))
+        process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
         let pid = process?.pid;
         let windowSource = null;
 
