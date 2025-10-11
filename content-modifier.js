@@ -13,6 +13,7 @@ const mcFunction = require("@spyglassmc/mcfunction");
 const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
 const lodash = require("lodash")
 const path = require("path")
+const {sep} = require("path")
 var chokidar = require('chokidar');
 const decompiler = require("./decompiler")
 
@@ -126,7 +127,7 @@ async function readZipEntry(path, value)
             parsed: toml.parse(value.replaceAll(/^([ \t]*)([A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+)([ \t]*)=/gm, (match, indent, key, space) => `${indent}"${key}"${space}=`))
         }
     }
-    else if(!path.endsWith("/") && value.arrayBuffer){value = Buffer.from(await value.arrayBuffer());}
+    else if(!path.endsWith(sep) && value.arrayBuffer){value = Buffer.from(await value.arrayBuffer());}
 
     return value;
 }
@@ -234,11 +235,11 @@ async function expandPaths(obj, modifyValue = (path, value) => {return value;})
 
     const result = {};
 
-    for (let [path, value] of Object.entries(obj))
+    for (let [p, value] of Object.entries(obj))
     {
-        value = await modifyValue(path, value);
+        value = await modifyValue(p, value);
 
-        const keys = path.split('/');
+        const keys = p.split(path.sep);
         let current = result;
 
         keys.forEach((key, index) =>
@@ -345,9 +346,9 @@ module.exports =
         let registeredMods = [];
         for(let [k, v] of Object.entries(jar).filter(([k,v]) => (k.startsWith("data/") && k!="data/") || (k.startsWith("assets/") && k!="assets/")))
         {
-            if(registeredMods.find(m => m.id == k.split("/")[1]) != undefined){continue;}
+            if(registeredMods.find(m => m.id == k.split(path.sep)[1]) != undefined){continue;}
 
-            registeredMods.push({id: k.split("/")[1], displayName: k.split("/")[1]})
+            registeredMods.push({id: k.split(sep)[1], displayName: k.split(sep)[1]})
         }
 
         // Retrive by File
@@ -374,12 +375,12 @@ module.exports =
 
         for(let [p, d] of Object.entries(jar).filter(([k,v]) => !k.startsWith("META-INF/") && !k.startsWith("resourcepacks/") && !k.startsWith("packs/") && !k.startsWith("assets/") && !k.startsWith("data/")))
         {
-            if(p.split("/").length >= 3 && p.split("/")[2].length > 0)
+            if(p.split(sep).length >= 3 && p.split(sep)[2].length > 0)
             {
                 let i = "";
                 for (let index = 0; index < 3; index++)
                 {
-                    i += (index==0?"":".")+p.split("/")[index];
+                    i += (index==0?"":".")+p.split(sep)[index];
                 }
                 if(registeredMods.find(m=>m.longId==i)!=undefined){continue;}
 
@@ -387,7 +388,7 @@ module.exports =
                 let biggest = {index: -1, similarity: 0}
                 for (let i = 0; i < registeredMods.length; i++)
                 {
-                    let s = similarity(registeredMods[i].id, p.split("/")[2]);
+                    let s = similarity(registeredMods[i].id, p.split(sep)[2]);
                     if(biggest.similarity < s)
                     { biggest = {index: i, similarity: s}; }
                 }
@@ -402,18 +403,18 @@ module.exports =
         for(let m of registeredMods)
         {
             // Data
-            let data = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("data/"+m.id+"/") && k!="data/"+m.id+"/")), async (path, value) => { return readZipEntry(path, value) }));
+            let data = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("data"+sep+m.id+sep) && k!="data"+sep+m.id+sep)), async (path, value) => { return readZipEntry(path, value) }));
             if(data.data){data = data.data[m.id]}
 
             // Assets
-            let assets = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("assets/"+m.id+"/") && k!="assets/"+m.id+"/")), async (path, value) => { return readZipEntry(path, value) }));
+            let assets = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith("assets"+sep+m.id+sep) && k!="assets"+sep+m.id+sep)), async (path, value) => { return readZipEntry(path, value) }));
             if(assets.assets){assets = assets.assets[m.id]}
 
             // Classes
             let classes = {};
             if(m.longId != undefined)
             {
-                classes = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith(m.longId.replaceAll(".", "/")))), async (path, value) => { return readZipEntry(path, value) }))[m.longId.split(".")[0]][m.longId.split(".")[1]][m.longId.split(".")[2]];
+                classes = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) => k.startsWith(m.longId.replaceAll(".", sep)))), async (path, value) => { return readZipEntry(path, value) }))[m.longId.split(".")[0]][m.longId.split(".")[1]][m.longId.split(".")[2]];
             }
 
             mods.push
@@ -432,7 +433,7 @@ module.exports =
 
         let otherData = (await expandPaths(Object.fromEntries(Object.entries(jar).filter(([k,v]) =>
         {
-            for(let {id} of registeredMods) { if(id && id.split('.')[0] == k.split("/")[0]){return false;} }
+            for(let {id} of registeredMods) { if(id && id.split('.')[0] == k.split(sep)[0]){return false;} }
             return !k.startsWith("data/") && !k.startsWith("assets/") && !k.startsWith("classes/")
         })), async (path, value) => { return readZipEntry(path, value) }));
 
@@ -662,7 +663,7 @@ module.exports =
             {
                 for(let [p, v] of Object.entries(jar))
                 {
-                    if(p.endsWith(".class") && !p.includes("/")) { jar[p] = null; delete jar[p]; }
+                    if(p.endsWith(".class") && !p.includes(sep)) { jar[p] = null; delete jar[p]; }
                 }
             }
 
@@ -684,8 +685,8 @@ module.exports =
         }
 
 
-        let realPath = "/"+id.split(":")[0];
-        for(let part of id.split(":")[1].split("/")){realPath+="/"+part}
+        let realPath = sep+id.split(":")[0];
+        for(let part of id.split(":")[1].split(sep)){realPath+=sep+part}
 
         let result = [];
 
@@ -778,7 +779,7 @@ module.exports =
             if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
 
             let truePath = "";
-            for(let k of keys) { truePath += k+"/"; }
+            for(let k of keys) { truePath += k+sep; }
             truePath = truePath.slice(0, truePath.length-1)
 
             if(jar[truePath])
@@ -803,7 +804,7 @@ module.exports =
         if(!jar){console.error("Invalid .jar path:", jarPath)}
 
         let truePath = "";
-        for(let k of keys) { truePath += k+"/"; }
+        for(let k of keys) { truePath += k+sep; }
         truePath = truePath.slice(0, truePath.length-1)
 
         return await readZipEntry(truePath, jar[truePath]);
@@ -826,7 +827,7 @@ module.exports =
         for(let p of properties)
         {
             let keyPath = "";
-            for(let k of p.keys){keyPath+="/"+k} keyPath = keyPath.slice(1);
+            for(let k of p.keys){keyPath+=sep+k} keyPath = keyPath.slice(1);
 
             console.log("jar",jar)
             console.log(jarPath, properties)

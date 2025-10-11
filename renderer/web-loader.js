@@ -557,7 +557,7 @@ window.web =
             }
 
 
-            await download(f.url, window.instance.path+'/'+cleanType, f.filename);
+            await download(f.url, window.instance.path+sep()+cleanType, f.filename);
         }
     },
     downloadCurseforge: async function(link, noVersionCheck = false, version = null)
@@ -673,7 +673,7 @@ window.web =
             }
 
             console.log('Downloading '+f.filename)
-            await download(f.url, window.instance.path+'/'+cleanType, f.filename)
+            await download(f.url, window.instance.path+sep()+cleanType, f.filename)
         }
     },
 

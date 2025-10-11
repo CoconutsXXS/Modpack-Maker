@@ -24,7 +24,7 @@ async function importSave(pack)
         }
         else
         {
-            await ipcInvoke('writeFile', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/'+c.path, c.data)
+            await ipcInvoke('writeFile', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+c.path, c.data)
         }
     }
 }
@@ -52,7 +52,7 @@ let packButton = packButtonList.childNodes[1].cloneNode(true); packButtonList.ch
 //         ({
 //             name: m.name,
 //             active: true,
-//             path: m.path+'/'+m.virtualPath,
+//             path: m.path+sep()+m.virtualPath,
 //             index: m.hierarchyIndex||0,
 //             icon: m.icon,
 //             filename: m.name,
@@ -79,24 +79,24 @@ let packButton = packButtonList.childNodes[1].cloneNode(true); packButtonList.ch
 //     {
 //         let currentPath = '';
 //         if(m.folder || m.path == undefined){continue;}
-//         for(let p of m.path.split('/'))
+//         for(let p of m.path.split(sep()))
 //         {
 //             if(p==''){continue;}
 //             let basePath = currentPath;
-//             if(currentPath.length>0){currentPath+='/'}
+//             if(currentPath.length>0){currentPath+=sep()}
 //             currentPath += p;
 
-//             if(currentPath.replaceAll('/','')==''){continue;}
+//             if(currentPath.replaceAll(sep(),'')==''){continue;}
 
-//             if(!files.includes(f=>f.name==currentPath.split('/')[currentPath.split('/').length-1] && f.path==basePath&& f.folder))
+//             if(!files.includes(f=>f.name==currentPath.split(sep())[currentPath.split(sep()).length-1] && f.path==basePath&& f.folder))
 //             {
 //                 files.push
 //                 ({
-//                     name: currentPath.split('/')[currentPath.split('/').length-1],
+//                     name: currentPath.split(sep())[currentPath.split(sep()).length-1],
 //                     active: true,
 //                     path: m.basePath,
 //                     index: 0,
-//                     filename: currentPath.split('/')[currentPath.split('/').length-1],
+//                     filename: currentPath.split(sep())[currentPath.split(sep()).length-1],
 //                     folder: true,
 //                     onSelect: ()=>
 //                     {
@@ -309,7 +309,7 @@ async function viewPack(name)
                         for(let [i, e] of pack.content.entries())
                         {
                             if(pack.content[i].virtualPath==undefined){continue}
-                            if(m.path == pack.content[i].virtualPath.substring(0, pack.content[i].virtualPath.lastIndexOf('/')) && m.name == pack.content[i].virtualPath.split('/')[pack.content[i].virtualPath.split('/').length-1])
+                            if(m.path == pack.content[i].virtualPath.substring(0, pack.content[i].virtualPath.lastIndexOf(sep())) && m.name == pack.content[i].virtualPath.split(sep())[pack.content[i].virtualPath.split(sep()).length-1])
                             {
                                 pack.content[i].virtualPath = '';
                                 count++;

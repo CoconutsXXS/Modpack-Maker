@@ -113,10 +113,10 @@ playButton.addEventListener('click', async () =>
                             for(let k in matches)
                             {
                                 let name = matches[k].slice(1, matches[k].length-1);
-                                if(name.includes('/'))
+                                if(name.includes(sep()))
                                 {
-                                    let thread = name.split('/')[0];
-                                    let type = name.split('/')[1];
+                                    let thread = name.split(sep())[0];
+                                    let type = name.split(sep())[1];
 
                                     if(threads.find(t=>t.name==thread) == undefined)
                                     {
@@ -131,7 +131,7 @@ playButton.addEventListener('click', async () =>
                                     let lastAdd = ''
                                     if(!c.includes(']: ') && Number(k)==matches.length-1)
                                     {
-                                        lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`;
+                                        lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType)?.softColor}">`;
                                     }
 
                                     c=c.replace(`[${name}]`, `[<span style="color:${threads.find(t=>t.name==thread).color}">${thread}</span>/<span style="color:${logTypes.find(t=>t.name==type).color}">${type}</span>]`+lastAdd)
@@ -150,7 +150,7 @@ playButton.addEventListener('click', async () =>
                                 let lastAdd = ''
                                 if(!c.includes(']: ') && Number(k)==matches.length-1)
                                 {
-                                    lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`;
+                                    lastAdd=`<span style="color:${logTypes.find(t=>t.name==finalType)?.softColor}">`;
                                 }
 
                                 c=c.replace(`[${name}]`, `[<span style="color:${preLogs.find(p=>p.name==name).color}">${name}</span>]`+lastAdd)
@@ -158,7 +158,7 @@ playButton.addEventListener('click', async () =>
 
                             if(c.includes(']: '))
                             {
-                                c=c.replace(`]: `, `]: <span style="color:${logTypes.find(t=>t.name==finalType).softColor}">`)
+                                c=c.replace(`]: `, `]: <span style="color:${logTypes.find(t=>t.name==finalType)?.softColor}">`)
                             }
                         }
 
@@ -216,7 +216,7 @@ playButton.addEventListener('click', async () =>
                     case "class_log":
                     {
                         // Add Tab
-                        let classStart = c.split('/')[0]+'/'+c.split('/')[1];
+                        let classStart = c.split(sep())[0]+sep()+c.split(sep())[1];
                 
                         if(Object.entries(document.getElementById('class-window').childNodes[1].childNodes).find(c => c[1].innerText == classStart) == undefined)
                         {

@@ -1507,8 +1507,8 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             // Save
             let data =
             {
-                parsed: await ipcInvoke("readFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt'),
-                buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt')
+                parsed: await ipcInvoke("readFile", 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt'),
+                buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt')
             };
             await onChange(data);
 
@@ -1535,7 +1535,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                             editors.nbtEditor.querySelectorAll("p")[0].innerHTML = "";
                             editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none"
 
-                            ipcInvoke('deleteFolder', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/');
+                            ipcInvoke('deleteFolder', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep());
                         },
                         network: (i, c) => {},
                         windowOpen: async (w, i) => {},
@@ -1549,7 +1549,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                 editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
             }
 
-            ipcInvoke('writeBuffer', 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/saves/.Structure Edition/generated/minecraft/structures/structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', data.buffer);
+            ipcInvoke('writeBuffer', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', data.buffer);
             editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
         }
 

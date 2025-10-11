@@ -1009,7 +1009,7 @@ label:has(>#synitra) { padding-left: 28px; }
 #saves-panel > #select > div:first-of-type
 {
     display: flex;
-    height: -webkit-fill-available; width: 100%;
+    height: fit-content; width: 100%;
     border-bottom: none;
 }
 #main > div:first-of-type > button { height: 100%; }

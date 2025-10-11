@@ -3,6 +3,7 @@ const path = require('node:path')
 const fs = require('fs')
 const fsPromise = require('fs/promises')
 const { download } = require("grape-electron-dl");
+const {sep} = require("path")
 
 const config = require('./config');
 
@@ -14,7 +15,7 @@ class Download
         // Safely create/repair
         if(!fs.existsSync(config.directories.download)) { await fsPromise.mkdir(config.directories.download, {recursive:true}); }
 
-        if(autoFilename) { dest = path.join(dest, decodeURI(new URL(await getRedirectLocation(url)).pathname.split('/').pop())) }
+        if(autoFilename) { dest = path.join(dest, decodeURI(new URL(await getRedirectLocation(url)).pathname.split(sep).pop())) }
         if(fs.existsSync(dest) && !erase){return dest}
 
         if(this.downloadData == null)
@@ -30,7 +31,7 @@ class Download
             }
         }
 
-        if(!fs.existsSync(dest.substring(0, dest.lastIndexOf('/')))) { await fsPromise.mkdir(dest.substring(0, dest.lastIndexOf('/')), {recursive: true}); }
+        if(!fs.existsSync(dest.substring(0, dest.lastIndexOf(sep)))) { await fsPromise.mkdir(dest.substring(0, dest.lastIndexOf(sep)), {recursive: true}); }
 
         // Check if exist
         if(this.downloadData.find(d => d.url == url))
@@ -45,10 +46,12 @@ class Download
 
         return new Promise(async (resolve) =>
         {
-            let directory = dest.substring(0, dest.lastIndexOf('/'));
+            console.log(dest, dest.substring(0, dest.lastIndexOf(sep)))
+            // C:\Users\coconuts\AppData\Roaming\Modpack Maker\instances\Fabulously Optimized\minecraft/mods
+            let directory = dest.substring(0, dest.lastIndexOf(sep));
             let filename = dest.replace(/^.*[\\/]/, '');
 
-            if(!fs.existsSync(directory+'/')) { await fsPromise.mkdir(directory+'/', {recursive:true}) }
+            if(!fs.existsSync(directory+sep)) { await fsPromise.mkdir(directory+sep, {recursive:true}) }
 
             // Classic
             // await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i)});

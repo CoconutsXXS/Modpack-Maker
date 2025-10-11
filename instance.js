@@ -16,6 +16,7 @@ const _ = require("lodash")
 const { execSync } = require("child_process")
 const unzipper = require("unzipper")
 const tar = require("tar")
+const {sep} = require("path")
 
 const nbt = require('prismarine-nbt');
 const minecraftData = require('minecraft-data')
@@ -30,7 +31,7 @@ const { exec } = require('node:child_process');
 
 function rootPath()
 {
-  if(app.isPackaged) { return __dirname.slice(0, __dirname.lastIndexOf("/")) }
+  if(app.isPackaged) { return __dirname.slice(0, __dirname.lastIndexOf(sep)) }
   return __dirname;
 }
 
@@ -71,8 +72,8 @@ class Instance
         let modCount = 0;
         modWatcher.on('all', (e, p, s) =>
         {
-            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes('/')){return}
-            let f = p.split('/')[p.split('/').length-1];
+            if(p.substring(path.join(this.path, 'mods').length+1, p.length).includes(sep)){return}
+            let f = p.split(sep)[p.split(sep).length-1];
 
             modCount++;
             if(modCount<this.mods.length && this.mods.findIndex(m => m.filename==Instance.cleanModName(f))){return}
@@ -130,9 +131,9 @@ class Instance
         let rpCount = 0;
         rpWatcher.on('all', (e, p, s) =>
         {
-            let f = p.split('/')[p.split('/').length-1];
+            let f = p.split(sep)[p.split(sep).length-1];
 
-            if(p.substring(path.join(this.path, 'resourcepacks').length+1, p.length).includes('/')){return}
+            if(p.substring(path.join(this.path, 'resourcepacks').length+1, p.length).includes(sep)){return}
             
             rpCount++;
             if(rpCount<this.rp.length && this.rp.findIndex(m => m.filename==Instance.cleanModName(f))){return}
@@ -189,9 +190,9 @@ class Instance
         let shaderCount = 0;
         shaderWatcher.on('all', (e, p, s) =>
         {
-            let f = p.split('/')[p.split('/').length-1];
+            let f = p.split(sep)[p.split(sep).length-1];
 
-            if(p.substring(path.join(this.path, 'shaderpacks').length+1, p.length).includes('/')){return}
+            if(p.substring(path.join(this.path, 'shaderpacks').length+1, p.length).includes(sep)){return}
             
             shaderCount++;
             if(shaderCount<this.rp.length && this.shaders.findIndex(m => m.filename==Instance.cleanModName(f))){return}
@@ -298,10 +299,10 @@ class Instance
 
         // Resource Path (download optimization)
         let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
-        if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
-        else{fs.cpSync(resourcePath+'/assets', path.join(this.path,'assets'), {recursive:true})}
-        if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
-        else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
+        if(!fs.existsSync(resourcePath+sep+'assets')){fs.mkdirSync(resourcePath+sep+'assets', {recursive: true});}
+        else{fs.cpSync(resourcePath+sep+'assets', path.join(this.path,'assets'), {recursive:true})}
+        if(!fs.existsSync(resourcePath+sep+'libraries')){fs.mkdirSync(resourcePath+sep+'libraries', {recursive: true});}
+        else{fs.cpSync(resourcePath+sep+'libraries', path.join(this.path,'libraries'), {recursive:true})}
 
         if(fs.existsSync(path.join(config.directories.resources, 'versions', this.version.number)))
         { fs.cpSync(path.join(config.directories.resources, 'versions', this.version.number), path.join(this.path,'versions',this.version.number), {recursive:true}) }
@@ -326,9 +327,9 @@ class Instance
             // customArgs: [`-javaagent:${config.javaAgent}`],
             // overrides:
             // {
-            //     // assetRoot: resourcePath+'/assets',
-            //     // assetIndex: resourcePath+'/assets/indexes',
-            //     // libraryRoot: resourcePath+'/libraries',
+            //     // assetRoot: resourcePath+sep+'assets',
+            //     // assetIndex: resourcePath+sep+'assets/indexes',
+            //     // libraryRoot: resourcePath+sep+'libraries',
             //     // directory: path.join(config.directories.resources, 'versions')
             // }
             // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
@@ -343,8 +344,8 @@ class Instance
         {
             if(e == '[MCLC]: Downloaded assets')
             {
-                fs.cpSync(path.join(this.path,'assets'), resourcePath+'/assets', {recursive:true})
-                fs.cpSync(path.join(this.path,'libraries'), resourcePath+'/libraries', {recursive:true})
+                fs.cpSync(path.join(this.path,'assets'), resourcePath+sep+'assets', {recursive:true})
+                fs.cpSync(path.join(this.path,'libraries'), resourcePath+sep+'libraries', {recursive:true})
                 fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
             }
         });
@@ -369,7 +370,7 @@ class Instance
         let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
         crashLogWatcher.on('add', (p) =>
         {
-            if(p.split('/')[p.split('/').length-1] != `hs_err_pid${pid}.log`){return}
+            if(p.split(sep)[p.split(sep).length-1] != `hs_err_pid${pid}.log`){return}
 
             let s = fs.createReadStream(p)
             .pipe(es.split())
@@ -534,10 +535,10 @@ class Instance
 
     //     // Resource Path (download optimization)
     //     let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
-    //     if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
-    //     else{fs.cpSync(resourcePath+'/assets', path.join(this.path,'assets'), {recursive:true})}
-    //     if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
-    //     else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
+    //     if(!fs.existsSync(resourcePath+sep+'assets')){fs.mkdirSync(resourcePath+sep+'assets', {recursive: true});}
+    //     else{fs.cpSync(resourcePath+sep+'assets', path.join(this.path,'assets'), {recursive:true})}
+    //     if(!fs.existsSync(resourcePath+sep+'libraries')){fs.mkdirSync(resourcePath+sep+'libraries', {recursive: true});}
+    //     else{fs.cpSync(resourcePath+sep+'libraries', path.join(this.path,'libraries'), {recursive:true})}
     //     if(!fs.existsSync(path.join(config.directories.resources, 'versions'))){fs.mkdirSync(path.join(config.directories.resources, 'versions'), {recursive: true});}
     //     // else { fs.cpSync(path.join(config.directories.resources, 'versions'), path.join(this.path,'versions'), {recursive:true}) }
 
@@ -553,9 +554,9 @@ class Instance
     //         customArgs: [`-javaagent:${config.javaAgent}`],
     //         overrides:
     //         {
-    //             // assetRoot: resourcePath+'/assets',
-    //             // assetIndex: resourcePath+'/assets/indexes',
-    //             // libraryRoot: resourcePath+'/libraries',
+    //             // assetRoot: resourcePath+sep+'assets',
+    //             // assetIndex: resourcePath+sep+'assets/indexes',
+    //             // libraryRoot: resourcePath+sep+'libraries',
     //             // directory: path.join(config.directories.resources, 'versions')
     //         }
     //     }
@@ -565,8 +566,8 @@ class Instance
     //     {
     //         if(e == '[MCLC]: Downloaded assets')
     //         {
-    //             fs.cpSync(path.join(this.path,'assets'), resourcePath+'/assets', {recursive:true})
-    //             fs.cpSync(path.join(this.path,'libraries'), resourcePath+'/libraries', {recursive:true})
+    //             fs.cpSync(path.join(this.path,'assets'), resourcePath+sep+'assets', {recursive:true})
+    //             fs.cpSync(path.join(this.path,'libraries'), resourcePath+sep+'libraries', {recursive:true})
     //             fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
     //         }
     //     });
@@ -807,7 +808,7 @@ class Instance
                     try
                     {
                         // Jarjar true content
-                        for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar/')&&k!='META-INF/jarjar/'&&k.endsWith('.jar')))
+                        for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar'+sep)&&k!='META-INF/jarjar'+sep&&k.endsWith('.jar')))
                         {
                             let entries = (await unzip(await r[subJarKey].arrayBuffer())).entries;
                             await this.analyseModJar(entries)
@@ -862,9 +863,9 @@ class Instance
                         if(this.mods[i].icon==undefined)
                         {
                             // let r = await jarReader.jar(workingPath, null, true)
-                            if(Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png') != undefined)
+                            if(Object.entries(r).find(e=>(e[0].startsWith('assets'+sep)&&e[0].endsWith('icon.png')&&e[0].split(sep).length==3) || e=='icon.png') != undefined)
                             {
-                                this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets/')&&e[0].endsWith('icon.png')&&e[0].split('/').length==3) || e=='icon.png')[1]?.arrayBuffer()));
+                                this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await Object.entries(r).find(e=>(e[0].startsWith('assets'+sep)&&e[0].endsWith('icon.png')&&e[0].split(sep).length==3) || e=='icon.png')[1]?.arrayBuffer()));
                             }
                         }
 
@@ -883,10 +884,10 @@ class Instance
     
         // Virtual Path
         if(data.virtualPath != undefined && data.virtualPath != ""
-            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)) && d.name == data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]) == undefined)
         {
             console.log('created virtual dir for mod', data)
-            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'mods', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
+            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)), parent: 'mods', name: data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]})
         }
 
         if(og != JSON.stringify(this.mods))
@@ -996,9 +997,9 @@ class Instance
     
         // Virtual Path
         if(data.virtualPath != undefined && data.virtualPath != ""
-            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)) && d.name == data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]) == undefined)
         {
-            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'resourcepacks', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
+            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)), parent: 'resourcepacks', name: data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]})
         }
 
         if(og != JSON.stringify(this.rp))
@@ -1103,9 +1104,9 @@ class Instance
     
         // Virtual Path
         if(data.virtualPath != undefined && data.virtualPath != ""
-            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')) && d.name == data.virtualPath.split('/')[data.virtualPath.split('/').length-1]) == undefined)
+            && this.virtualDirectories.find(d => d.path == data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)) && d.name == data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]) == undefined)
         {
-            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf('/')), parent: 'shaderpacks', name: data.virtualPath.split('/')[data.virtualPath.split('/').length-1]})
+            this.virtualDirectories.push({path: data.virtualPath.substring(0, data.virtualPath.lastIndexOf(sep)), parent: 'shaderpacks', name: data.virtualPath.split(sep)[data.virtualPath.split(sep).length-1]})
             console.log(this.virtualDirectories)
         }
 
@@ -1145,15 +1146,15 @@ class Instance
 
         console.log(p)
 
-        fs.writeFileSync("/tmp/text.txt", path.join(rootPath(), ".Test World"))
-        fs.writeFileSync("/tmp/text2.txt", path.join(__dirname, ".Test World"))
+        // fs.writeFileSync(path.join("tmp","text.txt"), path.join(rootPath(), ".Test World"))
+        // fs.writeFileSync(path.join("tmp","text2.txt"), path.join(__dirname, ".Test World"))
 
         if(fs.existsSync(p)){fs.rmSync(p, { recursive: true, force: true });}
         fs.mkdirSync(p, {recursive: true});
     
         // World
         try { fs.cpSync(path.join(rootPath(), ".Test World"), path.join(p, "saves/Test World"), {recursive: true}); }
-        catch(err){fs.writeFileSync("/tmp/err.txt", JSON.stringify(err)); return}
+        catch(err){fs.writeFileSync(path.join("tmp","err.txt"), JSON.stringify(err)); return}
 
         // Install Mods
         for(let m of mods)
@@ -1218,10 +1219,10 @@ class Instance
     
         // Resource Path (download optimization)
         let resourcePath = path.join(config.directories.resources, version.number+'-'+version.type)
-        if(!fs.existsSync(resourcePath+'/assets')){fs.mkdirSync(resourcePath+'/assets', {recursive: true});}
-        else{fs.cpSync(resourcePath+'/assets', path.join(p,'assets'), {recursive:true})}
-        if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
-        else{fs.cpSync(resourcePath+'/libraries', path.join(p,'libraries'), {recursive:true})}
+        if(!fs.existsSync(resourcePath+sep+'assets')){fs.mkdirSync(resourcePath+sep+'assets', {recursive: true});}
+        else{fs.cpSync(resourcePath+sep+'assets', path.join(p,'assets'), {recursive:true})}
+        if(!fs.existsSync(resourcePath+sep+'libraries')){fs.mkdirSync(resourcePath+sep+'libraries', {recursive: true});}
+        else{fs.cpSync(resourcePath+sep+'libraries', path.join(p,'libraries'), {recursive:true})}
 
         if(fs.existsSync(path.join(config.directories.resources, 'versions', version.number)))
         { fs.cpSync(path.join(config.directories.resources, 'versions', version.number), path.join(p,'versions',version.number), {recursive:true}) }
@@ -1232,8 +1233,8 @@ class Instance
         {
             if(e == '[MCLC]: Downloaded assets')
             {
-                fs.cpSync(path.join(p,'assets'), resourcePath+'/assets', {recursive:true})
-                fs.cpSync(path.join(p,'libraries'), resourcePath+'/libraries', {recursive:true})
+                fs.cpSync(path.join(p,'assets'), resourcePath+sep+'assets', {recursive:true})
+                fs.cpSync(path.join(p,'libraries'), resourcePath+sep+'libraries', {recursive:true})
                 fs.cpSync(path.join(p,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
             }
         });
@@ -1296,12 +1297,12 @@ class Instance
         if(url.hostname == "modrinth.com")
         {
             // Find Modpack Version
-            const version = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1]+'/version')).json())
+            const version = (await (await fetch('https://api.modrinth.com/v2/project'+sep+url.pathname.split(sep)[url.pathname.split(sep).length-1]+sep+'version')).json())
             .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); })[0];
             let file = version.files.filter(f=>f.primary)[0];
 
             // Metadata
-            let meta = (await (await fetch('https://api.modrinth.com/v2/project/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
+            let meta = (await (await fetch('https://api.modrinth.com/v2/project'+sep+url.pathname.split(sep)[url.pathname.split(sep).length-1])).json());
             i.description = meta.description;
             i.version.number = version.game_versions[0];
             i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
@@ -1322,7 +1323,7 @@ class Instance
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader/'+i.version.number.toString())).json();
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+sep+i.version.number.toString())).json();
                     i.loader.version = data[0].loader.version;
                     break;
                 }
@@ -1375,12 +1376,12 @@ class Instance
             // Other Files
             for(let e of Object.entries(entries))
             {
-                if(e[0].startsWith('overrides/') && e[0] != 'overrides/')
+                if(e[0].startsWith('overrides'+sep) && e[0] != 'overrides'+sep)
                 {
                     try
                     {
-                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
-                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep)))))
+                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep))), {recursive:true}) }
                         console.log(e[0].slice(10))
                         fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
                     }
@@ -1393,7 +1394,7 @@ class Instance
         // Curseforge
         else if(url.hostname == "www.curseforge.com")
         {
-            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split('/')[url.pathname.split('/').length-1]}&classId=4471`)).json()).data[0];
+            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split(sep)[url.pathname.split(sep).length-1]}&classId=4471`)).json()).data[0];
             let id = meta.id;
 
             // https://www.curseforge.com/api/v1/mods/936875/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true
@@ -1423,7 +1424,7 @@ class Instance
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader/'+i.version.number.toString())).json();
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+sep+i.version.number.toString())).json();
                     i.loader.version = data[0].loader.version;
                     break;
                 }
@@ -1468,7 +1469,7 @@ class Instance
                     if(dest == "resourcepacks")
                     {
                         const {entries} = await unzip(fs.readFileSync(r));
-                        if(entries["shaders/"]){ fs.renameSync(r, path.join(p, 'minecraft', "shaderpacks", r.slice(r.lastIndexOf("/")))) }
+                        if(entries["shaders"+sep]){ fs.renameSync(r, path.join(p, 'minecraft', "shaderpacks", r.slice(r.lastIndexOf(sep)))) }
                     }
                     
                     downloaded++;
@@ -1478,12 +1479,12 @@ class Instance
             // Other Files
             for(let e of Object.entries(entries))
             {
-                if(e[0].startsWith('overrides/') && e[0] != 'overrides/' && !e[0].endsWith("/"))
+                if(e[0].startsWith('overrides'+sep) && e[0] != 'overrides'+sep && !e[0].endsWith(sep))
                 {
                     try
                     {
-                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/')))))
-                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf('/'))), {recursive:true}) }
+                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep)))))
+                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep))), {recursive:true}) }
 
                         fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
                     }
@@ -1601,7 +1602,7 @@ async function installLoader(root, loader, version, listeners = null)
 
     if(file && targetFile)
     {
-        if(!fs.existsSync(targetFile.substring(0, targetFile.lastIndexOf('/')))){fs.mkdirSync(targetFile.substring(0, targetFile.lastIndexOf('/')), {recursive:true});}
+        if(!fs.existsSync(targetFile.substring(0, targetFile.lastIndexOf(sep)))){fs.mkdirSync(targetFile.substring(0, targetFile.lastIndexOf(sep)), {recursive:true});}
         fs.copyFileSync(file, targetFile);
     }
 

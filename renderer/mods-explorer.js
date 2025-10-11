@@ -60,8 +60,6 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                 // Config
                 infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>
                 {
-                    let p = 'Modpack\ Maker/instances/'+window.instance.name+'/minecraft/mods/'+(mods[k].filename.endsWith('.jar')?mods[k].filename.substring(0,mods[k].filename.length-4):(mods[k].filename.endsWith('.disabled')?mods[k].filename.substring(0, mods[k].filename.length-9):mods[k].filename))+(mods[k].disabled?'.disabled':'.jar');
-
                     window.configPanel((await window.instance.getConfigs()).sort((a,b) =>
                     {
                         return Math.max(similarity(a, f.name.toLowerCase().replace(' ','')),
@@ -138,7 +136,7 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                     for(let mod of window.instance.mods)
                     {
                         if(mod.virtualPath==undefined){continue}
-                        if(m.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf('/')) && m.name == mod.virtualPath.split('/')[mod.virtualPath.split('/').length-1])
+                        if(m.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf(sep())) && m.name == mod.virtualPath.split(sep())[mod.virtualPath.split(sep()).length-1])
                         {
                             mod.virtualPath = '';
                             window.instance.setModData(mod)

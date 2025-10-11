@@ -351,6 +351,8 @@ ipcMain.on('ephemeralLaunch', async (event, loader, version, mods) =>
     await Instance.ephemeralInstance(loader, version, mods);
 })
 
+ipcMain.on("sep", (e) => {e.returnValue = path.sep})
+
 
 
 // Saves

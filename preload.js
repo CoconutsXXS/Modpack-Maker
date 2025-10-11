@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
+
 window.onModUpdate = (i, m) => {}
+
+let sep = ipcRenderer.sendSync("sep");
+contextBridge.exposeInMainWorld("sep", () => { return sep });
 
 contextBridge.exposeInMainWorld('openInstanceSelector', async () => { return await ipcRenderer.send('openInstanceSelector') })
 contextBridge.exposeInMainWorld('instanceList', async () => { return await ipcRenderer.invoke('instanceList') })
@@ -21,9 +25,9 @@ class Instance
     deleteMod = function(name)
     {
         this.setModData({filename: name, missing: true})
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/mods/'+name+'.jar')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/mods/'+name+'.disabled')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/mods/'+name);
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'mods'+sep+name+'.jar')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'mods'+sep+name+'.disabled')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'mods'+sep+name);
     }
 
     setRPData = function(data)
@@ -38,9 +42,9 @@ class Instance
     deleteRP = function(name)
     {
         this.setRPData({filename: name, missing: true})
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.zip')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name+'.disabled')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/resourcepacks/'+name);
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'resourcepacks'+sep+name+'.zip')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'resourcepacks'+sep+name+'.disabled')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'resourcepacks'+sep+name);
     }
 
     setShaderData = function(data)
@@ -55,9 +59,9 @@ class Instance
     deleteShader = function(name)
     {
         this.setShaderData({filename: name, missing: true})
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.zip')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name+'.disabled')
-        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/shaderpacks/'+name);
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'shaderpacks'+sep+name+'.zip')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'shaderpacks'+sep+name+'.disabled')
+        ipcRenderer.invoke('deleteFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'shaderpacks'+sep+name);
     }
 
     saveFile = function(path, data)
@@ -65,9 +69,9 @@ class Instance
         return ipcRenderer.invoke('writeRawData', path, data)
     }
 
-    getConfigs = function() { return ipcRenderer.invoke('readFolder', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config') }
-    getConfig = function(p) { return ipcRenderer.invoke('readFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p) }
-    setConfig = function(p, d) { return ipcRenderer.invoke('writeFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p, d) }
+    getConfigs = function() { return ipcRenderer.invoke('readFolder', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'config') }
+    getConfig = function(p) { return ipcRenderer.invoke('readFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'config'+sep+p) }
+    setConfig = function(p, d) { return ipcRenderer.invoke('writeFile', 'Modpack\ Maker'+sep+'instances'+sep+this.name+sep+'minecraft'+sep+'config'+sep+p, d) }
     save = function(d) { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
 }
 

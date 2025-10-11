@@ -8,7 +8,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
     // Create container for diroctories in current path
     let dirElements = [];
-    for(let d of currentPath.split('/'))
+    for(let d of currentPath.split(sep()))
     {
         let dirElement = document.createElement('div');
         container.appendChild(dirElement);
@@ -19,9 +19,9 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
     function loadFolderContent(folderPath, erase = true)
     {
-        folderPath = (folderPath.startsWith('/')||folderPath=='')?folderPath:('/'+folderPath);
+        folderPath = (folderPath.startsWith(sep())||folderPath=='')?folderPath:(sep()+folderPath);
 
-        while(dirElements.length < folderPath.split('/').length)
+        while(dirElements.length < folderPath.split(sep()).length)
         {
             let dirElement = document.createElement('div');
 
@@ -30,7 +30,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
         }
         if(erase)
         {
-            while(dirElements.length > folderPath.split('/').length)
+            while(dirElements.length > folderPath.split(sep()).length)
             {
                 dirElements.pop().remove();
             }
@@ -40,7 +40,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             let dirPath = '';
             for (let i = 0; i < dirElements.length; i++)
             {
-                dirPath+='/'+folderPath.split('/')[i];
+                dirPath+=sep()+folderPath.split(sep())[i];
                 dirPath=cleanPath(dirPath)
 
                 if(dirElements[i].getAttribute('path') != dirPath)
@@ -51,7 +51,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             }
         }
 
-        dirElements[folderPath.split('/').length-1].innerHTML = '';
+        dirElements[folderPath.split(sep()).length-1].innerHTML = '';
 
         // Add Button
         let ab = document.createElement('button');
@@ -65,7 +65,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             input.type = 'text';
             newButton.setAttribute('folder', '')
             newButton.appendChild(input);
-            dirElements[folderPath.split('/').length-1].insertBefore(newButton, dirElements[folderPath.split('/').length-1].lastChild);
+            dirElements[folderPath.split(sep()).length-1].insertBefore(newButton, dirElements[folderPath.split(sep()).length-1].lastChild);
             input.focus();
 
             let finished = false;
@@ -90,13 +90,13 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
                     addFile(files.length-1)
                     newButton.remove();
-                    dirElements[folderPath.split('/').length-1].appendChild(ab);
+                    dirElements[folderPath.split(sep()).length-1].appendChild(ab);
 
                     for(let l of newFolderListeners) { l(nf); }
                 }
             })
         }
-        dirElements[folderPath.split('/').length-1].appendChild(ab);
+        dirElements[folderPath.split(sep()).length-1].appendChild(ab);
 
         // Load Content
         for(let k in files)
@@ -122,7 +122,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             b.setAttribute('index', f.index)
             files[k].element = b;
 
-            if(currentPath.split('/')[folderPath.split('/').length] == f.name)
+            if(currentPath.split(sep())[folderPath.split(sep()).length] == f.name)
             {
                 b.setAttribute('in-path', '');
             }
@@ -165,16 +165,16 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                 b.setAttribute('folder', '')
             }
             
-            dirElements[folderPath.split('/').length-1].appendChild(b);
+            dirElements[folderPath.split(sep()).length-1].appendChild(b);
 
             // Order
-            let unordered = Array.from(dirElements[folderPath.split('/').length-1].childNodes);
-            dirElements[folderPath.split('/').length-1].innerHTML = '';
+            let unordered = Array.from(dirElements[folderPath.split(sep()).length-1].childNodes);
+            dirElements[folderPath.split(sep()).length-1].innerHTML = '';
             for(let e of unordered.sort((a,b) => Number(a.getAttribute('index'))-Number(b.getAttribute('index'))))
             {
-                dirElements[folderPath.split('/').length-1].appendChild(e);
+                dirElements[folderPath.split(sep()).length-1].appendChild(e);
             }
-            dirElements[folderPath.split('/').length-1].appendChild(ab);
+            dirElements[folderPath.split(sep()).length-1].appendChild(ab);
 
             // Move
             let fileCurrentPath = folderPath;
@@ -201,8 +201,8 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                 b.setAttribute('selected', '');
                 if(f.folder)
                 {
-                    currentPath = f.path+'/'+f.name;
-                    loadFolderContent(f.path+'/'+f.name)
+                    currentPath = f.path+sep()+f.name;
+                    loadFolderContent(f.path+sep()+f.name)
 
                     for(let o of b.parentElement.childNodes)
                     {
@@ -332,14 +332,14 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                 {
                     for(let k in files)
                     {
-                        if(!cleanPath(files[k].path).startsWith( cleanPath(oldPath+'/'+f.name) )){continue}
+                        if(!cleanPath(files[k].path).startsWith( cleanPath(oldPath+sep()+f.name) )){continue}
                         let ogPath = files[k].path;
-                        files[k].path = cleanPath(newPath+'/'+f.name);
+                        files[k].path = cleanPath(newPath+sep()+f.name);
                         files[k].onMove(ogPath, files[k].path, files[k].index)
                     }
 
                     let newFolderPath = folderPath;
-                    if(newFolderPath.startsWith(cleanPath(oldPath+'/'+f.name)))
+                    if(newFolderPath.startsWith(cleanPath(oldPath+sep()+f.name)))
                     {
                         newFolderPath = oldPath;
                     }
@@ -421,9 +421,9 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
     // Load root files
     loadFolderContent('')
     // Load each folder of the current path
-    for(let f of files.filter(f=>currentPath.startsWith(f.path+'/'+f.name)&&f.folder))
+    for(let f of files.filter(f=>currentPath.startsWith(f.path+sep()+f.name)&&f.folder))
     {
-        loadFolderContent(f.path+'/'+f.name)
+        loadFolderContent(f.path+sep()+f.name)
     }
 
     return {
@@ -436,7 +436,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             let dirPath = '';
             for (let i = 0; i < dirElements.length; i++)
             {
-                dirPath+='/'+currentPath.split('/')[i-1];
+                dirPath+=sep()+currentPath.split(sep())[i-1];
                 dirPath=cleanPath(dirPath)
                 if((i-1)<0){dirPath=""}
 
@@ -466,9 +466,11 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
     }
 }
 
-function cleanPath(p='/')
+function cleanPath(p)
 {
-    while(p.startsWith('/')) { p = p.slice(1) }
-    while(p.endsWith('/')) { p = p.slice(0, p.length-1) }
+    if(!p){p=sep()}
+    
+    while(p.startsWith(sep())) { p = p.slice(1) }
+    while(p.endsWith(sep())) { p = p.slice(0, p.length-1) }
     return p;
 }
