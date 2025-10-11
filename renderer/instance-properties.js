@@ -18,30 +18,30 @@ window.addInstanceListener((i) =>
 
     loaderVersionSelector.parentNode.style.display = i.loader.name == 'vanilla'?'none':'block'
     sinytraCheckbox.parentNode.style.display = i.loader.name == 'forge'?'block':'none';
-    fetch("https://mc-versions-api.net/api/java").then((response) => response.json())
+    fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json").then((response) => response.json())
     .then((data) =>
     {
         var lastV = '0';
         var lastG = minecraftVersionSelector;
-        for(let v of data.result.reverse())
+        for(let v of data.versions.reverse().filter(v=>v.type == "release"))
         {
             let e = document.createElement('option');
-            e.label = v;
-            e.value = v;
+            e.label = v.id;
+            e.value = v.id;
     
-            if(v.split('.')[1] != lastV)
+            if(v.id.split('.')[1] != lastV)
             {
-                lastV = v.split('.')[1];
+                lastV = v.id.split('.')[1];
                 let g = lastG = document.createElement('optgroup');
-                g.label = v;
+                g.label = v.id;
                 minecraftVersionSelector.appendChild(g);
-                e.label = v+'.0';
+                e.label = v.id+'.0';
             }
     
             lastG.appendChild(e);
         }
     
-        // if(!i.version.number){ i.version.number = data.result[0]; return}
+        // if(!i.version.number){ i.version.number = data.versions[0]; return}
         minecraftVersionSelector.value = i.version.number
     })
     
@@ -92,6 +92,9 @@ async function updateLoaderVersionSelector()
             let text = await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text();
             const data = parseXml(text)
         
+            if(!Array.isArray(data.metadata.versioning.versions.version))
+            {data.metadata.versioning.versions.version = [data.metadata.versioning.versions.version]}
+
             for(let v of data.metadata.versioning.versions.version.filter(e => e["#text"].split('-')[0] == window.instance.version.number.toString()))
             {
                 versionList.push(v["#text"].split('-')[1]);
@@ -103,7 +106,13 @@ async function updateLoaderVersionSelector()
         {
             let text = await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text();
             const data = parseXml(text)
-        
+
+            if(!Array.isArray(data.metadata.versioning.versions.version))
+            {data.metadata.versioning.versions.version = [data.metadata.versioning.versions.version]}
+
+            console.log(data.metadata.versioning.versions.version)
+
+            for(let e of data.metadata.versioning.versions.version) { console.log('1.'+e["#text"].split('-')[0].substring(0, e["#text"].split('-')[0].lastIndexOf('.'))) }
             for(let v of data.metadata.versioning.versions.version.filter(e => '1.'+e["#text"].split('-')[0].substring(0, e["#text"].split('-')[0].lastIndexOf('.')) == window.instance.version.number.toString()).reverse())
             {
                 versionList.push(v["#text"]);

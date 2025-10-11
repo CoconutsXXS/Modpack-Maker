@@ -13,8 +13,10 @@ const { XMLParser } = require("fast-xml-parser");
 const es = require('event-stream');
 const os = require("os");
 const _ = require("lodash")
+const { execSync } = require("child_process")
+const unzipper = require("unzipper")
+const tar = require("tar")
 
-const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
 const minecraftData = require('minecraft-data')
 
@@ -23,6 +25,8 @@ const Download = require('./download');
 const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
 const { setTimeout } = require('node:timers/promises');
+const { platform } = require('node:os');
+const { exec } = require('node:child_process');
 
 function rootPath()
 {
@@ -299,6 +303,17 @@ class Instance
         if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
         else{fs.cpSync(resourcePath+'/libraries', path.join(this.path,'libraries'), {recursive:true})}
 
+        if(fs.existsSync(path.join(config.directories.resources, 'versions', this.version.number)))
+        { fs.cpSync(path.join(config.directories.resources, 'versions', this.version.number), path.join(this.path,'versions',this.version.number), {recursive:true}) }
+
+        // Java Version
+        let javaVersion = (await (await fetch((await (await fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json")).json()).versions.find(v=>v.id==this.version.number).url)).json()).javaVersion.majorVersion
+        let javaPath = findJavaExecutable(javaVersion);
+        if(!javaPath)
+        {
+            javaPath = await downloadJava(javaVersion, listeners)
+        }
+
         // Settings
         let options =
         {
@@ -317,7 +332,9 @@ class Instance
             //     // directory: path.join(config.directories.resources, 'versions')
             // }
             // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
-            quickPlay: world!=undefined?world:null
+            quickPlay: world!=undefined?world:null,
+            javaPath: javaPath?javaPath:'java',
+            overrides: {detached: true}
         }
         console.log(options)
 
@@ -1126,6 +1143,8 @@ class Instance
         // let p = path.join("/tmp/ephemeral-instances/", "/minecraft")
         const p = await fs.mkdtempSync(path.join(os.tmpdir(), 'ephemeral-instances-'));
 
+        console.log(p)
+
         fs.writeFileSync("/tmp/text.txt", path.join(rootPath(), ".Test World"))
         fs.writeFileSync("/tmp/text2.txt", path.join(__dirname, ".Test World"))
 
@@ -1145,6 +1164,16 @@ class Instance
 
         // Loader
         version.custom = await installLoader(p, loader, version)
+
+        // Java Version
+        let javaVersion = (await (await fetch((await (await fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json")).json()).versions.find(v=>v.id==version.number).url)).json()).javaVersion.majorVersion
+        let javaPath = findJavaExecutable(javaVersion);
+
+        if(!javaPath)
+        {
+            await downloadJava(javaVersion)
+            javaPath = findJavaExecutable(javaVersion);
+        }
 
         // // New World
         // if(!fs.existsSync(path.join(p, 'saves', 'world'))){fs.mkdirSync(path.join(p, 'saves', 'world'), {recursive: true});}
@@ -1194,6 +1223,9 @@ class Instance
         if(!fs.existsSync(resourcePath+'/libraries')){fs.mkdirSync(resourcePath+'/libraries', {recursive: true});}
         else{fs.cpSync(resourcePath+'/libraries', path.join(p,'libraries'), {recursive:true})}
 
+        if(fs.existsSync(path.join(config.directories.resources, 'versions', version.number)))
+        { fs.cpSync(path.join(config.directories.resources, 'versions', version.number), path.join(p,'versions',version.number), {recursive:true}) }
+
 
         // Asset Move
         launcher.on('debug', (e) =>
@@ -1218,10 +1250,12 @@ class Instance
         {
             root: p,
             version: version,
-            memory: {max: '6G', min: '4G'},
+            memory: {max: '4G', min: '2G'},
             authorization: await Authenticator.getAuth("tester"),
             forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
-            quickPlay: {type: "singleplayer", identifier: "Test World"}
+            quickPlay: {type: "singleplayer", identifier: "Test World"},
+            javaPath: javaPath?javaPath:'java',
+            overrides: {detached: true}
         }
 
         let childProcess = await launcher.launch(options);
@@ -1468,10 +1502,11 @@ async function installLoader(root, loader, version, listeners = null)
     let file = null;
     let targetFile = null;
 
-    let win = BrowserWindow.getAllWindows()[0];
-    if(win==undefined)
+    let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
+    let createdWin = win==undefined;
+    if(createdWin)
     {
-        win = selectorWindow = new BrowserWindow({});
+        win = new BrowserWindow({});
         win.hide();
     }
 
@@ -1530,7 +1565,6 @@ async function installLoader(root, loader, version, listeners = null)
 
             let link = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${loader.version}/neoforge-${loader.version}-installer.jar`;
             
-            console.log(targetPath, targetName)
             await download(win, link, {filename: targetName, directory: targetPath, onProgress: async (progress) =>
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
@@ -1571,7 +1605,7 @@ async function installLoader(root, loader, version, listeners = null)
         fs.copyFileSync(file, targetFile);
     }
 
-    win.close();
+    if(createdWin) { win.close(); }
 
     return version.custom;
 }
@@ -1686,6 +1720,182 @@ async function getRedirectLocation(initialUrl)
     {
         return initialUrl;
     }
+}
+
+
+function findJavaExecutable(targetMajorVersion)
+{
+    targetMajorVersion = targetMajorVersion.toString()
+
+    if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents/Home/bin/java')))
+    {
+        return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents/Home/bin/java')
+    }
+
+    const candidates = [];
+
+    if (process.env.JAVA_HOME)
+    {
+        const javaPath = path.join(process.env.JAVA_HOME, 'bin', platform() === 'win32' ? 'java.exe' : 'java');
+        if (fs.existsSync(javaPath)) candidates.push(javaPath);
+    }
+
+    if (platform() === 'win32')
+    {
+        const possibleRoots = [
+            'C:\\Program Files\\Java',
+            'C:\\Program Files (x86)\\Java'
+        ];
+        for (const root of possibleRoots)
+        {
+            try
+            {
+                const dirs = execSync(`dir "${root}" /b /ad`, { encoding: 'utf8' }).split(/\r?\n/);
+                for (const dir of dirs)
+                {
+                    if (dir.includes(targetMajorVersion))
+                    {
+                        const javaPath = path.join(root, dir, 'bin', 'java.exe');
+                        if (fs.existsSync(javaPath)) candidates.push(javaPath);
+                    }
+                }
+            }
+            catch(err){console.warn(err)}
+        }
+    }
+    else if (platform() === 'darwin')
+    {
+        // macOS
+        try
+        {
+            const out = execSync('/usr/libexec/java_home -V 2>&1', { encoding: 'utf8' });
+            const matches = [...out.matchAll(/([0-9][0-9._]*)[^\n]*?(\/Library\/Java\/JavaVirtualMachines\/[^/\n]+\/Contents\/Home)/g)];
+
+            for(const m of matches)
+            {
+                const versionStr = m[1];
+                const homePath = m[2];
+                const major = versionStr.startsWith('1.') ? parseInt(versionStr.split('.')[1], 10) : parseInt(versionStr.split('.')[0], 10);
+                if (major === targetMajorVersion)
+                {
+                    console.log(path.join(homePath, 'bin', 'java'))
+                    candidates.push(path.join(homePath, 'bin', 'java'));
+                }
+            }
+        }
+        catch(err){console.warn(err)}
+    }
+    else
+    {
+        // Linux
+        try
+        {
+            const dirs = execSync('ls /usr/lib/jvm', { encoding: 'utf8' }).split(/\r?\n/);
+            for (const dir of dirs)
+            {
+                if (dir.includes(targetMajorVersion))
+                {
+                    const javaPath = path.join('/usr/lib/jvm', dir, 'bin', 'java');
+                    if (fs.existsSync(javaPath)) candidates.push(javaPath);
+                }
+            }
+        }
+        catch(err){console.warn(err)}
+    }
+
+    try
+    {
+        const sysJava = execSync('which java', { encoding: 'utf8' }).trim();
+        if (fs.existsSync(sysJava)) candidates.push(sysJava);
+    }
+    catch(err){console.warn(err)}
+
+    for(const candidate of candidates)
+    {
+        try
+        {
+            const versionOut = execSync(`"${candidate}" -version`, { encoding: 'utf8', stderr: 'pipe' });
+            if(!versionOut.includes(targetMajorVersion)){continue;}
+            return candidate;
+        }
+        catch(err){console.warn(err)}
+    }
+
+    return null;
+}
+async function downloadJava(version, listeners = null)
+{
+    let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
+    let createdWin = win==undefined;
+    if(createdWin)
+    {
+        win = new BrowserWindow({});
+        win.hide();
+    }
+
+    // https://api.adoptium.net/v3/binary/latest/<major_version>/<release_type>/<os>/<arch>/<image_type>/<jvm_impl>/<heap_size>/<vendor>?project=jdk
+    let os = 'windows';
+    switch(platform())
+    {
+        case "win32": os = "windows"; break;
+        case "darwin": os = "mac"; break;
+        case "linux": os = "linux"; break;
+        default: throw new Error(`Unsupported os: ${platform()}`);
+    }
+
+    let arch = "aarch64";
+    switch (process.arch)
+    {
+        case 'x64': arch = 'x64'; break;
+        case 'arm64': arch = 'aarch64'; break;
+        case 'arm': arch = 'arm'; break;
+        default: throw new Error(`Unsupported arch: ${process.arch}`);
+    }
+
+    fs.mkdirSync(path.join(config.directories.jre, `java-${version}`), {recursive: true})
+
+    let link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`
+    await download(win, link, {filename: `java-${version}.tar`, directory: config.directories.jre, onProgress: async (progress) =>
+    {
+        if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
+    }});
+
+    // await new Promise((resolve, reject) =>
+    // {
+    //     fs.createReadStream(path.join(config.directories.jre, `java-${version}.tar`))
+    //         .pipe(unzipper.Extract({ path: path.join(config.directories.jre, `java-${version}`) }))
+    //         .on("close", resolve)
+    //         .on("error", reject);
+    // });
+
+    await tar.x
+    ({
+        file: path.join(config.directories.jre, `java-${version}.tar`),
+        cwd: path.join(config.directories.jre, `java-${version}`)
+    });
+
+    // Direct Directory
+    const baseDir = path.join(config.directories.jre, `java-${version}`);
+    const subDirs = fs.readdirSync(baseDir);
+
+    if (subDirs.length === 1)
+    {
+        const nestedDir = path.join(baseDir, subDirs[0]);
+        const items = fs.readdirSync(nestedDir);
+
+        for(const item of items)
+        {
+            fs.renameSync(path.join(nestedDir, item), path.join(baseDir, item));
+        }
+
+        fs.rmdirSync(nestedDir);
+    }
+
+    fs.unlinkSync(path.join(config.directories.jre, `java-${version}.tar`))
+
+    if(createdWin) { win.close(); }
+
+    return path.join(config.directories.jre, `java-${version}`, 'Contents/Home/bin/java')
 }
 
 module.exports = Instance;

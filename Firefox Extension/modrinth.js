@@ -402,11 +402,16 @@ setInterval(async () =>
                 {
                     let text = await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text();
                     const data = parseXml(text)
+
+                    if(!Array.isArray(data.metadata.versioning.versions.version))
+                    {data.metadata.versioning.versions.version = [data.metadata.versioning.versions.version]}
                 
                     for(let v of data.metadata.versioning.versions.version.filter(e => e["#text"].split('-')[0] == allFiles[0].game_versions[0]))
                     {
                         versionList.push(v["#text"].split('-')[1]);
                     }
+
+                    if(versionList.length == 0){versionList = [data.metadata.versioning.versions.version[0]["#text"].split('-')[1]]}
 
                     break;
                 }
@@ -414,11 +419,16 @@ setInterval(async () =>
                 {
                     let text = await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text();
                     const data = parseXml(text)
+
+                    if(!Array.isArray(data.metadata.versioning.versions.version))
+                    {data.metadata.versioning.versions.version = [data.metadata.versioning.versions.version]}
                 
                     for(let v of data.metadata.versioning.versions.version.filter(e => '1.'+e["#text"].split('-')[0].substring(0, e["#text"].split('-')[0].lastIndexOf('.')) == allFiles[0].game_versions[0]).reverse())
                     {
                         versionList.push(v["#text"]);
                     }
+
+                    if(versionList.length == 0){versionList = [data.metadata.versioning.versions.version[0]["#text"]]}
 
                     break;
                 }
@@ -434,6 +444,8 @@ setInterval(async () =>
                     break;
                 }
             }
+
+            console.log("versionList", versionList)
 
             testButton.querySelector("button").style.backgroundPositionX = `-${testButton.querySelector("button").getBoundingClientRect().width/4-3}px`
 

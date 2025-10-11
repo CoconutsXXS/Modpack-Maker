@@ -19,6 +19,10 @@ watcher.on('all', (e, p, s) =>
     // Add (or init)
     if(e=='add' || e=="change")
     {
+        let parsed = [];
+        try{parsed=JSON.parse(fs.readFileSync(config.directories.browserRequests))}
+        catch(err){fs.writeFileSync(config.directories.browserRequests, "[]")}
+        
         for(let r of JSON.parse(fs.readFileSync(config.directories.browserRequests)))
         {
             (async () =>

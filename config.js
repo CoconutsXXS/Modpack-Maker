@@ -13,6 +13,7 @@ module.exports =
         saves: path.join(app.getPath('appData'), 'Modpack Maker', 'saves'),
         browserRequests: path.join(app.getPath('appData'), 'Modpack Maker', '.browser-requests.json'),
         extension: path.join(app.getPath('appData'), 'Modpack Maker', 'extension'),
+        jre: path.join(app.getPath('appData'), 'Modpack Maker', 'JRE')
     },
     javaAgent: `${app.getAppPath()}/agent/agent.jar`
 }
