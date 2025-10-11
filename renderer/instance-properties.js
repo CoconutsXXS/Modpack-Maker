@@ -46,7 +46,19 @@ window.addInstanceListener((i) =>
     })
     
     if(window.instance.name == ''){focus(nameInput)}
-    nameInput.onkeyup = (ev) => {if(ev.key != "Enter"){return} window.instance .name = nameInput.value; window.instance.save(window.instance); window.loadInstance(window.instance.name);}
+    nameInput.onkeyup = async (ev) =>
+    {
+        if(ev.key != "Enter"){return}
+
+        if(await ipcInvoke("renameInstance", window.instance.name.toString(), nameInput.value.toString()))
+        {
+            window.instance.name = nameInput.value;
+        }
+        else
+        {
+            nameInput.value = window.instance.name
+        }
+    }
     descriptionInput.oninput = () => window.instance.description = descriptionInput.value;
     loaderSelector.onchange = () =>
     {

@@ -263,10 +263,28 @@ ipcMain.handle('saveInstance', (event, d) =>
 {
     if(loadedInstances.find(i => i.name == d.name))
     {
-        loadedInstances.find(i => i.name == d.name).instance = Object.assign(loadedInstances.find(i => i.name == d.name).instance, d);
-        loadedInstances.find(i => i.name == d.name).instance.save();
+        loadedInstances[loadedInstances.findIndex(i => i.name == d.name)].instance = Object.assign(loadedInstances.find(i => i.name == d.name).instance, d);
+        loadedInstances[loadedInstances.findIndex(i => i.name == d.name)].instance.save();
     }
     else { Object.assign(Instance.getInstance(d.name), d).save(); }
+})
+
+ipcMain.handle('renameInstance', (event, previousName, nextName) =>
+{
+    if(!fs.existsSync(path.join(config.directories.instances, previousName)) || fs.existsSync(path.join(config.directories.instances, nextName)))
+    {return false;}
+
+    if(loadedInstances.find(i => i.name == previousName))
+    {
+        loadedInstances[loadedInstances.findIndex(i => i.name == previousName)].instance.name = nextName;
+    }
+    else { Instance.getInstance(previousName).name = nextName; }
+
+    fs.renameSync(path.join(config.directories.instances, previousName), path.join(config.directories.instances, nextName))
+
+    if(loadedInstances.find(i => i.name == previousName)) { loadedInstances[loadedInstances.findIndex(i => i.name == previousName)].instance.save(); }
+
+    return true;
 })
 
 ipcMain.handle('download', async (event, url, directory, filename, createDirectory = true) =>

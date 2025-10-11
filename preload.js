@@ -68,7 +68,7 @@ class Instance
     getConfigs = function() { return ipcRenderer.invoke('readFolder', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config') }
     getConfig = function(p) { return ipcRenderer.invoke('readFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p) }
     setConfig = function(p, d) { return ipcRenderer.invoke('writeFile', 'Modpack\ Maker/instances/'+this.name+'/minecraft/config/'+p, d) }
-    save = function(d) { console.log(JSON.parse(JSON.stringify(d))); return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
+    save = function(d) { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(d))) }
 }
 
 contextBridge.exposeInMainWorld('getInstance', async (name, onModUpdate = (i, m) => {}, onRPUpdate = (i, m) => {}, onShaderUpdate = (i, m) => {}, onRequestUpdate = (i, m) => {}, onLoadingUpdate = (i, l) => {}) =>
