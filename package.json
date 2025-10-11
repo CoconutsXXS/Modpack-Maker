@@ -80,9 +80,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": true,
-      "shortcutName": "ModpackMaker",
-      "closeAppBeforeInstall": false
+      "shortcutName": "ModpackMaker"
     },
     "mac": {
       "target": [

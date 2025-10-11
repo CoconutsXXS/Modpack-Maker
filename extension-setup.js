@@ -5,6 +5,8 @@ const path = require("path");
 const os = require("os");
 const config = require('./config');
 
+const version = "0.1.21";
+
 module.exports = 
 {
     firefox: () =>
@@ -27,7 +29,6 @@ module.exports =
 
 
         // Host data
-        const version = "0.1.2";
         let hostData =
         {
             appData: path.join(app.getPath('appData'), 'Modpack Maker'),
