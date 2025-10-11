@@ -78,15 +78,6 @@
         "repo": "Modpack-Maker"
       }
     ],
-    "nsis": {
-      "allowToChangeInstallationDirectory": true,
-      "oneClick": false,
-      "include": "build/installer.nsh",
-      "shortcutName": "ModpackMaker",
-      "uninstallDisplayName": "ModpackMaker",
-      "perMachine": false,
-      "runAfterFinish": true
-    },
     "mac": {
       "target": [
         "dmg",
@@ -96,11 +87,14 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        "portable"
       ],
-      "icon": "icon/icon.ico",
-      "artifactName": "${productName}-${version}-Setup.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "icon": "icon/icon.ico"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}",
+      "requestExecutionLevel": "user"
     },
     "linux": {
       "maintainer": "CoconutsXXS <axel.ohresser47@gmail.com>",
