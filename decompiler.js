@@ -2,9 +2,6 @@ const { spawn, exec, execSync } = require('child_process');
 const { promises: fs, existsSync, createWriteStream } = require('fs');
 const path = require('path');
 const os = require('os');
-const extract = require('extract-zip')
-const https = require('https');
-const { Readable } = require("stream");
 
 function run(cmd, args, opts = {})
 {
