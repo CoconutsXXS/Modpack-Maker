@@ -1,0 +1,163 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows-x64:
+    name: windows (x64)
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      ELECTRON_CACHE: ~/.cache/electron
+      ELECTRON_BUILDER_CACHE: ~/.cache/electron-builder
+      npm_config_arch: x64
+      npm_config_target_arch: x64
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules for Electron (x64)
+        run: |
+          npx electron-rebuild --arch=x64 --force
+
+      - name: Build windows App (x64)
+        run: |
+          npm run dist -- --win --x64 --publish=never
+
+      - name: Upload windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/
+
+  # build-windows-arm64:
+  #   name: Windows (arm64)
+  #   runs-on: windows-11-arm
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     ELECTRON_CACHE: ~\AppData\Local\electron\Cache
+  #     ELECTRON_BUILDER_CACHE: ~\AppData\Local\electron-builder\Cache
+  #     VCPKG_ROOT: C:\vcpkg
+  #     VCPKG_DEFAULT_TRIPLET: arm64-windows
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+
+  #     - name: Install Python & CMake & Visual Studio Build Tools (with ARM64 components)
+  #       shell: pwsh
+  #       run: |
+  #         $ErrorActionPreference = 'Stop'
+  #         choco install -y python --version=3.11.8
+  #         refreshenv
+  #         python -m pip install --upgrade pip setuptools wheel
+  #         # Install CMake via choco so cmake.exe is on PATH
+  #         choco install -y cmake --installargs '"ADD_CMAKE_TO_PATH=System"'
+  #         refreshenv
+  #         # Install VS Build Tools with ARM components (explicit)
+  #         choco install -y visualstudio2022buildtools --package-parameters '--add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041 --includeRecommended'
+  #         refreshenv
+
+  #     - name: Bootstrap vcpkg and install liblzma (liblzma provides liblzma/liblzma.lib)
+  #       shell: pwsh
+  #       run: |
+  #         $ErrorActionPreference = 'Stop'
+
+  #         # clone/update vcpkg (full clone, avoid shallow)
+  #         if (-not (Test-Path 'C:\vcpkg')) {
+  #           git clone https://github.com/microsoft/vcpkg C:\vcpkg
+  #         } else {
+  #           Set-Location 'C:\vcpkg'
+  #           git fetch --all
+  #           git reset --hard origin/master
+  #         }
+
+  #         Set-Location 'C:\vcpkg'
+
+  #         # ensure cmake is available (bootstrap needs it)
+  #         if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+  #           choco install -y cmake --installargs '"ADD_CMAKE_TO_PATH=System"'
+  #           refreshenv
+  #         }
+
+  #         Write-Host "Bootstrapping vcpkg..."
+  #         .\bootstrap-vcpkg.bat
+
+  #         if (-not (Test-Path '.\vcpkg.exe')) { throw "vcpkg.exe missing after bootstrap" }
+
+  #         Write-Host "vcpkg version:"
+  #         .\vcpkg.exe version
+
+  #         Write-Host "Searching for liblzma/xz ports (diagnostic):"
+  #         .\vcpkg.exe search liblzma || Write-Host "liblzma not found"
+  #         .\vcpkg.exe search xz || Write-Host "xz not found"
+
+  #         Write-Host "Installing liblzma for arm64..."
+  #         .\vcpkg.exe update
+  #         .\vcpkg.exe install liblzma:arm64-windows
+
+  #         Write-Host "Installed libs under C:\vcpkg\installed\arm64-windows\lib (listing):"
+  #         if (Test-Path 'C:\vcpkg\installed\arm64-windows\lib') {
+  #           Get-ChildItem 'C:\vcpkg\installed\arm64-windows\lib' -Recurse | Select-Object Name,Length | Format-Table -AutoSize
+  #         } else {
+  #           Write-Error "C:\vcpkg\installed\arm64-windows\lib not found after install"
+  #           exit 1
+  #         }
+
+  #         # export env vars so MSBuild/node-gyp can find the libs/headers
+  #         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_TRIPLET=arm64-windows"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "INCLUDE=C:\vcpkg\installed\arm64-windows\include"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "LIB=C:\vcpkg\installed\arm64-windows\lib"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "PATH=C:\vcpkg\installed\arm64-windows\bin;$env:PATH"
+
+  #         Write-Host "vcpkg liblzma installation done."
+  #     - name: Clean workspace (avoid EBUSY artifacts)
+  #       shell: pwsh
+  #       run: |
+  #         git clean -ffdx || true
+  #         Start-Sleep -Seconds 2
+
+  #     - name: Export npm/node-gyp env for electron ARM64
+  #       shell: pwsh
+  #       run: |
+  #         Add-Content -Path $env:GITHUB_ENV -Value "npm_config_build_from_source=true"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "npm_config_runtime=electron"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "npm_config_target=38.2.2"   # adapte à ta version d'Electron si besoin
+  #         Add-Content -Path $env:GITHUB_ENV -Value "npm_config_arch=arm64"
+  #         Add-Content -Path $env:GITHUB_ENV -Value "npm_config_disturl=https://electronjs.org/headers"
+
+  #     - name: Install dependencies (build native modules)
+  #       shell: pwsh
+  #       run: |
+  #         npm ci
+
+  #     - name: Rebuild native modules for Electron (ARM64)
+  #       shell: pwsh
+  #       run: |
+  #         npx electron-rebuild --arch=arm64 --force || true
+
+  #     - name: Build Windows App (ARM64)
+  #       shell: pwsh
+  #       run: |
+  #         npm run dist -- --win --arm64 --publish=never
+
+  #     - name: Upload Windows artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: Windows-arm64
+  #         path: dist/
