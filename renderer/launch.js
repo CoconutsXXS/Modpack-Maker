@@ -62,18 +62,24 @@ playButton.addEventListener('click', async () =>
             log: (t, c) =>
             {
                 if(closed){return;}
+
+                let progress = c.task/c.total;
+                if(isNaN(progress) && c.task){progress = c.task/100}
+                else if(isNaN(progress)){progress = c/100}
+
                 console.log(t, c)
+                
                 // Prepare Element
                 var el = document.createElement('p');
                 if(t == 'progress')
                 {
                     let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
-                    for (let i = 0; i < Math.floor(c.task/c.total * 64); i++)
+                    for (let i = 0; i < Math.floor(progress * 64); i++)
                     {
                         loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
                     }
 
-                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">${c.type}:</span> ${loadText} - ${Math.floor(c.task/c.total * 100)}%`;
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">${c.type}:</span> ${loadText} - ${Math.floor(progress * 100)}%`;
                     if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] ${c.type}: `))
                     {
                         consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
@@ -84,13 +90,29 @@ playButton.addEventListener('click', async () =>
                 else if(t == 'loaderProgress')
                 {
                     let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
-                    for (let i = 0; i < Math.floor(c.task/c.total * 64); i++)
+                    for (let i = 0; i < Math.floor(progress * 64); i++)
                     {
                         loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
                     }
 
-                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">loader download: :</span> ${loadText} - ${Math.floor(c.task/c.total * 100)}%`;
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">loader download: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
                     if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] loader download: `))
+                    {
+                        consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
+                        el.remove();
+                        return
+                    }
+                }
+                else if(t == 'javaProgress')
+                {
+                    let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
+                    for (let i = 0; i < Math.floor(progress * 64); i++)
+                    {
+                        loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
+                    }
+
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">java download: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] java download: `))
                     {
                         consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
                         el.remove();

@@ -15,7 +15,7 @@ module.exports =
         extension: path.join(app.getPath('appData'), 'Modpack Maker', 'extension'),
         jre: path.join(app.getPath('appData'), 'Modpack Maker', 'JRE')
     },
-    javaAgent: `${app.getAppPath()}/agent/agent.jar`
+    javaAgent:path.join(app.getAppPath(), 'agent', 'agent.jar')
 }
 
 if(!fs.existsSync(module.exports.directories.instances)) { fs.mkdirSync(module.exports.directories.instances, {recursive: true}); }

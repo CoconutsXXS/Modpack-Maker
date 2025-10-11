@@ -1858,7 +1858,7 @@ async function downloadJava(version, listeners = null)
     let link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`
     await download(win, link, {filename: `java-${version}.tar`, directory: config.directories.jre, onProgress: async (progress) =>
     {
-        if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
+        if(listeners) { listeners.log('javaProgress', Math.round(progress.percent*100).toString()) }
     }});
 
     // await new Promise((resolve, reject) =>
