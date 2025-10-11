@@ -5,8 +5,6 @@ const launcher = new Client();
 const path = require('node:path')
 const fs = require('fs')
 const { windowManager } = require('node-window-manager');
-const nut = require('@nut-tree-fork/nut-js');
-const net = require('net');
 var chokidar = require('chokidar');
 const { unzip } = require('unzipit');
 const { XMLParser } = require("fast-xml-parser");
@@ -14,20 +12,15 @@ const es = require('event-stream');
 const os = require("os");
 const _ = require("lodash")
 const { execSync } = require("child_process")
-const unzipper = require("unzipper")
 const tar = require("tar")
 const {sep} = require("path")
-
-const nbt = require('prismarine-nbt');
-const minecraftData = require('minecraft-data')
+const extract = require("extract-zip");
 
 const config = require('./config');
 const Download = require('./download');
 const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
-const { setTimeout } = require('node:timers/promises');
 const { platform } = require('node:os');
-const { exec } = require('node:child_process');
 
 function rootPath()
 {
@@ -1611,55 +1604,6 @@ async function installLoader(root, loader, version, listeners = null)
     return version.custom;
 }
 
-async function inputOnWindow(win, action, x, y, width, height, sync = false)
-{    
-    if(sync)
-    {
-        win.setBounds({x: mainWindow.getBounds().x + x+1, y: mainWindow.getBounds().y + y+1, width: width, height: height});
-    }
-    const bounds = win.getBounds();
-
-    let oldMousePosition = null
-    if(sync)
-    {
-        const pidWin = windowManager.getWindows().find(w => w.processId === minecraftProcess.pid);
-        if(pidWin)
-        {
-            pidWin.bringToTop()
-        }else{win.bringToTop()}
-        
-        await nut.mouse.setPosition(await nut.mouse.getPosition());
-        await action();
-    }
-    else
-    {
-        oldMousePosition = await nut.mouse.getPosition();
-
-        const relX = (oldMousePosition.x - mainWindow.getBounds().x - x) / width;
-        const relY = (oldMousePosition.y - mainWindow.getBounds().y - y) / height;
-
-        const absX = Math.floor(bounds.x + (bounds.width * relX));
-        const absY = Math.floor(bounds.y + (bounds.height * relY));
-
-        const pidWin = windowManager.getWindows().find(w => w.processId === minecraftProcess.pid);
-        if(pidWin)
-        {
-            pidWin.bringToTop()
-        }else{win.bringToTop()}
-        
-        await nut.mouse.setPosition(new nut.Point(absX, absY));
-        await action();
-    }
-
-    if(mainWindow)
-    {
-        app.focus({steal: true})
-        mainWindow.focus()
-
-        if(oldMousePosition != null) { await nut.mouse.setPosition(new nut.Point(oldMousePosition.x, oldMousePosition.y)); }
-    }
-}
-
 function fixJSONChar(jsonString)
 {
   let inString = false;
@@ -1728,10 +1672,11 @@ function findJavaExecutable(targetMajorVersion)
 {
     targetMajorVersion = targetMajorVersion.toString()
 
-    if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents/Home/bin/java')))
-    {
-        return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents/Home/bin/java')
-    }
+    if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents','Home','bin','java')))
+    { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents','Home','bin','java') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe')))
+    { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe') }
+
 
     const candidates = [];
 
@@ -1869,11 +1814,20 @@ async function downloadJava(version, listeners = null)
     //         .on("error", reject);
     // });
 
-    await tar.x
-    ({
-        file: path.join(config.directories.jre, `java-${version}.tar`),
-        cwd: path.join(config.directories.jre, `java-${version}`)
-    });
+    console.log(path.join(config.directories.jre, `java-${version}.tar`))
+    try
+    {
+        await tar.x
+        ({
+            file: path.join(config.directories.jre, `java-${version}.tar`),
+            cwd: path.join(config.directories.jre, `java-${version}`),
+            gzip: true
+        });
+    }
+    catch(err)
+    {
+        await extract(path.join(config.directories.jre, `java-${version}.tar`), { dir: path.join(config.directories.jre, `java-${version}`) });
+    }
 
     // Direct Directory
     const baseDir = path.join(config.directories.jre, `java-${version}`);
@@ -1896,7 +1850,10 @@ async function downloadJava(version, listeners = null)
 
     if(createdWin) { win.close(); }
 
-    return path.join(config.directories.jre, `java-${version}`, 'Contents/Home/bin/java')
+    if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
 }
 
 module.exports = Instance;
