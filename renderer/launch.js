@@ -277,8 +277,6 @@ playButton.addEventListener('click', async () =>
 
                 stopButton.onclick = () => { closeGame(i); }
 
-                return;
-
                 // return;
 
                 // Resize

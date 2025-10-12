@@ -425,6 +425,8 @@ class Instance
             let isAppFocused = false;
             for(var w of BrowserWindow.getAllWindows()) { if(w.isFocused()){isAppFocused=true;break;} }
 
+            return true;
+
             if(isAppFocused)
             {
                 app.focus({steal: true});
