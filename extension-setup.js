@@ -1,4 +1,4 @@
-const { exec } = require("child_process");
+const { exec, execSync } = require("child_process");
 const { app } = require('electron');
 const fs = require("fs");
 const path = require("path");
@@ -11,7 +11,7 @@ const version = "0.1.22";
 
 module.exports = 
 {
-    firefox: () =>
+    firefox: async () =>
     {
         // Déterminer dossier du manifeste selon OS
         let hostDir;
@@ -59,6 +59,8 @@ module.exports =
         };
 
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+        try{execSync(`chmod +x "${hostPath}"`)}catch(err){console.warn(err)}
 
         if(checkedVersion){return}
 

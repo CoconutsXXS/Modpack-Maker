@@ -1,5 +1,4 @@
-#!/usr/bin/env -S /usr/local/bin/node
-// TODO ^^^ adapt to system
+#!/usr/bin/env node
 
 import fs from "node:fs/promises";
 import path from "path";
