@@ -1,0 +1,14 @@
+Windows
+npm run dist -- --win --arm64 --publish=never
+npm run dist -- --win --x64 --publish=never
+npm run dist -- --win --ia32 --publish=never
+
+MacOS
+npm run dist -- --mac --arm64 --publish=never
+npm run dist -- --mac --x64 --publish=never
+npm run dist -- --mac --ia32 --publish=never
+
+Linux
+npm run dist -- --linux --arm64 --publish=never
+npm run dist -- --linux --x64 --publish=never
+npm run dist -- --linux --ia32 --publish=never
