@@ -7,6 +7,8 @@ const config = require('./config');
 
 const version = "0.1.22";
 
+// chmod +x ".../extension/host.mjs"
+
 module.exports = 
 {
     firefox: () =>
