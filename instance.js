@@ -310,9 +310,10 @@ class Instance
         }
 
         // Auth
-        const authManager = new Auth("consent");
-        const xboxManager = await authManager.launch("raw");
+        const authManager = new Auth("select_account");
+        const xboxManager = await authManager.launch("electron");
         const token = await xboxManager.getMinecraft();
+        fs.writeFileSync(path.join(app.getAppPath(), 'account.json'), JSON.stringify(token));
 
         // Settings
         let options =
@@ -321,7 +322,7 @@ class Instance
             version: this.version,
             memory: this.memory,
             // authorization: await Authenticator.getAuth("dev"),
-            authorization: token.mclc(),
+            authorization: token.mclc(true),
             forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
             // clientPackage: null,
             // customArgs: [`-javaagent:${config.javaAgent}`],
