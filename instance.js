@@ -336,6 +336,14 @@ class Instance
             // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
             quickPlay: world!=undefined?world:null,
             javaPath: javaPath?javaPath:'java',
+<<<<<<< Updated upstream
+=======
+
+            features: ["is_demo_user", "offline"],
+
+            detached: true,
+            customArgs: ['-XstartOnFirstThread'],
+>>>>>>> Stashed changes
             overrides: {detached: true}
         }
         console.log(options)
