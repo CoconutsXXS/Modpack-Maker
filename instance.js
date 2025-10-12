@@ -363,6 +363,7 @@ class Instance
 
         // Launch
         let process = await launcher.launch(options);
+        if(!process){console.error("No process, cannot launch..."); return;}
         process.on("error", (e) => listeners.log('error', e))
         process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
         let pid = process?.pid;
