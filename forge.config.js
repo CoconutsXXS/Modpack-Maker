@@ -1,6 +1,7 @@
 module.exports = {
   packagerConfig: {
     asar: false,
+    icon: '/icon/icon'
   },
   makers: [
     {
