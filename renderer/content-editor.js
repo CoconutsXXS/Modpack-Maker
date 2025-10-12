@@ -338,7 +338,7 @@ window.jarData =
 window.addInstanceListener((i) => {jarAnalyseSetup(i)});
 async function jarAnalyseSetup(i)
 {
-    if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
+    if(!(await ipcInvoke("isMinecraftInstalled", window.instance.name, window.instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
     document.getElementById("launch-required").style.display = "none";
     document.getElementById("launch-required").querySelector("button").onclick = ()=>{jarAnalyseSetup(i)}
 
@@ -421,7 +421,7 @@ async function jarAnalyseSetup(i)
 
     window.jarData.openExplorer = async function(path = "")
     {
-        if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
+        if(!(await ipcInvoke("isMinecraftInstalled", window.instance.name, window.instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
         document.getElementById("launch-required").style.display = "none";
 
         let pathKeys = path;

@@ -1,6 +1,7 @@
 const { app, desktopCapturer, BrowserWindow } = require('electron');
 const { download } = require("grape-electron-dl");
 const { Client, Authenticator } = require('minecraft-launcher-core');
+const { Auth } = require("msmc");
 const launcher = new Client();
 const path = require('node:path')
 const fs = require('fs')
@@ -308,13 +309,19 @@ class Instance
             javaPath = await downloadJava(javaVersion, listeners)
         }
 
+        // Auth
+        const authManager = new Auth("consent");
+        const xboxManager = await authManager.launch("raw");
+        const token = await xboxManager.getMinecraft();
+
         // Settings
         let options =
         {
             root: this.path,
             version: this.version,
             memory: this.memory,
-            authorization: await Authenticator.getAuth("dev"),
+            // authorization: await Authenticator.getAuth("dev"),
+            authorization: token.mclc(),
             forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
             // clientPackage: null,
             // customArgs: [`-javaagent:${config.javaAgent}`],
@@ -328,7 +335,8 @@ class Instance
             // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
             quickPlay: world!=undefined?world:null,
             javaPath: javaPath?javaPath:'java',
-            overrides: {detached: true}
+            overrides: {detached: true},
+            features: ["is_demo_user", "offline"]
         }
         console.log(options)
 
@@ -339,6 +347,7 @@ class Instance
             {
                 fs.cpSync(path.join(this.path,'assets'), resourcePath+sep+'assets', {recursive:true})
                 fs.cpSync(path.join(this.path,'libraries'), resourcePath+sep+'libraries', {recursive:true})
+
                 fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
             }
         });
@@ -1292,12 +1301,12 @@ class Instance
         if(url.hostname == "modrinth.com")
         {
             // Find Modpack Version
-            const version = (await (await fetch('https://api.modrinth.com/v2/project'+sep+url.pathname.split(sep)[url.pathname.split(sep).length-1]+sep+'version')).json())
+            const version = (await (await fetch('https://api.modrinth.com/v2/project'+'/'+url.pathname.split('/')[url.pathname.split('/').length-1]+'/'+'version')).json())
             .sort((a,b) => { return new Date(b.date_published) - new Date(a.date_published); })[0];
             let file = version.files.filter(f=>f.primary)[0];
 
             // Metadata
-            let meta = (await (await fetch('https://api.modrinth.com/v2/project'+sep+url.pathname.split(sep)[url.pathname.split(sep).length-1])).json());
+            let meta = (await (await fetch('https://api.modrinth.com/v2/project'+'/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
             i.description = meta.description;
             i.version.number = version.game_versions[0];
             i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
@@ -1318,7 +1327,7 @@ class Instance
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+sep+i.version.number.toString())).json();
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+i.version.number.toString())).json();
                     i.loader.version = data[0].loader.version;
                     break;
                 }
@@ -1389,7 +1398,7 @@ class Instance
         // Curseforge
         else if(url.hostname == "www.curseforge.com")
         {
-            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split(sep)[url.pathname.split(sep).length-1]}&classId=4471`)).json()).data[0];
+            let meta = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${url.pathname.split('/')[url.pathname.split('/').length-1]}&classId=4471`)).json()).data[0];
             let id = meta.id;
 
             // https://www.curseforge.com/api/v1/mods/936875/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true
@@ -1419,7 +1428,7 @@ class Instance
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+sep+i.version.number.toString())).json();
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+i.version.number.toString())).json();
                     i.loader.version = data[0].loader.version;
                     break;
                 }
@@ -1676,6 +1685,8 @@ function findJavaExecutable(targetMajorVersion)
 
     if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents','Home','bin','java')))
     { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'Contents','Home','bin','java') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'javaw.exe')))
+    { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'javaw.exe') }
     else if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe')))
     { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe') }
 
@@ -1803,6 +1814,11 @@ async function downloadJava(version, listeners = null)
     fs.mkdirSync(path.join(config.directories.jre, `java-${version}`), {recursive: true})
 
     let link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`
+
+    let res = await fetch(link, { method: "HEAD" })
+    if(!res.ok){arch="x64"; link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`}
+    
+
     await download(win, link, {filename: `java-${version}.tar`, directory: config.directories.jre, onProgress: async (progress) =>
     {
         if(listeners) { listeners.log('javaProgress', Math.round(progress.percent*100).toString()) }
@@ -1854,6 +1870,8 @@ async function downloadJava(version, listeners = null)
 
     if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java')))
     { return path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe') }
     else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe')))
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
 }

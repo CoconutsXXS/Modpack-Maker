@@ -322,7 +322,7 @@ async function getJar(path, expend = false)
 
 function minecraftVersion(name, version)
 {
-    if(fs.existsSync(path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar"))){return path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar")}
+    if(fs.existsSync(path.join(config.directories.instances, name,"minecraft", "versions", version, version+".jar"))){return path.join(config.directories.instances, name,"minecraft", "versions", version, version+".jar")}
     else if(fs.existsSync(path.join(config.directories.resources, "versions", version, version+".jar"))){return path.join(config.directories.resources, "versions", version, version+".jar")}
     else { console.warn("Minecraft version not found for",name,version); return ""; }
 }
@@ -334,13 +334,14 @@ module.exports =
 
     isMinecraftInstalled: async(name, version) =>
     {
-        return fs.existsSync(path.join(config.directories.instances, name, "minecraft/versions/", version, version+".jar")) || fs.existsSync(path.join(config.directories.resources, "versions", version, version+".jar"));
+        return fs.existsSync(path.join(config.directories.instances, name, "minecraft", "versions", version, version+".jar")) || fs.existsSync(path.join(config.directories.resources, "versions", version, version+".jar"));
     },
     minecraftVersion: minecraftVersion,
 
     fullModData: async (path) =>
     {
         let jar = await jarReader.jar(path, null, true);
+        console.log("jar", jar)
 
         // Iterate Data per Mods
         let registeredMods = [];
