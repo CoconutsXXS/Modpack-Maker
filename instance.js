@@ -363,6 +363,7 @@ class Instance
 
         // Launch
         let process = await launcher.launch(options);
+        if(!process){console.error("No process, cannot launch..."); return;}
         process.on("error", (e) => listeners.log('error', e))
         process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
         let pid = process?.pid;
@@ -1689,6 +1690,8 @@ function findJavaExecutable(targetMajorVersion)
     { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'javaw.exe') }
     else if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe')))
     { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java.exe') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java')))
+    { return path.join(config.directories.jre, `java-${targetMajorVersion}`, 'bin', 'java') }
 
 
     const candidates = [];
@@ -1832,7 +1835,6 @@ async function downloadJava(version, listeners = null)
     //         .on("error", reject);
     // });
 
-    console.log(path.join(config.directories.jre, `java-${version}.tar`))
     try
     {
         await tar.x
@@ -1874,6 +1876,8 @@ async function downloadJava(version, listeners = null)
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe') }
     else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe')))
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
+    else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java') }
 }
 
 module.exports = Instance;
