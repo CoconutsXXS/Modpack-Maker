@@ -79,6 +79,7 @@
         "repo": "Modpack-Maker"
       }
     ],
+
     "mac": {
       "target": [
         "dmg",
@@ -99,10 +100,20 @@
     },
     "linux": {
       "maintainer": "CoconutsXXS <axel.ohresser47@gmail.com>",
+      "category": "Utility",
       "target": [
-        "AppImage"
+        "deb"
       ],
       "icon": "icon/icon.png"
+    },
+    "deb": {
+      "priority": "optional",
+      "compression": "xz",
+      "depends": [
+        "libappindicator3-1",
+        "gconf2",
+        "libnotify4"
+      ]
     }
   }
 }
