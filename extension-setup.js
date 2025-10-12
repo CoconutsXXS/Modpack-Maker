@@ -41,11 +41,11 @@ module.exports =
         if(fs.existsSync(path.join(config.directories.extension, "host.json"))) {checkedVersion = JSON.parse(fs.readFileSync(path.join(config.directories.extension, "host.json"))).version == version};
         fs.writeFileSync(path.join(config.directories.extension, "host.json"), JSON.stringify(hostData), {recursive: true});
 
+        const manifestPath = path.join(hostDir, "modpack_maker.json");
+
         // Manifest
         const hostPath = path.join(config.directories.extension, "host.mjs");
         fs.copyFileSync(path.join(__dirname, "host.mjs"), hostPath);
-
-        const manifestPath = path.join(hostDir, "modpack_maker.json");
 
         const manifest =
         {
@@ -70,6 +70,6 @@ module.exports =
             if(err) {console.error("Failed to open Firefox:", err)}
         });
 
-        // console.log("Installed Firefox host.");
+        console.log("Successfully installed Firefox extension version",version)
     }
 }
