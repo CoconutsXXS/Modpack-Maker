@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S /usr/local/bin/node
 
 import fs from "node:fs/promises";
 import path from "path";
