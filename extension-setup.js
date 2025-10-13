@@ -49,6 +49,14 @@ module.exports =
         const hostPath = path.join(config.directories.extension, "host.mjs");
         fs.copyFileSync(path.join(__dirname, "host.mjs"), hostPath);
 
+        let nodePath = execSync('node -p "process.execPath"').toString().split("\n")[0];
+        let hostScript = fs.readFileSync(path.join(__dirname, "host.mjs")).toString("utf8");
+        console.log(nodePath)
+        hostScript = "#!"+nodePath+"\n"+hostScript
+
+        console.log(hostScript)
+        fs.writeFileSync(hostPath, hostScript);
+
         const manifest =
         {
             name: "modpack_maker",
