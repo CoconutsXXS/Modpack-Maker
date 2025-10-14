@@ -1887,7 +1887,16 @@ async function downloadJava(version, listeners = null)
 const lwjglVersion = "3.3.6"
 async function fixLibraries(libraryPath, listeners = null)
 {
-    if(platform() != "linux" || arch() == "arm64"){return}
+    console.log(platform(), arch())
+    if(platform() != "linux" || arch() != "arm64"){return}
+
+    let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
+    let createdWin = win==undefined;
+    if(createdWin)
+    {
+        win = new BrowserWindow({});
+        win.hide();
+    }
 
     const LIBS =
     [
@@ -1911,13 +1920,12 @@ async function fixLibraries(libraryPath, listeners = null)
         try
         {
             fs.mkdirSync(libPath, { recursive: true });
-            console.log(`⬇ Téléchargement ${lib} ARM64...`);
 
-            await download(win, `https://build.lwjgl.org/release/${lwjglVersion}/bin/linux/arm64/${lib}-${lwjglVersion}-natives-linux-arm64.jar`,
-            {filename: `${lib}-${lwjglVersion}-natives-linux-arm64.jar`, directory: libPath, onProgress: async (progress) =>
-            {
-                if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
-            }});
+            // await download(win, `https://build.lwjgl.org/release/${lwjglVersion}/bin/linux/arm64/${lib}-${lwjglVersion}-natives-linux-arm64.jar`,
+            // {filename: `${lib}-${lwjglVersion}-natives-linux-arm64.jar`, directory: libPath, onProgress: async (progress) =>
+            // {
+            //     if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
+            // }});
 
             console.log(`✅ Patch appliqué: ${nativeFile}`);
         }
@@ -1926,6 +1934,8 @@ async function fixLibraries(libraryPath, listeners = null)
             console.error(`❌ Erreur lors du patch de ${lib}: ${err.message}`);
         }
     }
+
+    if(createdWin) { win.close(); }
 }
 
 module.exports = Instance;
