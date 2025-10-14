@@ -115,7 +115,7 @@ async function modify()
 
     // Chapter
     if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
-    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
     {
         // if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
         // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }

@@ -48,28 +48,43 @@ module.exports =
         // Manifest
         const hostPath = path.join(config.directories.extension, "host.mjs");
         fs.copyFileSync(path.join(__dirname, "host.mjs"), hostPath);
+        let execFile = hostPath
 
-        let nodePath = execSync('node -p "process.execPath"').toString().split("\n")[0];
         let hostScript = fs.readFileSync(path.join(__dirname, "host.mjs")).toString("utf8");
-        console.log(nodePath)
-        hostScript = "#!"+nodePath+"\n"+hostScript
+        let nodePath = execSync('node -p "process.execPath"').toString().split("\n")[0];
 
-        console.log(hostScript)
+        if(os.platform() == "win32")
+        {
+            let batScript = `@echo off
+"${nodePath}" "${hostPath}"`
+            fs.writeFileSync(path.join(config.directories.extension, "host.bat"), batScript)
+            execFile = path.join(config.directories.extension, "host.bat")
+        }
+        else
+        {
+            hostScript = "#!"+nodePath+"\n"+hostScript
+        }
+
         fs.writeFileSync(hostPath, hostScript);
 
         const manifest =
         {
             name: "modpack_maker",
             description: "Native Modpack-Maker host",
-            path: hostPath,
+            path: execFile,
             type: "stdio",
             allowed_extensions: ["modpack_maker@example.com"]
         };
 
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+        if(os.platform() == "win32")
+        {
+            execSync(`powershell -Command "New-Item -Path 'HKCU:\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\modpack_maker' -Force; Set-ItemProperty -Path 'HKCU:\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\modpack_maker' -Name '(default)' -Value '${manifestPath.replace(/"/g, '`"')}'"`)
+        }
 
-        try{execSync(`chmod +x "${hostPath}"`)}catch(err){console.warn(err)}
-
+        if(os.platform() != "win32")
+        {try{execSync(`chmod +x "${hostPath}"`)}catch(err){console.warn(err)}}
+        
         if(checkedVersion){return}
 
         const addonPath = path.join(__dirname, "modpack_maker.xpi");
