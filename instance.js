@@ -1887,8 +1887,8 @@ async function downloadJava(version, listeners = null)
 const lwjglVersion = "3.3.6"
 async function fixLibraries(libraryPath, listeners = null)
 {
-    console.log(platform(), arch())
-    if(platform() != "linux" || arch() != "arm64"){return}
+    let resourcePath = path.join(__dirname, "lwjgl", `${platform()}-${arch()}.zip`)
+    if(!fs.existsSync(resourcePath)){return}
 
     let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
     let createdWin = win==undefined;
@@ -1905,6 +1905,11 @@ async function fixLibraries(libraryPath, listeners = null)
         "lwjgl-opengl",
         "lwjgl-stb"
     ];
+
+    let unziped = (await unzip(resourcePath)).entries;
+    console.log(unziped)
+
+    return;
 
     for (const lib of LIBS)
     {
