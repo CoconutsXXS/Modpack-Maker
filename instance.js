@@ -21,7 +21,7 @@ const config = require('./config');
 const Download = require('./download');
 const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
-const { platform } = require('node:os');
+const { platform, arch } = require('node:os');
 
 function rootPath()
 {
@@ -308,6 +308,8 @@ class Instance
         {
             javaPath = await downloadJava(javaVersion, listeners)
         }
+
+        await fixLibraries(path.join(resourcePath, 'libraries'), listeners)
 
         // Auth
         // const authManager = new Auth("select_account");
@@ -1880,6 +1882,50 @@ async function downloadJava(version, listeners = null)
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
     else if(fs.existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java')))
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java') }
+}
+
+const lwjglVersion = "3.3.6"
+async function fixLibraries(libraryPath, listeners = null)
+{
+    if(platform() != "linux" || arch() == "arm64"){return}
+
+    const LIBS =
+    [
+        "lwjgl",
+        "lwjgl-glfw",
+        "lwjgl-opengl",
+        "lwjgl-stb"
+    ];
+
+    for (const lib of LIBS)
+    {
+        const libPath = path.join(libraryPath, "org", "lwjgl", lib, lwjglVersion);
+        const nativeFile = path.join(libPath, `${lib}-${lwjglVersion}-natives-linux-arm64.jar`);
+
+        if (fs.existsSync(nativeFile))
+        {
+            console.log(`✔ ${lib}: déjà patché`);
+            continue;
+        }
+
+        try
+        {
+            fs.mkdirSync(libPath, { recursive: true });
+            console.log(`⬇ Téléchargement ${lib} ARM64...`);
+
+            await download(win, `https://build.lwjgl.org/release/${lwjglVersion}/bin/linux/arm64/${lib}-${lwjglVersion}-natives-linux-arm64.jar`,
+            {filename: `${lib}-${lwjglVersion}-natives-linux-arm64.jar`, directory: libPath, onProgress: async (progress) =>
+            {
+                if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
+            }});
+
+            console.log(`✅ Patch appliqué: ${nativeFile}`);
+        }
+        catch (err)
+        {
+            console.error(`❌ Erreur lors du patch de ${lib}: ${err.message}`);
+        }
+    }
 }
 
 module.exports = Instance;
