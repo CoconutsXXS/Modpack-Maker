@@ -5,7 +5,7 @@ const path = require("path");
 const os = require("os");
 const config = require('./config');
 
-const version = "0.1.22";
+const version = "0.1.23";
 
 // chmod +x ".../extension/host.mjs"
 
