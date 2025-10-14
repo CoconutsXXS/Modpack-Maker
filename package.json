@@ -89,10 +89,17 @@
     },
     "win": {
       "target": [
-        "portable"
+        "nsis"
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "icon/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}",

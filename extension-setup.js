@@ -87,7 +87,8 @@ module.exports =
         
         if(checkedVersion){return}
 
-        const addonPath = path.join(__dirname, "modpack_maker.xpi");
+        const addonPath = path.join(config.directories.extension, "modpack_maker.xpi");
+        fs.copyFileSync(path.join(__dirname, "modpack_maker.xpi"), addonPath)
 
         // Construct the "file://" URL (Firefox understands this)
         const fileUrl = `file://${addonPath.replace(/\\/g, "/")}`;
