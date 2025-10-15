@@ -12,7 +12,7 @@ const { XMLParser } = require("fast-xml-parser");
 const es = require('event-stream');
 const os = require("os");
 const _ = require("lodash")
-const { execSync, spawn } = require("child_process")
+const { execSync } = require("child_process")
 const tar = require("tar")
 const {sep} = require("path")
 const extract = require("extract-zip");
@@ -311,12 +311,6 @@ class Instance
 
         let customArgs = await fixLibraries(path.join(this.path, 'versions', this.version.number, "natives"), this)
 
-        customArgs.push(
-            "-DprintEnv=DEBUG", 
-            "-Dorg.lwjgl.Debug=true"
-        );
-
-
         // Manual (test)
         {
         //     const libsDir = path.join(this.path, "libraries");
@@ -406,16 +400,6 @@ class Instance
             authorization: await Authenticator.getAuth("dev"),
             // authorization: token.mclc(true),
             forge: this.loader.name=='forge'||this.loader.name=='neoforge'?path.join(this.path, 'versions', `${this.loader.name}-${this.version.number}-${this.loader.version}`, `${this.loader.name}-${this.version.number}-${this.loader.version}.jar`):null,
-            // clientPackage: null,
-            // customArgs: [`-javaagent:${config.javaAgent}`],
-            // overrides:
-            // {
-            //     // assetRoot: resourcePath+sep+'assets',
-            //     // assetIndex: resourcePath+sep+'assets/indexes',
-            //     // libraryRoot: resourcePath+sep+'libraries',
-            //     // directory: path.join(config.directories.resources, 'versions')
-            // }
-            // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
             quickPlay: world!=undefined?world:null,
             javaPath: javaPath?javaPath:'java',
             overrides: {detached: true},
@@ -444,19 +428,16 @@ class Instance
         launcher.on('error', (e) => listeners.log('error', e));
         launcher.on('close', (e) => {listeners.close(e);launcher.removeAllListeners();})
 
-        process.env.GDK_BACKEND = 'x11';
-        process.env.SDL_VIDEODRIVER = 'x11';
-        process.env.DISPLAY ??= ':0';
-        
+
         // Launch
-        let mProcess = await launcher.launch(options);
-        if(!mProcess){console.error("No process, cannot launch..."); return;}
-        mProcess.on("error", (e) => listeners.log('error', e))
-        mProcess.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
-        let pid = mProcess?.pid;
+        let process = await launcher.launch(options);
+        if(!process){console.error("No process, cannot launch..."); return;}
+        process.on("error", (e) => listeners.log('error', e))
+        process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
+        let pid = process?.pid;
         let windowSource = null;
 
-        if(!mProcess) { console.error("No process, crashed") }
+        if(!process) { console.error("No process, crashed") }
 
         // Crashlog
         let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
@@ -536,8 +517,8 @@ class Instance
             {
                 let listener = async (w) =>
                 {
-                    if(!mProcess){resolve(); return;}
-                    if(w.processId == mProcess.pid)
+                    if(!process){resolve(); return;}
+                    if(w.processId == process.pid)
                     {
                         windowManager.removeListener('window-activated', listener);
                         await trySource();
@@ -566,7 +547,7 @@ class Instance
             {
                 let listener = async (w) =>
                 {
-                    if(w.processId == mProcess.pid)
+                    if(w.processId == process.pid)
                     {
                         windowManager.removeListener('window-activated', listener);
                         await trySource();
@@ -589,7 +570,7 @@ class Instance
             })
         }
 
-        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {mProcess.kill('SIGINT')});
+        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {process.kill('SIGINT')});
     }
     // async launch(listeners =
     //     {
@@ -2051,7 +2032,7 @@ async function fixLibraries(libraryPath, instance)
 
     fs.copyFileSync(path.join(__dirname, "lwjgl", "libglfw.so"), path.join(libraryPath, "libglfw.so"))
 
-    return ["-Djava.library.path=\""+path.join(instance.path, 'versions', instance.version.number, "natives")+'"'];
+    return ["-Djava.library.path="+path.join(instance.path, 'versions', instance.version.number, "natives")];
 }
 
 module.exports = Instance;
