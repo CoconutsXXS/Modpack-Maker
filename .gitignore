@@ -4,6 +4,7 @@ immersion-intro/Ultra Unimmersive.zip
 Modpack-Maker.code-workspace
 
 node_modules/
+lwjgl/*
 
 dist/
 out/
