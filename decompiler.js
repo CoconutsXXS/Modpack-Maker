@@ -2,6 +2,12 @@ const { spawn, exec, execSync } = require('child_process');
 const { promises: fs, existsSync, createWriteStream } = require('fs');
 const path = require('path');
 const os = require('os');
+const config = require("./config")
+const {BrowserWindow} = require("electron");
+const { platform } = require('process');
+const { download } = require('grape-electron-dl');
+const tar = require("tar")
+const extract = require("extract-zip");
 
 function run(cmd, args, opts = {})
 {
@@ -204,7 +210,7 @@ module.exports =
         const destinationOut = path.join(tmp, 'src');
         await fs.mkdir(destinationOut);
 
-        await run('java', ['-jar', path.resolve(__dirname, 'cfr.jar'), '--outputdir', destinationOut, original]);
+        await run(await getJava('22'), ['-jar', path.resolve(__dirname, 'cfr.jar'), '--outputdir', destinationOut, original]);
 
         let result = await findSingleFileRecursive(destinationOut, '.java');
         result.file = (await fs.readFile(result.file)).toString();
@@ -218,7 +224,7 @@ module.exports =
         const destinationOut = path.join(tmp, 'src');
         await fs.mkdir(destinationOut);
 
-        await run('java', ['-jar', path.resolve(__dirname, 'procyon.jar'), '-jar', jarPath, '-o', destinationOut]);
+        await run(await getJava('22'), ['-jar', path.resolve(__dirname, 'procyon.jar'), '-jar', jarPath, '-o', destinationOut]);
 
         return destinationOut;
     },
@@ -469,4 +475,112 @@ java {
         //     console.log(path.join(decompiled, "build", "libs", jar))
         // }
     }
+}
+
+async function getJava(version, listeners = null)
+{
+    version = version.toString()
+
+    if(existsSync(path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java') }
+
+    let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
+    let createdWin = win==undefined;
+    if(createdWin)
+    {
+        win = new BrowserWindow({});
+        win.hide();
+    }
+
+    // https://api.adoptium.net/v3/binary/latest/<major_version>/<release_type>/<os>/<arch>/<image_type>/<jvm_impl>/<heap_size>/<vendor>?project=jdk
+    let os = 'windows';
+    switch(platform)
+    {
+        case "win32": os = "windows"; break;
+        case "darwin": os = "mac"; break;
+        case "linux": os = "linux"; break;
+        default: throw new Error(`Unsupported os: ${platform}`);
+    }
+
+    let arch = "aarch64";
+    switch (process.arch)
+    {
+        case 'x64': arch = 'x64'; break;
+        case 'arm64': arch = 'aarch64'; break;
+        case 'arm': arch = 'arm'; break;
+        default: throw new Error(`Unsupported arch: ${process.arch}`);
+    }
+
+    await fs.mkdir(path.join(config.directories.jre, `java-${version}`), {recursive: true})
+
+    let link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`
+
+    let res = await fetch(link, { method: "HEAD" })
+    if(!res.ok){arch="x64"; link = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${os}/${arch}/jre/hotspot/normal/adoptium?project=jdk`}
+    
+
+    await download(win, link, {filename: `java-${version}.tar`, directory: config.directories.jre, onProgress: async (progress) =>
+    {
+        if(listeners) { listeners.log('javaProgress', Math.round(progress.percent*100).toString()) }
+    }});
+
+    // await new Promise((resolve, reject) =>
+    // {
+    //     fs.createReadStream(path.join(config.directories.jre, `java-${version}.tar`))
+    //         .pipe(unzipper.Extract({ path: path.join(config.directories.jre, `java-${version}`) }))
+    //         .on("close", resolve)
+    //         .on("error", reject);
+    // });
+
+    console.log(path.join(config.directories.jre, `java-${version}`))
+
+    try
+    {
+        await tar.x
+        ({
+            file: path.join(config.directories.jre, `java-${version}.tar`),
+            cwd: path.join(config.directories.jre, `java-${version}`),
+            gzip: true
+        });
+    }
+    catch(err)
+    {
+        await extract(path.join(config.directories.jre, `java-${version}.tar`), { dir: path.join(config.directories.jre, `java-${version}`) });
+    }
+
+    // Direct Directory
+    const baseDir = path.join(config.directories.jre, `java-${version}`);
+    const subDirs = await fs.readdir(baseDir);
+
+    if (subDirs.length === 1)
+    {
+        const nestedDir = path.join(baseDir, subDirs[0]);
+        const items = await fs.readdir(nestedDir);
+
+        for(const item of items)
+        {
+            await fs.rename(path.join(nestedDir, item), path.join(baseDir, item));
+        }
+
+        await fs.rmdir(nestedDir);
+    }
+
+    await fs.unlink(path.join(config.directories.jre, `java-${version}.tar`))
+
+    if(createdWin) { win.close(); }
+
+    if(existsSync(path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'Contents','Home','bin','java') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'javaw.exe') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java.exe') }
+    else if(existsSync(path.join(config.directories.jre, `java-${version}`, 'bin', 'java')))
+    { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java') }
 }

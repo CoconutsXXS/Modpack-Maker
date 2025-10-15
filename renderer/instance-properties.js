@@ -60,12 +60,12 @@ window.addInstanceListener((i) =>
         }
     }
     descriptionInput.oninput = () => window.instance.description = descriptionInput.value;
-    loaderSelector.onchange = () =>
+    loaderSelector.addEventListener("change", () =>
     {
         window.instance.loader.name = loaderSelector.value; updateLoaderVersionSelector();
         document.getElementById('browse-panel').querySelector('.tab > button:nth-child(2)').disabled = window.instance.loader.name == 'vanilla';
         document.getElementById('browse-panel').querySelector('.tab > button:nth-child(4)').disabled = window.instance.loader.name == 'vanilla' || (window.instance.mods.find(m=>m.title=='Iris'||m.title=='Iris Shaders'||m.title=='Oculus')==undefined);
-    };
+    });
     minecraftVersionSelector.onchange = () => { window.instance.version.number = minecraftVersionSelector.value; updateLoaderVersionSelector(); }
     loaderVersionSelector.onchange = () => window.instance.loader.version = loaderVersionSelector.value;
     sinytraCheckbox.onclick = () =>

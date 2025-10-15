@@ -1499,7 +1499,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
         }
 
         editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
-        editors.nbtEditor.querySelectorAll("div > button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Open in Minecraft"
+        editors.nbtEditor.querySelectorAll("div > button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Edit in Minecraft"
 
         editors.nbtEditor.querySelectorAll(":scope > button")[0].innerText = "Save into "+filename;
         editors.nbtEditor.querySelectorAll(":scope > button")[0].onclick = async () => 
@@ -1530,7 +1530,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
                         {
                             closeEditor();
                             nbtEditorOpened = false;
-                            editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Open in Minecraft"
+                            editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Edit in Minecraft"
                             editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
                             editors.nbtEditor.querySelectorAll("p")[0].innerHTML = "";
                             editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none"

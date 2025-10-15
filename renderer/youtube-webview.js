@@ -1,49 +1,125 @@
-console.log('INJECTED YT')
-console.log(window.captions)
-setInterval(() =>
-{
-    try{modify();}catch(err){console.error(err)}
-    if(description == null) { try{descTry();}catch(err){console.warn(err)} }
-}, 1000/60);
+// Similarity
+var cache = []
+var codes = []
 
-let lastDescription = null;
+function levenshtein(value, other, insensitive)
+{
+  var length
+  var lengthOther
+  var code
+  var result
+  var distance
+  var distanceOther
+  var index
+  var indexOther
+
+  if (value === other) {
+    return 0
+  }
+
+  length = value.length
+  lengthOther = other.length
+
+  if (length === 0) {
+    return lengthOther
+  }
+
+  if (lengthOther === 0) {
+    return length
+  }
+
+  if (insensitive) {
+    value = value.toLowerCase()
+    other = other.toLowerCase()
+  }
+
+  index = 0
+
+  while (index < length) {
+    codes[index] = value.charCodeAt(index)
+    cache[index] = ++index
+  }
+
+  indexOther = 0
+
+  while (indexOther < lengthOther) {
+    code = other.charCodeAt(indexOther)
+    result = distance = indexOther++
+    index = -1
+
+    while (++index < length) {
+      distanceOther = code === codes[index] ? distance : distance + 1
+      distance = cache[index]
+      cache[index] = result =
+        distance > result
+          ? distanceOther > result
+            ? result + 1
+            : distanceOther
+          : distanceOther > distance
+          ? distance + 1
+          : distanceOther
+    }
+  }
+
+  return result
+}
+function similarity(a, b, options)
+{
+  var left = a || ''
+  var right = b || ''
+  var insensitive = !(options || {}).sensitive
+  var longest = Math.max(left.length, right.length)
+
+  return longest === 0
+    ? 1
+    : (longest - levenshtein(left, right, insensitive)) / longest
+}
+
+function np(s) { return s.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim(); }
+const urlRegex = /\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/g;
+
+// URL
+window.originalLocation = window.location.href;
+let videoId = new URL(window.location.href).searchParams.get("v");
+
+
 let description = null;
+let time = 0;
+let chapters = [];
+let currentChapter;
+let links = [];
+
 let lastScrappedChapter = null;
-let scrappedChapter = false;
 let modButton = null;
 let modSaveButton = null;
 let gallery = null;
-let backButton = null;
+
+
 async function modify()
 {
-    window.scrollX = 0;
-    if(window.location.href != window.originalLocation)
-    {
-        // window.location.assign(window.originalLocation);
-        description = null; scrappedChapter = false;
-        window.electron.sendToHost('new');
-    }
+    // Clear
+    if(modButton){modButton.remove();modButton=null;}
+    if(modSaveButton){modSaveButton.remove();modSaveButton=null;}
 
-    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button") && 
-    document.querySelector("#player-container.style-scope.ytd-watch-flexy") &&
-    document.querySelector("#player-container.style-scope.ytd-watch-flexy").parentNode != document.querySelector("#player-full-bleed-container"))
-    { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button").click(); }
-
-    // Subtitle
-    let t = document.querySelector("#movie_player > div.html5-video-container > video").currentTime;
-    window.electron.sendToHost('time', t);
+    // Cinema
+    // if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button") && 
+    // document.querySelector("#player-container.style-scope.ytd-watch-flexy") &&
+    // document.querySelector("#player-container.style-scope.ytd-watch-flexy").parentNode != document.querySelector("#player-full-bleed-container"))
+    // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button").click(); }
 
     // Chapter
-    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer") && !scrappedChapter)
+    if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
     {
-        if(!document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer").checkVisibility() && !scrappedChapter)
-        { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
+        // if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
+        // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
 
-        if(document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer") &&
-        document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer").checkVisibility() && !scrappedChapter)
+        if(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
+        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
         {
-            let chapters = [];
-            for(let c of document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer").childNodes)
+            chapters = [];
+
+            for(let c of document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
             {
                 if(!c.querySelector("#endpoint")) { continue }
                 let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
@@ -56,25 +132,24 @@ async function modify()
 
             if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters))
             {
-                console.log(JSON.stringify(lastScrappedChapter), JSON.stringify(chapters))
-                window.electron.sendToHost('chapters', chapters);
                 lastScrappedChapter = chapters;
-                scrappedChapter = true;
-                console.log('chapters =',chapters)
                 // setTimeout(() => scrappedChapter = false, 3000);
 
-                if(document.querySelector(".style-scope.ytd-engagement-panel-section-list-renderer > #contents.style-scope.ytd-macro-markers-list-renderer").checkVisibility())
-                { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
+                // if(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+                // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
             }
         }
+
+        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(7) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
     }
-    else if(!scrappedChapter)
+    else
     {
         console.log("Failed to handle chapters");
+        return false;
     }
 
     // New button
-    if(document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0] != undefined && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].children.length > 0 && (modButton==null || !document.body.contains(modButton) || modButton.children.length == 0))
+    if(document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > .ytIconWrapperHost") && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0] != undefined && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].children.length > 0)
     {
         modButton = document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].cloneNode(true);
 
@@ -85,7 +160,7 @@ async function modify()
         // #top-level-buttons-computed > yt-button-view-model > button-view-model > button > div.yt-spec-button-shape-next__icon
         modButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > img").style.width = modButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > img").style.height = '24px'
         modButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > img").style.borderRadius = '8px';
-        modButton.onclick = () => { window.electron.sendToHost('open-mod'); document.querySelector("#movie_player > div.html5-video-container > video").pause(); }
+        modButton.addEventListener("click", () => { document.querySelector("#movie_player > div.html5-video-container > video").pause(); });
 
         modButton.title = 'View Mod'
         modButton.setAttribute('data-title-no-tooltip', 'View Mod');
@@ -95,12 +170,15 @@ async function modify()
     else if(modButton==null || !document.body.contains(modButton))
     {
         console.log("Failed to create new buttons");
+        return false;
     }
 
 
-    document.querySelectorAll("#button-shape")[0].remove();
+    if(document.querySelectorAll("#button-shape")[0])
+    { document.querySelectorAll("#button-shape")[0].remove(); }
+    
 
-    if(document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0] != undefined && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].children.length > 0 && (modSaveButton==null || !document.body.contains(modSaveButton) || modSaveButton.children.length == 0))
+    if(!modSaveButton && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0] != undefined && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].children.length > 0)
     {
         modSaveButton = document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].cloneNode(true);
 
@@ -119,6 +197,7 @@ async function modify()
 
         let p = document.createElementNS('http://www.w3.org/2000/svg',"path");
         p.setAttributeNS(null, "d", "M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
+
         modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg").appendChild(p);
 
         modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg").setAttributeNS(null, "width", "24");
@@ -136,6 +215,7 @@ async function modify()
     else if(modSaveButton==null || !document.body.contains(modSaveButton))
     {
         console.log("Failed to create new buttons");
+        return false;
     }
 
     if(gallery==undefined || !document.body.contains(gallery))
@@ -162,8 +242,9 @@ async function modify()
             if(scroll > gallery.scrollLeftMax){scroll=gallery.scrollLeftMax;}
         })
 
-        setInterval(() =>
+        let scrolInterval = setInterval(() =>
         {
+            if(!gallery){clearInterval(scrolInterval);return;}
             if(scroll == gallery.scrollLeft){return;}
             gallery.scrollLeft = lerp(gallery.scrollLeft, scroll, 0.6);
         }, 1000/60)
@@ -172,40 +253,272 @@ async function modify()
     else if(!document.body.contains(gallery))
     {
         console.log("Failed to handle gallery");
+        return false;
     }
 
-    if(backButton==null)
+    return true;
+}
+
+
+function scrapDescription(change = (d)=>{})
+{
+    if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")) { if(!document.querySelector("#description-interaction")){return false} document.querySelector("#description-interaction").click(); }
+
+    if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")){return false;}
+
+    let desc = '';
+
+    for(let c of document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")?.childNodes)
     {
-        backButton = document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > button").cloneNode(true);
-        document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > button").parentNode.appendChild(backButton);
-        backButton.style.rotate = '180deg';
-        backButton.title = 'Back'
-        backButton.setAttribute('data-title-no-tooltip', 'Back');
-        backButton.setAttribute('aria-keyshortcuts', '');
-
-        let escapeHTMLPolicy = trustedTypes.createPolicy("forceInner", {
-            createHTML: (to_escape) => to_escape
-        })
-        backButton.innerHTML = escapeHTMLPolicy.createHTML(`<svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%"><use class="ytp-svg-shadow" xlink:href="#ytp-id-58"></use><path class="ytp-svg-fill" d="M 12,26 18.5,22 18.5,14 12,10 z M 18.5,22 25,18 25,18 18.5,14 z" id="ytp-id-58"></path></svg>`);
-
-        backButton.onclick = () =>
+        if(c.nodeName != 'SPAN' && c.nodeName == 'UL')
         {
-            window.electron.sendToHost('back');
-            window.location.href = 'about:blank';
+            for(let a of c.querySelectorAll('a')){desc+=a.href+'\n';}
+        }
+        else if(c.nodeName != 'SPAN'){continue;}
+        if(c.querySelector("a")) { desc+=c.querySelector("a").href+'\n'; }
+        else{desc+=c.innerText+'\n'}
+    }
+
+    document.querySelector("#description-inline-expander > #collapse.button.style-scope.ytd-text-inline-expander").click()
+
+    console.log("description != desc",description != desc)
+    if(desc != '' && description != desc)
+    {
+        description = desc;
+        change(description);
+
+        return true
+    }
+
+    return false
+}
+
+async function handleDescription()
+{
+    if(!description){ console.warn("No Description"); return;}
+
+    let linkText = description.match(urlRegex)
+    let nolinkText = description.split(urlRegex)
+    let link = []
+    description.replace(urlRegex, function(url)
+    {
+        link.push(url);
+        return url;
+    })
+
+    let final = [];
+    let i = 0;
+    for(let e of linkText)
+    {
+        i++;
+
+        e = e.replaceAll('\n','');
+        if(!e.startsWith('https://') && !e.startsWith('http://')) { e = 'https://'+e; }
+
+        let baseUrl = new URL(e);
+        let href = decodeURIComponent(baseUrl.searchParams.get("q"));
+        let url = (href==null||href=='null')?baseUrl:new URL(href);
+
+        // Google Doc Scrapping
+        if(url.hostname == 'docs.google.com' && url.pathname.startsWith('/document/d'))
+        {
+            let doc = await (await fetch(`https://docs.google.com/document/d/${url.pathname.split('/')[3]}/export?format=txt`)).text();
+
+            let linkText = doc.match(urlRegex)
+            let nolinkText = doc.split(urlRegex)
+            let index2 = 0;
+            for(let l of linkText)
+            {
+                index2++;
+
+                let before = null;
+                let fullBefore = null;
+                if(nolinkText.filter(p=>!urlRegex.test(p))[index2-1])
+                {
+                    fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-1].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+
+                    let substract = 2
+                    while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > index2-substract && index2-substract >= 0)
+                    {
+                        fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-substract].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+                        substract++;
+                    }
+
+                    before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
+                }
+                
+                final.push
+                ({
+                    url: l,
+                    before,
+                    fullBefore
+                })
+            }
+        }
+        // MC-MOD.GG Scrapping
+        if(url.hostname == "mc-mod.gg")
+        {
+            let doc = new DOMParser().parseFromString(await (await fetch(url.href)).text(), "text/html");;
+            for(let c of doc.querySelector("#content").childNodes)
+            {
+                if(c.nodeName != "DIV" || !c.querySelector("span") || !c.querySelector("a")){continue;}
+                c.querySelector("span").innerText
+                final.push
+                ({
+                    url: c.querySelector("a").href,
+                    before: c.querySelector("span").innerText,
+                    fullBefore: [c.querySelector("span").innerText]
+                })
+            }
+        }
+
+        // Time Chapter
+        if(url.hostname == 'www.youtube.com' && url.pathname == '/watch' && url.searchParams.get("v") == videoId && nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='').length > 0)
+        {
+            let chapterTime = 0;
+            if(url.searchParams.get("t") != null) { chapterTime = Number(url.searchParams.get("t").replace('s','')); }
+            chapters.push({name: nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='')[0].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim(), time: chapterTime});
+        }
+
+        if(url.hostname != 'www.curseforge.com' && url.hostname != 'modrinth.com') { continue; }
+
+        let before = null;
+        let fullBefore = null;
+        if(nolinkText.filter(p=>!urlRegex.test(p))[i-1])
+        {
+            fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[i-1].split('\n').filter(p=>p!='');
+
+            let substract = 2
+            while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > i-substract && i-substract >= 0)
+            {
+                fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[i-substract].split('\n').filter(p=>p!='');
+                substract++;
+            }
+
+            before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
+        }
+        final.push
+        ({
+            url: url.href,
+            before,
+            fullBefore
+        })
+    }
+    links = final;
+
+    // If it's an only one mod showcase
+    let usualLinks = links.filter(l=>new URL(l.url).hostname == 'www.curseforge.com'||new URL(l.url).hostname == 'modrinth.com');
+    let modLinks = usualLinks.filter(l=>new URL(l.url).pathname.split('/')[1] == "mod" || new URL(l.url).pathname.split('/')[2] == "mc-mods")
+    let rpLinks = usualLinks.filter(l=>new URL(l.url).pathname.split('/')[1] == "resourcepack" || new URL(l.url).pathname.split('/')[2] == "texture-packs")
+    let shaderLinks = usualLinks.filter(l=>new URL(l.url).pathname.split('/')[1] == "shader" || new URL(l.url).pathname.split('/')[2] == "shaders")
+
+    if(modLinks.filter.length <= 2 && (modLinks.filter(l=>new URL(l.url).hostname == 'www.curseforge.com').length == 1 || modLinks.filter(l=>new URL(l.url).hostname == 'modrinth.com').length == 1))
+    {
+        let finish = false;
+        for(let l of modLinks.filter(l=>new URL(l.url).hostname == 'modrinth.com'))
+        {
+            if(finish){break;}
+            finish = await setCurrentMod(l.url);
+        }
+        for(let l of modLinks.filter(l=>new URL(l.url).hostname == 'www.curseforge.com'))
+        {
+            if(finish){break;}
+            finish = await setCurrentMod(l.url);
         }
     }
 }
 
-window.updateMod = function(url, name, icon, description, images, compatible, saved)
-{
-    console.log("mod update");
 
+async function setCurrentMod(baseUrl)
+{
+    let url = new URL(baseUrl);
+    openFunction = function()
+    {
+        // document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
+        window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), baseUrl)
+        Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
+    }
+
+    // Youtube Button Update
+    if(url.hostname=='www.curseforge.com')
+    {
+        let i = [];
+        let res = await fetch(`https://www.curseforge.com/minecraft/${url.pathname.split('/')[2]}/${url.pathname.split('/')[3]}/gallery`);
+        if(!res.ok){return false;}
+        let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
+        if(galPage.querySelector('.images-gallery > ul:nth-child(1)'))
+        {
+            for(let c of galPage.querySelector('.images-gallery > ul:nth-child(1)').childNodes)
+            {
+                if(!c.querySelector("a > img")){continue;}
+
+                i.push(c.querySelector("a > img").src);
+            }
+        }
+
+        let type = url.pathname.split('/')[2];
+        let cleanType = type;
+        let classId = 6
+        switch(type)
+        {
+            case 'mc-mods': { classId = 6; cleanType = 'mods'; break; }
+            case 'shaders': { classId = 6552; cleanType = 'shaderpacks'; break; }
+            case 'texture-packs': { classId = 12; cleanType = 'resourcepacks'; break; }
+        }
+
+        updateMod
+        (
+            url.protocol+'//'+url.host+url.pathname,
+            galPage.querySelector(".name-container > h1").innerText,
+            galPage.querySelector(".author-info > img").src,
+            galPage.querySelector(".project-summary").innerHTML,
+            i
+        );
+    }
+    else
+    {
+        let i = [];
+        
+        let res = await fetch(`https://modrinth.com/${url.pathname.split('/')[1]}/${url.pathname.split('/')[2]}/gallery`);
+        if(!res.ok){return false;}
+        let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
+        if(galPage.querySelector('.items'))
+        {
+            for(let c of galPage.querySelector('.items').childNodes)
+            {
+                if(c.nodeName != 'DIV'){continue}
+                if(!c.querySelector("a:nth-child(1) > img:nth-child(1)")){continue;}
+
+                i.push(c.querySelector("a:nth-child(1) > img:nth-child(1)").src);
+            }
+        }
+
+        updateMod
+        (
+            url.protocol+'//'+url.host+url.pathname,
+            galPage.querySelector("h1.m-0").innerText, 
+            galPage.querySelector(".gap-x-8 > div:nth-child(1) > img:nth-child(1)").src, 
+            galPage.querySelector("div.flex.gap-4 > div > p").innerText, 
+            i
+        );
+    }
+
+    lastURL=baseUrl
+    return true;
+}
+
+let saved = false
+window.changeIsSaved = (v) => {saved=v; console.log("Saved changed")}
+async function updateMod(url, name, icon, description, images)
+{
+    if(!modButton || !modSaveButton){return;}
     modButton.firstChild.style.display = 'block'
     modButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__button-text-content").innerText = name;
     modButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > img").src = icon;
 
     while(gallery.firstChild) { gallery.removeChild(gallery.lastChild); }
     gallery.style.display = 'none'
+
     for(let i of images)
     {
         let el = document.createElement('img');
@@ -215,13 +528,11 @@ window.updateMod = function(url, name, icon, description, images, compatible, sa
         gallery.style.display = 'flex'
     }
 
-    // outline: green 3px solid;
-    modButton.firstChild.onmouseenter = () => { modButton.firstChild.firstChild.style.outline = (compatible?'green':'red')+' 3px solid' }
-    modButton.firstChild.onmouseleave = () => { modButton.firstChild.firstChild.style.outline = 'none' }
-
     // Save Button
+
     modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
 
+    modButton.onclick = () => { window.electron.sendToHost('open-mod'); document.querySelector("#movie_player > div.html5-video-container > video").pause(); }
 
     modSaveButton.onclick = (ev) =>
     {
@@ -241,7 +552,7 @@ window.updateMod = function(url, name, icon, description, images, compatible, sa
         }
         else
         {
-            window.electron.sendToHost('unsave', url);
+            window.electron.sendToHost('unsave', url)
             saved = false;
         }
 
@@ -249,25 +560,154 @@ window.updateMod = function(url, name, icon, description, images, compatible, sa
     }
 }
 
-// document.querySelectorAll()
 
-window.scrollTo({top: 0})
-
-function descTry()
+function update()
 {
-    document.querySelector("#description-interaction").click();
-    let desc = '';
-    if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")){return}
-    for(let c of document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")?.childNodes)
+    time = document.querySelector("#movie_player > div.html5-video-container > video").currentTime;
+
+    // Chapter Mod Recognition
+    // console.log(time, chapters)
+    if(chapters.length > 0 && chapters.sort((a,b) => b.time-a.time).find(a => a.time < time) != currentChapter)
     {
-        if(c.nodeName != 'SPAN' && c.nodeName == 'UL')
+        currentChapter = chapters.sort((a,b) => b.time-a.time).find(a => a.time < time);
+        if(!currentChapter) { console.log('no chapter found, chapter =', chapters, 'time = ', time); }
+        else
         {
-            for(let a of c.querySelectorAll('a')){desc+=a.href+'\n';}
+            let l  = links.sort((a,b) =>
+            {
+                let ia = 0;
+                for(let before of a.fullBefore)
+                {
+                    ia+=similarity(np(before), np(currentChapter.name), {sensitive: true});
+                }
+                ia /= a.fullBefore.length;
+
+                let ib = 0;
+                for(let before of b.fullBefore)
+                {
+                    ib+=similarity(np(before), np(currentChapter.name), {sensitive: true});
+                }
+                ib /= b.fullBefore.length;
+
+                return Math.max(ib, similarity(np(b.before), np(currentChapter.name), {sensitive: true})) - Math.max(ia, similarity(np(a.before), np(currentChapter.name), {sensitive: true}));
+            })[0];
+
+            if(!l){return;}
+            setCurrentMod(l.url);
         }
-        else if(c.nodeName != 'SPAN'){continue;}
-        if(c.querySelector("a")) { desc+=c.querySelector("a").href+'\n'; }
-        else{desc+=c.innerText+'\n'}
     }
-    document.querySelector("#description-inline-expander > #collapse.button.style-scope.ytd-text-inline-expander").click()
-    if(desc != '' && lastDescription != desc) { description = lastDescription = desc; window.electron.sendToHost('description', description); console.log('UPDATED DESC:',desc) }
 }
+
+
+let interval = null;
+let intervalFunction = () =>
+{
+    let href = window.location.href;
+
+    let scapped = scrapDescription((d) =>
+    {
+        let hashtags = [...d.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
+        if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
+        { handleDescription() }
+    });
+    if(description==null || !scapped){return;}
+
+    // Filter by #
+    let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
+
+    clearInterval(interval);
+
+    if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && !(description.toLowerCase().includes("minecraft") && description.toLowerCase().includes(" mod")))
+    {
+        return;
+    }
+
+    let setupInterval = setInterval(() =>
+    {
+        modify();
+        if(description!=null && modButton!=null && links.length>0 && chapters.length > 0)
+        {
+            window.scrollTo(0, 0);
+            clearInterval(setupInterval);
+            clearInterval(interval);
+            let subInterval = setInterval(() =>
+            {
+                if(href != window.location.href || !document.body.contains(modButton))
+                {
+                    if(modButton){modButton.remove();}
+                    if(modSaveButton){modSaveButton.remove();}
+                    if(gallery){gallery.remove();}
+
+                    time = 0;
+                    chapters = [];
+                    currentChapter;
+                    links = [];
+
+                    lastScrappedChapter = null;
+                    modButton = null;
+                    modSaveButton = null;
+                    gallery = null;
+
+                    clearInterval(subInterval);
+
+                    if(!new URL(window.location.href).searchParams.has("v")){return;}
+
+                    if(interval){clearInterval(interval)}
+                    interval = setInterval(intervalFunction, 200);
+                    return;
+                }
+                update();
+            }, 100)
+        }
+    }, 100)
+};
+
+let videoWait = setInterval(() =>
+{
+    if(!document.querySelector(".video-stream")){return;}
+    clearInterval(videoWait);
+
+    let lastAttr = null;
+    let o = new MutationObserver((mutations) =>
+    {
+        for(let m of mutations)
+        {
+            if(m.attributeName == "src" && lastAttr != document.querySelector(".video-stream").getAttribute("src"))
+            { update() }
+        }
+    })
+    o.observe(document.querySelector(".video-stream"), {childList: true, characterData: true, attributes: true, subtree: true})
+
+    function update()
+    {
+        if(!new URL(window.location.href).searchParams.has("v")){return;}
+        lastAttr = document.querySelector(".video-stream").getAttribute("src")
+        console.log("VIDEO UPDATED")
+        window.originalLocation = window.location.href;
+
+        if(modButton){modButton.remove();}
+        if(modSaveButton){modSaveButton.remove();}
+        if(gallery){gallery.remove();}
+
+        time = 0;
+        chapters = [];
+        currentChapter;
+        links = [];
+
+        lastScrappedChapter = null;
+        modButton = null;
+        modSaveButton = null;
+        gallery = null;
+
+
+        if(interval){clearInterval(interval)}
+        interval = setInterval(intervalFunction, 200);
+    }
+
+    document.querySelector(".video-stream").onloadeddata = (ev) =>
+    {
+        if(!new URL(window.location.href).searchParams.has("v")){return;}
+        update();
+        document.querySelector(".video-stream").onloadeddata = null;
+    }
+}, 100);

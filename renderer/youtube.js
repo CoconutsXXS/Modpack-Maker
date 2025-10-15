@@ -293,6 +293,9 @@ async function loadVideo(videoId)
 
     // Launch
     webview.src = `https://www.youtube.com/watch?v=${videoId}`
+    webview.openDevTools();
+    document.getElementById('web-window').querySelector('webview').openDevTools()
+    document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
 
     // Mod Display
     let lastURL = null;
@@ -302,7 +305,6 @@ async function loadVideo(videoId)
         let url = new URL(baseUrl);
         openFunction = function()
         {
-            // document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
             window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), baseUrl)
             // Array.from(document.getElementById('bottom-panel').childNodes[1].childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
             Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
@@ -437,6 +439,13 @@ async function loadVideo(videoId)
                 }
 
                 break;
+            }
+            case 'isSaved':
+            {
+                console.log(event)
+				let savedList = await ipcInvoke("readFile", path.join("saves", 'saved.json'));
+
+                await webview.executeJavaScript(`window.changeIsSaved(${(savedList.find(s => s.url == event.args[0])!=undefined)?"true":"false"})`)
             }
             case 'open-mod': { if(openFunction!=null){openFunction()} }
             case 'description':
@@ -590,5 +599,3 @@ async function loadVideo(videoId)
 
 // no parenthese
 function np(s) { return s.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim(); }
-
-// document.addEventListener('keypress', e => {if(e.key == 'd'){webview.openDevTools()}})

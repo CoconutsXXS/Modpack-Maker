@@ -112,10 +112,11 @@ async function mainWindow()
 
         darkTheme: true,
 
-        minimizable: true,
-        maximizable: true,
+        minimizable: false,
+        maximizable: false,
         closable: true,
-        show: false
+        show: false,
+        titleBarStyle: 'hiddenInset'
     });
 
     // Debug
@@ -444,7 +445,7 @@ ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app
 ipcMain.handle('readFile', async (event, p) => { return await reader.autoData(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('readRawFile', (event, p) => { return fs.readFileSync(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('writeFile', (event, p, d) => { return reader.saveData(path.join(app.getPath('appData'), p), d); })
-ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData'), p); if(!fs.existsSync(p.substring(0, p.lastIndexOf("/")))){fs.mkdirSync(p.substring(0, p.lastIndexOf("/")), {recursive: true})} fs.writeFileSync(p, Buffer.from(b)) })
+ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData'), p); if(!fs.existsSync(p.substring(0, p.lastIndexOf(path.sep)))){fs.mkdirSync(p.substring(0, p.lastIndexOf(path.sep)), {recursive: true})} fs.writeFileSync(p, Buffer.from(b)) })
 ipcMain.handle('writeRawData', (event, p, d) => { return reader.writeRawData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ return fs.unlinkSync(path.join(app.getPath('appData'), n)); }catch(err){console.warn(err)} })
 ipcMain.handle('deleteFolder', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ fs.rmSync(path.join(app.getPath('appData'), n), { recursive: true, force: true }); }catch(err){console.warn(err)} })

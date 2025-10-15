@@ -1125,12 +1125,25 @@ label:has(#filter-version-browsing)
 /* Content Editor */
 #content-editor { height: calc(100% - 25px); overflow: hidden; display: block; }
 #content-editor > div:last-of-type { width: 100%; height: calc(100% - 27px); overflow: hidden; display: flex; }
-#content-editor > div:last-of-type > div:last-of-type {width: 100%; height: 100%;}
+#content-editor > div:last-of-type > div:last-of-type
+{
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow-x: hidden;
+}
 
 #editor-container > div
 {
     height: 100%;
     overflow-y: hidden;
+}
+#editor-container > #code-editor
+{
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: auto;
+    max-width: 100%;
 }
 
 #mod-content-editor { height: 100%; display: flex; max-width: 50%; display: none; min-width: 50%; overflow-x: auto; }
@@ -1205,6 +1218,8 @@ label:has(#filter-version-browsing)
     right: 8px;
 }
 #code-editor > .exit-options > button:first-of-type:not(:disabled) { border-right: none; }
+#code-editor > .ͼ1 .cm-scroller { overflow: hidden; }
+#code-editor > .cm-editor{width: fit-content;}
 
 #nbt-editor
 {

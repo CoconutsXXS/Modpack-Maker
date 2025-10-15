@@ -7,6 +7,7 @@ let sinytraCompat = JSON.parse(await (await fetch("./renderer/sinytra-compatibil
 const parser = new DOMParser();
 async function searchMod(text = '')
 {
+    if(window.instance.loader.name=="vanilla"){return []}
     let searchResult = [];
 
     // Modrinth
@@ -213,7 +214,7 @@ window.setupTab(document.getElementById('mod-browser-filter'),
         select: () => { if(!sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.push('minecraftMods');displayResult()} },
         deselect: () => { if(sourceFilter.find(e=>e=='minecraftMods')){sourceFilter.splice(sourceFilter.findIndex(e=>e=='minecraftMods'), 1); displayResult()} }
     }
-], 0, true, false);
+], 0, true, true);
 
 // Display event
 searchInput.onkeydown = async (e) =>
@@ -223,6 +224,22 @@ searchInput.onkeydown = async (e) =>
     result = await searchMod(searchInput.value);
     displayResult()
 }
+
+document.getElementById('minecraft-loader').addEventListener("change", async () =>
+{
+    let ogLoader = window.instance.loader.name;
+    while(ogLoader==window.instance.loader.name){await new Promise(resolve=>setTimeout(resolve, 50))}
+    result = await searchMod(searchInput.value);
+    displayResult()
+})
+document.getElementById('sinytra').addEventListener("click", async () =>
+{
+    let ogLoader = window.instance.sinytra;
+    while(ogLoader==window.instance.sinytra){await new Promise(resolve=>setTimeout(resolve, 50))}
+    result = await searchMod(searchInput.value);
+    displayResult()
+})
+
 window.addInstanceListener(() => searchInput.onkeydown({key:'Enter'}))
 
 let selected = null;
