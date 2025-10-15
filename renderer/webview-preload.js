@@ -3,7 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron',
 {
     sendToHost: (channel, data) => ipcRenderer.sendToHost(channel, data),
-    onMessage: (channel, callback) => { ipcRenderer.on(channel, (event, args) => callback(args)); }
+    onMessage: (channel, callback) => { ipcRenderer.on(channel, (event, args) => callback(args)); },
+    // fetchTxt: async (url) => { console.log("fetching",url,fetch); return await (await fetch(url)).text(); }
+    fetchTxt: async (url) => { return await ipcRenderer.invoke("fetch-text", url) }
 });
 
 // Prevent window change

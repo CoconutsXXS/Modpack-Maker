@@ -1,11 +1,12 @@
 const { app, BrowserWindow, ipcMain, screen, session, dialog, shell } = require('electron');
 const path = require('node:path')
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
-const fetch = require('cross-fetch');
+const crossFetch = require('cross-fetch');
 const fs = require('fs')
 const fsPromise = require('fs/promises')
 const {unzip} = require('unzipit');
 const v8 = require('v8');
+const https = require("https")
 const msgpack = require('@msgpack/msgpack');
 
 const config = require('./config');
@@ -14,7 +15,7 @@ const Download = require('./download');
 const Saves = require('./saves.js');
 const contentModifier = require("./content-modifier.js")
 
-ElectronBlocker.fromPrebuiltFull(fetch).then(b=>b.enableBlockingInSession(session.defaultSession))
+ElectronBlocker.fromPrebuiltFull(crossFetch).then(b=>b.enableBlockingInSession(session.defaultSession))
 
 // Extension Host
 const isSilent = require("./browser-request.js");
@@ -449,3 +450,15 @@ ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData
 ipcMain.handle('writeRawData', (event, p, d) => { return reader.writeRawData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ return fs.unlinkSync(path.join(app.getPath('appData'), n)); }catch(err){console.warn(err)} })
 ipcMain.handle('deleteFolder', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ fs.rmSync(path.join(app.getPath('appData'), n), { recursive: true, force: true }); }catch(err){console.warn(err)} })
+ipcMain.handle('fetch-text', async (event, url) =>
+{
+    console.log("fetch-text", url)
+    return await (await fetch(url)).text();
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => resolve(data));
+        }).on('error', reject);
+    });
+});

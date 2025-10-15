@@ -79,7 +79,7 @@ function np(s) { return s.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s{2,}/g, ' 
 const urlRegex = /\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/g;
 
 // URL
-window.originalLocation = window.location.href;
+// window.originalLocation = window.location.href;
 let videoId = new URL(window.location.href).searchParams.get("v");
 
 
@@ -260,14 +260,13 @@ async function modify()
 }
 
 
-function scrapDescription(change = (d)=>{})
+async function scrapDescription(change = (d)=>{})
 {
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")) { if(!document.querySelector("#description-interaction")){return false} document.querySelector("#description-interaction").click(); }
 
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")){return false;}
 
     let desc = '';
-
     for(let c of document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")?.childNodes)
     {
         if(c.nodeName != 'SPAN' && c.nodeName == 'UL')
@@ -281,16 +280,10 @@ function scrapDescription(change = (d)=>{})
 
     document.querySelector("#description-inline-expander > #collapse.button.style-scope.ytd-text-inline-expander").click()
 
-    console.log("description != desc",description != desc)
-    if(desc != '' && description != desc)
-    {
-        description = desc;
-        change(description);
+    description = desc;
+    await change(description);
 
-        return true
-    }
-
-    return false
+    return true
 }
 
 async function handleDescription()
@@ -306,6 +299,8 @@ async function handleDescription()
         return url;
     })
 
+    console.log("linkText",linkText)
+
     let final = [];
     let i = 0;
     for(let e of linkText)
@@ -316,17 +311,23 @@ async function handleDescription()
         if(!e.startsWith('https://') && !e.startsWith('http://')) { e = 'https://'+e; }
 
         let baseUrl = new URL(e);
-        let href = decodeURIComponent(baseUrl.searchParams.get("q"));
+        let href = decodeURIComponent(baseUrl.searchParams.get("q") || baseUrl.searchParams.get("redir_token"));
         let url = (href==null||href=='null')?baseUrl:new URL(href);
+
+        console.log(url)
+        console.log(url.hostname == 'docs.google.com' && url.pathname.startsWith('/document/d'))
 
         // Google Doc Scrapping
         if(url.hostname == 'docs.google.com' && url.pathname.startsWith('/document/d'))
         {
-            let doc = await (await fetch(`https://docs.google.com/document/d/${url.pathname.split('/')[3]}/export?format=txt`)).text();
+            let doc = await window.electron.fetchTxt(`https://docs.google.com/document/d/${url.pathname.split('/')[3]}/export?format=txt`);
+            console.log("google doc",doc)
 
             let linkText = doc.match(urlRegex)
             let nolinkText = doc.split(urlRegex)
             let index2 = 0;
+
+            console.log("google doc linkText",linkText)
             for(let l of linkText)
             {
                 index2++;
@@ -347,6 +348,7 @@ async function handleDescription()
                     before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
                 }
                 
+                console.log("doc:", l)
                 final.push
                 ({
                     url: l,
@@ -358,7 +360,7 @@ async function handleDescription()
         // MC-MOD.GG Scrapping
         if(url.hostname == "mc-mod.gg")
         {
-            let doc = new DOMParser().parseFromString(await (await fetch(url.href)).text(), "text/html");;
+            let doc = new DOMParser().parseFromString(escapeHTMLPolicy.createHTML(await window.electron.fetchTxt(url.href)), "text/html");
             for(let c of doc.querySelector("#content").childNodes)
             {
                 if(c.nodeName != "DIV" || !c.querySelector("span") || !c.querySelector("a")){continue;}
@@ -439,13 +441,20 @@ async function setCurrentMod(baseUrl)
         Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
     }
 
+    console.log("Current mod =",url)
+
+    escapeHTMLPolicy = trustedTypes.createPolicy("forceInner",
+    {
+        createHTML: (to_escape) => to_escape
+    })
+
     // Youtube Button Update
     if(url.hostname=='www.curseforge.com')
     {
         let i = [];
-        let res = await fetch(`https://www.curseforge.com/minecraft/${url.pathname.split('/')[2]}/${url.pathname.split('/')[3]}/gallery`);
-        if(!res.ok){return false;}
-        let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
+        let res = await window.electron.fetchTxt(`https://www.curseforge.com/minecraft/${url.pathname.split('/')[2]}/${url.pathname.split('/')[3]}/gallery`);
+        let galPage = new DOMParser().parseFromString(escapeHTMLPolicy.createHTML(res), "text/html");
+        console.log(galPage)
         if(galPage.querySelector('.images-gallery > ul:nth-child(1)'))
         {
             for(let c of galPage.querySelector('.images-gallery > ul:nth-child(1)').childNodes)
@@ -479,9 +488,8 @@ async function setCurrentMod(baseUrl)
     {
         let i = [];
         
-        let res = await fetch(`https://modrinth.com/${url.pathname.split('/')[1]}/${url.pathname.split('/')[2]}/gallery`);
-        if(!res.ok){return false;}
-        let galPage = new DOMParser().parseFromString(await (res).text(), "text/html");
+        let res = await window.electron.fetchTxt(`https://modrinth.com/${url.pathname.split('/')[1]}/${url.pathname.split('/')[2]}/gallery`);
+        let galPage = new DOMParser().parseFromString(escapeHTMLPolicy.createHTML(res), "text/html");
         if(galPage.querySelector('.items'))
         {
             for(let c of galPage.querySelector('.items').childNodes)
@@ -532,7 +540,7 @@ async function updateMod(url, name, icon, description, images)
 
     modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
 
-    modButton.onclick = () => { window.electron.sendToHost('open-mod'); document.querySelector("#movie_player > div.html5-video-container > video").pause(); }
+    modButton.onclick = () => { window.electron.sendToHost('open-mod', url); document.querySelector("#movie_player > div.html5-video-container > video").pause(); }
 
     modSaveButton.onclick = (ev) =>
     {
@@ -540,6 +548,13 @@ async function updateMod(url, name, icon, description, images)
 
         if(!saved)
         {
+            console.log({
+                url,
+                name,
+                description,
+                icon,
+                date: new Date()
+            })
             window.electron.sendToHost('save',
             {
                 url,
@@ -600,6 +615,7 @@ function update()
 
 
 let interval = null;
+let desc = '';
 let intervalFunction = () =>
 {
     let href = window.location.href;
@@ -607,10 +623,17 @@ let intervalFunction = () =>
     let scapped = scrapDescription((d) =>
     {
         let hashtags = [...d.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
+        console.log(hashtags)
         if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
-        { handleDescription() }
+        {
+            handleDescription()
+        }
     });
-    if(description==null || !scapped){return;}
+    console.log(description==null, !scapped, links.length==0, chapters.length == 0)
+    if(description==null || !scapped || links.length==0 || chapters.length == 0){return;}
+    console.log("desc == description",desc == description)
+    if(desc == description){return;}
+    desc = description;
 
     // Filter by #
     let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
@@ -624,6 +647,7 @@ let intervalFunction = () =>
 
     let setupInterval = setInterval(() =>
     {
+        console.log("Modify")
         modify();
         if(description!=null && modButton!=null && links.length>0 && chapters.length > 0)
         {
@@ -673,17 +697,19 @@ let videoWait = setInterval(() =>
         for(let m of mutations)
         {
             if(m.attributeName == "src" && lastAttr != document.querySelector(".video-stream").getAttribute("src"))
-            { update() }
+            { desc = ''; update() }
         }
     })
     o.observe(document.querySelector(".video-stream"), {childList: true, characterData: true, attributes: true, subtree: true})
+
+    update()
 
     function update()
     {
         if(!new URL(window.location.href).searchParams.has("v")){return;}
         lastAttr = document.querySelector(".video-stream").getAttribute("src")
         console.log("VIDEO UPDATED")
-        window.originalLocation = window.location.href;
+        // window.originalLocation = window.location.href;
 
         if(modButton){modButton.remove();}
         if(modSaveButton){modSaveButton.remove();}

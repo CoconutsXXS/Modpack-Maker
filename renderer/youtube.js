@@ -221,6 +221,8 @@ async function loadVideo(videoId)
     if(event!=null){webview.removeEventListener('dom-ready',event)}
     event = async () =>
     {
+        document.addEventListener('keypress', e => {if(e.key == 'y' && e.ctrlKey){webview.openDevTools()}})
+
         if(event!=null){webview.removeEventListener('dom-ready',event)}
         webview.style.display = 'flex';
         document.getElementById('youtube-search').style.display = 'none';
@@ -293,9 +295,6 @@ async function loadVideo(videoId)
 
     // Launch
     webview.src = `https://www.youtube.com/watch?v=${videoId}`
-    webview.openDevTools();
-    document.getElementById('web-window').querySelector('webview').openDevTools()
-    document.addEventListener('keypress', e => {if(e.key == 's'){document.getElementById('web-window').querySelector('webview').openDevTools()}})
 
     // Mod Display
     let lastURL = null;
@@ -303,9 +302,9 @@ async function loadVideo(videoId)
     {
         if(lastURL==baseUrl){return true;}
         let url = new URL(baseUrl);
-        openFunction = function()
+        openFunction = function(url)
         {
-            window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), baseUrl)
+            window.web[url.hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), url)
             // Array.from(document.getElementById('bottom-panel').childNodes[1].childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
             Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
         }
@@ -385,7 +384,7 @@ async function loadVideo(videoId)
             );`, true)
         }
 
-        lastURL=baseUrl
+        lastURL=url
         return true;
     }
 
@@ -398,8 +397,15 @@ async function loadVideo(videoId)
     let openFunction = null
     webview.addEventListener('ipc-message', async (event) =>
     {
+        console.log(event.channel)
         switch(event.channel)
         {
+            case 'fetch':
+            {
+                let r = await fetch(event.args[0][0])
+                return JSON.stringify((await r.text()));
+                break;
+            }
             case 'back':
             {
                 if(event!=null){webview.removeEventListener('dom-ready',event)}
@@ -446,8 +452,14 @@ async function loadVideo(videoId)
 				let savedList = await ipcInvoke("readFile", path.join("saves", 'saved.json'));
 
                 await webview.executeJavaScript(`window.changeIsSaved(${(savedList.find(s => s.url == event.args[0])!=undefined)?"true":"false"})`)
+                break;
             }
-            case 'open-mod': { if(openFunction!=null){openFunction()} }
+            case 'open-mod':
+            {
+                window.web[event.args[0].hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), event.args[0])
+                Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
+                break;
+            }
             case 'description':
             {
                 // Register all Mods Links and Chapter
@@ -587,11 +599,12 @@ async function loadVideo(videoId)
             }
             case 'save':
             {
-                await ipcInvoke('addSaved', event.args[0]);
+                console.log(event.args[0])
+                await ipcInvoke('addSaved', [event.args[0]]);
             }
             case 'unsave':
             {
-                await ipcInvoke('deleteSaved', event.args[0]);
+                await ipcInvoke('deleteSaved', [event.args[0]]);
             }
         }
     });
