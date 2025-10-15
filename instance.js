@@ -12,7 +12,7 @@ const { XMLParser } = require("fast-xml-parser");
 const es = require('event-stream');
 const os = require("os");
 const _ = require("lodash")
-const { execSync } = require("child_process")
+const { execSync, spawn } = require("child_process")
 const tar = require("tar")
 const {sep} = require("path")
 const extract = require("extract-zip");
@@ -309,7 +309,76 @@ class Instance
             javaPath = await downloadJava(javaVersion, listeners)
         }
 
-        await fixLibraries(path.join(resourcePath, 'libraries'), listeners)
+        let customArgs = await fixLibraries(path.join(this.path, 'versions', this.version.number, "natives"), this)
+
+        customArgs.push(
+            "-DprintEnv=DEBUG", 
+            "-Dorg.lwjgl.Debug=true"
+        );
+
+
+        // Manual
+        {
+            const libsDir = path.join(this.path, "libraries");
+            const versionJar = path.join(this.path, "versions", this.version.number, `${this.version.number}.jar`);
+
+            function collectJars(dir)
+            {
+                let results = [];
+                const files = fs.readdirSync(dir, { withFileTypes: true });
+
+                for (const file of files) {
+                    const fullPath = path.join(dir, file.name);
+                    if (file.isDirectory()) {
+                    results = results.concat(collectJars(fullPath));
+                    } else if (file.name.endsWith(".jar")) {
+                    results.push(fullPath);
+                    }
+                }
+
+                return results;
+            }
+            
+            let jars = collectJars(libsDir);
+            jars.push(versionJar)
+            const separator = os.platform() === "win32" ? ";" : ":";
+            const classpath = jars.join(separator);
+
+            console.log(classpath)
+
+            const auth = await Authenticator.getAuth("dev")
+
+            const javaArgs =
+            [
+                "-Xms2G",
+                "-Xmx4G",
+                `-Djava.library.path=${path.join(this.path, 'versions', this.version.number, "natives")}`,
+                "-cp",
+                classpath,
+                "net.minecraft.client.main.Main",
+                "--version", this.version.number,
+                "--gameDir", this.path,
+                "--assetsDir", path.join(this.path, "assets"),
+                "--assetIndex", this.version.number,
+                "--uuid", auth.uuid,
+                "--accessToken", auth.access_token,
+                "--userType", "mojang"
+            ];
+
+            // Optionally set env variables for X11 / XWayland
+            const env = { ...process.env, GDK_BACKEND: "x11", SDL_VIDEODRIVER: "x11" };
+
+            console.log(javaArgs)
+
+            const child = spawn(javaPath?javaPath:'java', javaArgs, { cwd: this.path, env, stdio: "inherit" });
+
+            child.on("message", console.log)
+            child.on("spawn", console.log)
+            child.on("exit", console.log)
+            child.on("disconnect", console.log)
+            child.on("error", console.error)
+        }
+        return
 
         // Auth
         // const authManager = new Auth("select_account");
@@ -338,7 +407,9 @@ class Instance
             // quickPlay: {type: "singleplayer", identifier: "Structure Edition"}
             quickPlay: world!=undefined?world:null,
             javaPath: javaPath?javaPath:'java',
-            overrides: {detached: true}
+            overrides: {detached: true},
+            os: platform()=="darwin"?"osx":(platform()=="win32"?"windows":"linux"),
+            customArgs
         }
         console.log(options)
 
@@ -362,16 +433,19 @@ class Instance
         launcher.on('error', (e) => listeners.log('error', e));
         launcher.on('close', (e) => {listeners.close(e);launcher.removeAllListeners();})
 
-
+        process.env.GDK_BACKEND = 'x11';
+        process.env.SDL_VIDEODRIVER = 'x11';
+        process.env.DISPLAY ??= ':0';
+        
         // Launch
-        let process = await launcher.launch(options);
-        if(!process){console.error("No process, cannot launch..."); return;}
-        process.on("error", (e) => listeners.log('error', e))
-        process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
-        let pid = process?.pid;
+        let mProcess = await launcher.launch(options);
+        if(!mProcess){console.error("No process, cannot launch..."); return;}
+        mProcess.on("error", (e) => listeners.log('error', e))
+        mProcess.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
+        let pid = mProcess?.pid;
         let windowSource = null;
 
-        if(!process) { console.error("No process, crashed") }
+        if(!mProcess) { console.error("No process, crashed") }
 
         // Crashlog
         let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
@@ -451,8 +525,8 @@ class Instance
             {
                 let listener = async (w) =>
                 {
-                    if(!process){resolve(); return;}
-                    if(w.processId == process.pid)
+                    if(!mProcess){resolve(); return;}
+                    if(w.processId == mProcess.pid)
                     {
                         windowManager.removeListener('window-activated', listener);
                         await trySource();
@@ -481,7 +555,7 @@ class Instance
             {
                 let listener = async (w) =>
                 {
-                    if(w.processId == process.pid)
+                    if(w.processId == mProcess.pid)
                     {
                         windowManager.removeListener('window-activated', listener);
                         await trySource();
@@ -504,7 +578,7 @@ class Instance
             })
         }
 
-        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {process.kill('SIGINT')});
+        listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {mProcess.kill('SIGINT')});
     }
     // async launch(listeners =
     //     {
@@ -1884,11 +1958,11 @@ async function downloadJava(version, listeners = null)
     { return path.join(config.directories.jre, `java-${version}`, 'bin', 'java') }
 }
 
-const lwjglVersion = "3.3.6"
-async function fixLibraries(libraryPath, listeners = null)
+const lwjglVersion = "3.3.1"
+async function fixLibraries(libraryPath, instance)
 {
     let resourcePath = path.join(__dirname, "lwjgl", `${platform()}-${arch()}.zip`)
-    if(!fs.existsSync(resourcePath)){return}
+    if(!fs.existsSync(resourcePath)){return [];}
 
     let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
     let createdWin = win==undefined;
@@ -1898,49 +1972,75 @@ async function fixLibraries(libraryPath, listeners = null)
         win.hide();
     }
 
-    const LIBS =
-    [
-        "lwjgl",
-        "lwjgl-glfw",
-        "lwjgl-opengl",
-        "lwjgl-stb"
-    ];
-
-    let unziped = (await unzip(resourcePath)).entries;
-    console.log(unziped)
-
-    return;
-
-    for (const lib of LIBS)
+    if(!fs.existsSync(path.join(config.directories.resources, "lwjgl"))){fs.mkdirSync(path.join(config.directories.resources, "lwjgl"))}
+    let movedResourcePath = path.join(config.directories.resources, "lwjgl", `${platform()}-${arch()}.zip`)
+    if(!fs.existsSync(movedResourcePath))
     {
-        const libPath = path.join(libraryPath, "org", "lwjgl", lib, lwjglVersion);
-        const nativeFile = path.join(libPath, `${lib}-${lwjglVersion}-natives-linux-arm64.jar`);
-
-        if (fs.existsSync(nativeFile))
-        {
-            console.log(`✔ ${lib}: déjà patché`);
-            continue;
-        }
-
-        try
-        {
-            fs.mkdirSync(libPath, { recursive: true });
-
-            // await download(win, `https://build.lwjgl.org/release/${lwjglVersion}/bin/linux/arm64/${lib}-${lwjglVersion}-natives-linux-arm64.jar`,
-            // {filename: `${lib}-${lwjglVersion}-natives-linux-arm64.jar`, directory: libPath, onProgress: async (progress) =>
-            // {
-            //     if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
-            // }});
-
-            console.log(`✅ Patch appliqué: ${nativeFile}`);
-        }
-        catch (err)
-        {
-            console.error(`❌ Erreur lors du patch de ${lib}: ${err.message}`);
-        }
+        fs.copyFileSync(resourcePath, movedResourcePath);
     }
 
-    if(createdWin) { win.close(); }
+    let extractedTemp = fs.mkdtempSync(path.join(os.tmpdir(), "lwjgl-"))
+
+    console.log(extractedTemp)
+    await extract(movedResourcePath,
+    {
+        dir: extractedTemp,
+        onEntry: (entry, zipfile) =>
+        {
+            console.log(`Extracting: ${entry.fileName}`);
+        }
+    })
+
+    if(!fs.existsSync(libraryPath)){fs.mkdirSync(libraryPath)}
+    for(let f of fs.readdirSync(extractedTemp))
+    {
+        if(!f.endsWith(".jar")){continue}
+        let ogPath = path.join(extractedTemp, f);
+        let dirList = [f.split(".")[0].split("-")[0]+(f.split(".")[0].split("-")[1]?("-"+f.split(".")[0].split("-")[1]):""), lwjglVersion];
+
+        if(!fs.existsSync(path.join(libraryPath, "org", "lwjgl", ...dirList)))
+        {fs.mkdirSync(path.join(libraryPath, "org", "lwjgl", ...dirList), {recursive: true})}
+
+        if(f.endsWith("-natives-linux-arm64.jar"))
+        {
+            let tempDir = libraryPath + "-tmp";
+            fs.mkdirSync(tempDir, { recursive: true });
+            await extract(ogPath, { dir: tempDir });
+
+            let stack = [tempDir];
+            while (stack.length)
+            {
+                let cur = stack.pop();
+                for (let f of fs.readdirSync(cur, { withFileTypes: true }))
+                {
+                    let fullPath = path.join(cur, f.name);
+                    if(f.isDirectory())
+                    {
+                        stack.push(fullPath);
+                    }
+                    else if(f.name.endsWith(".so"))
+                    {
+                        fs.mkdirSync(libraryPath, { recursive: true });
+                        fs.renameSync(fullPath, path.join(libraryPath, f.name));
+                    }
+                }
+            }
+
+            fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        continue
+
+        let filename = f.split(".")[0].split("-")[0]+(f.split(".")[0].split("-")[1]?("-"+f.split(".")[0].split("-")[1]):"")+"-"+lwjglVersion+f.slice((f.split(".")[0].split("-")[0]+(f.split(".")[0].split("-")[1]?("-"+f.split(".")[0].split("-")[1]):"")).length, f.length);
+        if(f.slice(6, f.length)=="jar"){filename="lwjgl-"+lwjglVersion+".jar"}
+        dirList.push(filename)
+
+        console.log(path.join(...dirList))
+        fs.copyFileSync(ogPath, path.join(libraryPath, "org", "lwjgl", ...dirList))
+    }
+
+    fs.copyFileSync(path.join(__dirname, "lwjgl", "libglfw.so"), path.join(libraryPath, "libglfw.so"))
+
+    return ["-Djava.library.path="+path.join(instance.path, 'versions', instance.version.number, "natives")];
 }
 
 module.exports = Instance;
