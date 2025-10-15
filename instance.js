@@ -317,82 +317,79 @@ class Instance
         );
 
 
-        // Manual
+        // Manual (test)
         {
-            const libsDir = path.join(this.path, "libraries");
-            const versionJar = path.join(this.path, "versions", this.version.number, `${this.version.number}.jar`);
+        //     const libsDir = path.join(this.path, "libraries");
+        //     const versionJar = path.join(this.path, "versions", this.version.number, `${this.version.number}.jar`);
 
-            function collectJars(dir)
-            {
-                let results = [];
-                const files = fs.readdirSync(dir, { withFileTypes: true });
+        //     function collectJars(dir)
+        //     {
+        //         let results = [];
+        //         const files = fs.readdirSync(dir, { withFileTypes: true });
 
-                for (const file of files) {
-                    const fullPath = path.join(dir, file.name);
-                    if (file.isDirectory()) {
-                        results = results.concat(collectJars(fullPath));
-                    } else if (file.name.endsWith(".jar")) {
-                        results.push(fullPath);
-                    }
-                }
+        //         for (const file of files) {
+        //             const fullPath = path.join(dir, file.name);
+        //             if (file.isDirectory()) {
+        //                 results = results.concat(collectJars(fullPath));
+        //             } else if (file.name.endsWith(".jar")) {
+        //                 results.push(fullPath);
+        //             }
+        //         }
 
-                return results;
-            }
+        //         return results;
+        //     }
             
-            let jars = collectJars(libsDir);
-            jars.push(versionJar)
-            const separator = os.platform() === "win32" ? ";" : ":";
-            const classpath = jars.join(separator);
+        //     let jars = collectJars(libsDir);
+        //     jars.push(versionJar)
+        //     const separator = os.platform() === "win32" ? ";" : ":";
+        //     const classpath = jars.join(separator);
 
-            const auth = await Authenticator.getAuth("dev")
+        //     const auth = await Authenticator.getAuth("dev")
 
-            const javaArgs =
-            [
-                "-Xms2G",
-                "-Xmx4G",
-                `-Djava.library.path=${path.join(this.path, 'versions', this.version.number, "natives")}`,
-                '-Dorg.lwjgl.util.Debug=true',
-                '-Dorg.lwjgl.util.DebugLoader=true',
-                "-cp",
-                classpath,
-                "net.minecraft.client.main.Main",
-                "--version", this.version.number,
-                "--gameDir", this.path,
-                "--assetsDir", path.join(this.path, "assets"),
-                "--assetIndex", this.version.number,
-                "--uuid", auth.uuid,
-                "--accessToken", auth.access_token,
-                "--userType", "mojang"
-            ];
+        //     const javaArgs =
+        //     [
+        //         "-Xms2G",
+        //         "-Xmx4G",
+        //         "-cp",
+        //         '"'+classpath+'"',
+        //         "net.minecraft.client.main.Main",
+        //         "--version", this.version.number,
+        //         "--gameDir", '"'+this.path+'"',
+        //         "--assetsDir", '"'+path.join(this.path, "assets")+'"',
+        //         "--assetIndex", this.version.number,
+        //         "--uuid", auth.uuid,
+        //         "--accessToken", auth.access_token,
+        //         "--userType", "mojang"
+        //     ].concat(customArgs);
 
-            // Optionally set env variables for X11 / XWayland
-            const env =
-            {
-                ...process.env,
-                GDK_BACKEND: "x11",
-                SDL_VIDEODRIVER: "x11",
-                WAYLAND_DISPLAY: undefined,
-                DISPLAY: ":0"
-           }
+        //     // Optionally set env variables for X11 / XWayland
+        //     const env =
+        //     {
+        //         ...process.env,
+        //         GDK_BACKEND: "x11",
+        //         SDL_VIDEODRIVER: "x11",
+        //         WAYLAND_DISPLAY: undefined,
+        //         DISPLAY: ":0"
+        //    }
 
-            console.log(javaArgs)
+        //     console.log(javaArgs)
 
-            const child = spawn(javaPath?javaPath:'java', javaArgs, { cwd: this.path, env, stdio: ["inherit", "pipe", "pipe"] });
+        //     console.log(`spawn(${'"'+(javaPath?javaPath:'java')+'"'+", "+JSON.stringify(javaArgs)+", "+JSON.stringify({ cwd: this.path, shell: true, env, stdio: ["inherit", "pipe", "pipe"] })})`)
+        //     const child = spawn('"'+(javaPath?javaPath:'java')+'"', javaArgs, { cwd: this.path, shell: true, env, stdio: ["inherit", "pipe", "pipe"] });
 
-            child.stderr.on("data", (data) => process.stdout.write(data.toString()));
-            child.stderr.on("data", (data) => process.stderr.write(data.toString()));
+        //     child.stdout.on("data", (data) => process.stdout.write(data.toString()));
+        //     child.stderr.on("data", (data) => process.stdout.write(data.toString()));
 
-            child.on("exit", (code, signal) =>
-            {
-                console.log("Minecraft exited with:", code, signal);
-            });
+        //     child.on("exit", (code, signal) =>
+        //     {
+        //         console.log("Minecraft exited with:", code, signal);
+        //     });
 
-            child.on("message", console.log)
-            child.on("spawn", console.log)
-            child.on("disconnect", console.log)
-            child.on("error", console.error)
+        //     child.on("message", console.log)
+        //     child.on("spawn", console.log)
+        //     child.on("disconnect", console.log)
+        //     child.on("error", console.error)
         }
-        return
 
         // Auth
         // const authManager = new Auth("select_account");
@@ -2054,7 +2051,7 @@ async function fixLibraries(libraryPath, instance)
 
     fs.copyFileSync(path.join(__dirname, "lwjgl", "libglfw.so"), path.join(libraryPath, "libglfw.so"))
 
-    return ["-Djava.library.path="+path.join(instance.path, 'versions', instance.version.number, "natives")];
+    return ["-Djava.library.path=\""+path.join(instance.path, 'versions', instance.version.number, "natives")+'"'];
 }
 
 module.exports = Instance;
