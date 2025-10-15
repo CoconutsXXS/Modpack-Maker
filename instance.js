@@ -330,9 +330,9 @@ class Instance
                 for (const file of files) {
                     const fullPath = path.join(dir, file.name);
                     if (file.isDirectory()) {
-                    results = results.concat(collectJars(fullPath));
+                        results = results.concat(collectJars(fullPath));
                     } else if (file.name.endsWith(".jar")) {
-                    results.push(fullPath);
+                        results.push(fullPath);
                     }
                 }
 
@@ -344,8 +344,6 @@ class Instance
             const separator = os.platform() === "win32" ? ";" : ":";
             const classpath = jars.join(separator);
 
-            console.log(classpath)
-
             const auth = await Authenticator.getAuth("dev")
 
             const javaArgs =
@@ -353,6 +351,8 @@ class Instance
                 "-Xms2G",
                 "-Xmx4G",
                 `-Djava.library.path=${path.join(this.path, 'versions', this.version.number, "natives")}`,
+                '-Dorg.lwjgl.util.Debug=true',
+                '-Dorg.lwjgl.util.DebugLoader=true',
                 "-cp",
                 classpath,
                 "net.minecraft.client.main.Main",
@@ -366,15 +366,29 @@ class Instance
             ];
 
             // Optionally set env variables for X11 / XWayland
-            const env = { ...process.env, GDK_BACKEND: "x11", SDL_VIDEODRIVER: "x11" };
+            const env =
+            {
+                ...process.env,
+                GDK_BACKEND: "x11",
+                SDL_VIDEODRIVER: "x11",
+                WAYLAND_DISPLAY: undefined,
+                DISPLAY: ":0"
+           }
 
             console.log(javaArgs)
 
-            const child = spawn(javaPath?javaPath:'java', javaArgs, { cwd: this.path, env, stdio: "inherit" });
+            const child = spawn(javaPath?javaPath:'java', javaArgs, { cwd: this.path, env, stdio: ["inherit", "pipe", "pipe"] });
+
+            child.stderr.on("data", (data) => process.stdout.write(data.toString()));
+            child.stderr.on("data", (data) => process.stderr.write(data.toString()));
+
+            child.on("exit", (code, signal) =>
+            {
+                console.log("Minecraft exited with:", code, signal);
+            });
 
             child.on("message", console.log)
             child.on("spawn", console.log)
-            child.on("exit", console.log)
             child.on("disconnect", console.log)
             child.on("error", console.error)
         }
