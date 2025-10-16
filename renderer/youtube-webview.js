@@ -652,8 +652,8 @@ function setup()
                 handleDescription()
             }
         });
-        console.log(description==null, !scapped, links.length==0, chapters.length == 0)
-        if(description==null || !scapped || links.length==0 || chapters.length == 0){return;}
+        console.log(description==null, !scapped, links.length==0)
+        if(description==null || !scapped || links.length==0){return;}
         console.log("desc == description",desc == description)
         if(desc == description){return;}
         desc = description;
@@ -665,7 +665,35 @@ function setup()
 
         if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && !(description.toLowerCase().includes("minecraft") && description.toLowerCase().includes(" mod")))
         {
+            console.log("No Matching #")
             return;
+        }
+
+        chapters = []
+        if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+        if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+        {
+            if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+            {
+                for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
+                {
+                    if(!c.querySelector("#endpoint")) { continue }
+                    let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
+                    chapters.push
+                    ({
+                        name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
+                        time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
+                    })
+                }
+
+                if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters)) {lastScrappedChapter = chapters;}
+            }
+
+            document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(7) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
+        }
+        else
+        {
+            console.log("Failed to handle chapters");
         }
 
         let setupInterval = setInterval(() =>
@@ -705,6 +733,12 @@ function setup()
                     }
                     update();
                 }, 100)
+            }
+            else
+            {
+                console.log("Cannot Setup:", description!=null, modButton!=null, links.length>0, chapters.length > 0)
+                if(interval){clearInterval(interval)}
+                interval = setInterval(intervalFunction, 200);
             }
         }, 100)
     };

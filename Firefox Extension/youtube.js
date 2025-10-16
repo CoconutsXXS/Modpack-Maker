@@ -120,9 +120,10 @@ async function modify()
         // if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
         // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
 
-        if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
-        document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+        if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
         {
+            chapters = []
+
             for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
             {
                 if(!c.querySelector("#endpoint")) { continue }
@@ -134,14 +135,7 @@ async function modify()
                 })
             }
 
-            if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters))
-            {
-                lastScrappedChapter = chapters;
-                // setTimeout(() => scrappedChapter = false, 3000);
-
-                // if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
-                // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
-            }
+            if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters)) {lastScrappedChapter = chapters;}
         }
 
         document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(7) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
@@ -295,6 +289,8 @@ async function handleDescription()
 {
     if(!description){ console.warn("No Description"); return;}
 
+    chapters = [];
+
     let linkText = description.match(urlRegex)
     let nolinkText = description.split(urlRegex)
     let link = []
@@ -377,7 +373,6 @@ async function handleDescription()
             let chapterTime = 0;
             if(url.searchParams.get("t") != null) { chapterTime = Number(url.searchParams.get("t").replace('s','')); }
             chapters.push({name: nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='')[0].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim(), time: chapterTime});
-            console.log(nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='')[0].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim())
         }
 
         if(url.hostname != 'www.curseforge.com' && url.hostname != 'modrinth.com') { continue; }
@@ -581,6 +576,7 @@ function update()
     if(chapters.length > 0 && chapters.sort((a,b) => b.time-a.time).find(a => a.time < time) != currentChapter)
     {
         currentChapter = chapters.sort((a,b) => b.time-a.time).find(a => a.time < time);
+        console.log("currentChapter", currentChapter)
         if(!currentChapter) { console.log('no chapter found, chapter =', chapters, 'time = ', time); }
         else
         {
@@ -621,10 +617,9 @@ let intervalFunction = () =>
         if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
         { handleDescription() }
     });
-    console.log(description==null, !scapped, links.length==0, chapters.length == 0)
-    if(description==null || !scapped || links.length==0 || chapters.length == 0){return;}
+    if(description==null || !scapped || links.length==0){return;}
 
-        // Filter by #
+    // Filter by #
     let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
 
     clearInterval(interval);
@@ -633,6 +628,33 @@ let intervalFunction = () =>
     {
         console.log("No Matching #")
         return;
+    }
+
+    chapters = []
+    if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+    if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+    {
+        if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+        {
+            for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
+            {
+                if(!c.querySelector("#endpoint")) { continue }
+                let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
+                chapters.push
+                ({
+                    name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
+                    time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
+                })
+            }
+
+            if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters)) {lastScrappedChapter = chapters;}
+        }
+
+        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(7) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
+    }
+    else
+    {
+        console.log("Failed to handle chapters");
     }
 
     let setupInterval = setInterval(() =>
@@ -652,7 +674,6 @@ let intervalFunction = () =>
                     if(gallery){gallery.remove();}
 
                     time = 0;
-                    console.log("reset chapters")
                     chapters = [];
                     currentChapter;
                     links = [];
@@ -703,6 +724,9 @@ let videoWait = setInterval(() =>
         if(!new URL(window.location.href).searchParams.has("v")){return;}
         lastAttr = document.querySelector(".video-stream").getAttribute("src")
         console.log("VIDEO UPDATED")
+
+        if(interval){clearInterval(interval)}
+
         window.originalLocation = window.location.href;
 
         if(modButton){modButton.remove();}
@@ -710,7 +734,6 @@ let videoWait = setInterval(() =>
         if(gallery){gallery.remove();}
 
         time = 0;
-        console.log("reset chapters")
         chapters = [];
         currentChapter;
         links = [];
@@ -721,7 +744,6 @@ let videoWait = setInterval(() =>
         gallery = null;
 
 
-        if(interval){clearInterval(interval)}
         interval = setInterval(intervalFunction, 200);
     }
 
