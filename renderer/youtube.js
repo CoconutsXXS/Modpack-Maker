@@ -221,9 +221,14 @@ async function loadVideo(videoId)
     if(event!=null){webview.removeEventListener('dom-ready',event)}
     event = async () =>
     {
+        await webview.executeJavaScript(`window.originalLocation = "${webview.src}";`, true)
+        await webview.executeJavaScript(`window.videoId = "${videoId}";`, true)
+        await webview.executeJavaScript(sourceCode, true)
+
+        webview.openDevTools()
         document.addEventListener('keypress', e => {if(e.key == 'y' && e.ctrlKey){webview.openDevTools()}})
 
-        if(event!=null){webview.removeEventListener('dom-ready',event)}
+        // if(event!=null){webview.removeEventListener('dom-ready',event)}
         webview.style.display = 'flex';
         document.getElementById('youtube-search').style.display = 'none';
 
@@ -236,10 +241,10 @@ async function loadVideo(videoId)
                 overflow-x: scroll;
                 max-height: 50vh;
                 margin-top: 8px;
-                overflow-y: hidden;
+                overflow: hidden;
                 height: 315px;
             }
-            #mod-gallery > img
+            #mod-gallery img
             {
                 border-radius: 12px;
                 margin-right: 8px;
@@ -283,9 +288,6 @@ async function loadVideo(videoId)
             #guide { display: none; }
             #subscribe-button > ytd-subscribe-button-renderer > yt-smartimation > div.smartimation__border { pointer-events: none; }
         `)
-        await webview.executeJavaScript(`window.originalLocation = "${webview.src}";`, true)
-        await webview.executeJavaScript(`window.videoId = "${videoId}";`, true)
-        await webview.executeJavaScript(sourceCode, true)
 
         // Cations
         let captions = await getSubtitles({videoID: videoId})

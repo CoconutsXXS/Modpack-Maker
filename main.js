@@ -145,8 +145,6 @@ async function selectWindow()
     ({
         width: screen.getAllDisplays()[0].bounds.width/2,
         height: screen.getAllDisplays()[0].bounds.height/2,
-        frame: true,
-        thickFrame: true,
         webPreferences:
         {
             preload: path.join(__dirname, 'preload.js'),
@@ -161,11 +159,11 @@ async function selectWindow()
         // backgroundMaterial: 'acrylic',
 
         darkTheme: true,
-        hasShadow: false,
+        hasShadow: true,
         closable: true,
         minimizable: true,
         maximizable: true,
-        titleBarStyle: 'default'
+        autoHideMenuBar: true
     });
     win.loadFile('select.html')
 }

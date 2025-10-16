@@ -59,6 +59,9 @@ select
     outline: none;
     cursor: pointer;
 }
+select option { background-color: var(--primary-color); }
+select optgroup { background-color: var(--primary-color); }
+select::-webkit-scrollbar {display: none;}
 
 /* Input */
 input[type="text"]
@@ -411,7 +414,7 @@ tfoot td
     top: 0;
     height: 100%;
     width: 8px;
-    cursor: col-resize;
+    cursor: ew-resize;
     z-index: 1;
 }
 #top-panel > .resize-hand

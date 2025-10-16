@@ -114,18 +114,18 @@ async function modify()
     // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button").click(); }
 
     // Chapter
-    if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+    if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
     if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
     {
-        // if(!document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
+        // if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
         // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
 
-        if(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
-        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+        if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
+        document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
         {
             chapters = [];
 
-            for(let c of document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
+            for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
             {
                 if(!c.querySelector("#endpoint")) { continue }
                 let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
@@ -141,7 +141,7 @@ async function modify()
                 lastScrappedChapter = chapters;
                 // setTimeout(() => scrappedChapter = false, 3000);
 
-                // if(document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(2) > ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+                // if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
                 // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
             }
         }
