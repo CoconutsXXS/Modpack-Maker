@@ -404,6 +404,37 @@ tfoot td
 }
 #center-panel{position: fixed;}
 
+#right-panel > .resize-hand
+{
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 8px;
+    cursor: col-resize;
+    z-index: 1;
+}
+#top-panel > .resize-hand
+{
+    position: absolute;
+    left: 0;
+    top: calc(100% - 8px);
+    height: 8px;
+    width: 100%;
+    cursor: ns-resize;
+    z-index: 1;
+}
+#bottom-panel > .resize-hand
+{
+    position: absolute;
+    left: 0;
+    top: calc(100% - 8px);
+    height: 8px;
+    width: 100%;
+    cursor: ns-resize;
+    z-index: 1;
+}
+
 #top-tab
 {
     height: 27px;

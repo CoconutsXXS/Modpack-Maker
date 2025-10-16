@@ -36,3 +36,63 @@ observer.observe(rightPanel)
 observer.observe(topPanel)
 observer.observe(bottomPanel)
 window.onresize = resizeVerticalPanel;
+
+// Resize Hands
+// Right
+{
+    let mouse = false;
+    let startPosition = {x:null,y:null}
+    let startWidth = null;
+    rightPanel.querySelector(".resize-hand").onmousedown = (ev) => {mouse=true; startPosition.x = ev.clientX; startPosition.y = ev.clientY; startWidth=rightPanel.getBoundingClientRect().width; ev.preventDefault();}
+    document.addEventListener("mouseup", () => {mouse=false;startPosition = {x:null,y:null}; startWidth=null;})
+
+    document.addEventListener("mousemove", (ev) =>
+    {
+        if(!mouse){return;}
+        if(startPosition.x == null || startPosition.y == null)
+        { startPosition.x = ev.clientX; startPosition.y = ev.clientY; return; }
+
+        rightPanel.style.width = `${startWidth+(startPosition.x - ev.clientX)}px`
+
+        ev.preventDefault();
+    })
+}
+// Top
+{
+    let mouse = false;
+    let startPosition = {x:null,y:null}
+    let startHeight = null;
+    topPanel.querySelector(".resize-hand").onmousedown = (ev) => {mouse=true; startPosition.x = ev.clientX; startPosition.y = ev.clientY; startHeight=topPanel.getBoundingClientRect().height; ev.preventDefault();}
+    document.addEventListener("mouseup", () => {mouse=false;startPosition = {x:null,y:null}; startHeight=null;})
+
+    document.addEventListener("mousemove", (ev) =>
+    {
+        if(!mouse){return;}
+        if(startPosition.x == null || startPosition.y == null)
+        { startPosition.x = ev.clientX; startPosition.y = ev.clientY; return; }
+
+        console.log(startHeight, (startPosition.y - ev.clientY))
+        topPanel.style.height = `${startHeight-(startPosition.y - ev.clientY)}px`
+
+        ev.preventDefault();
+    })
+}
+// Bottom
+{
+    let mouse = false;
+    let startPosition = {x:null,y:null}
+    let startHeight = null;
+    bottomPanel.querySelector(".resize-hand").onmousedown = (ev) => {mouse=true; startPosition.x = ev.clientX; startPosition.y = ev.clientY; startHeight=bottomPanel.getBoundingClientRect().height; ev.preventDefault();}
+    document.addEventListener("mouseup", () => {mouse=false;startPosition = {x:null,y:null}; startHeight=null;})
+
+    document.addEventListener("mousemove", (ev) =>
+    {
+        if(!mouse){return;}
+        if(startPosition.x == null || startPosition.y == null)
+        { startPosition.x = ev.clientX; startPosition.y = ev.clientY; return; }
+
+        bottomPanel.style.height = `${startHeight+(startPosition.y - ev.clientY)}px`
+
+        ev.preventDefault();
+    })
+}
