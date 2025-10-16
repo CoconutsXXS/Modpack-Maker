@@ -225,8 +225,8 @@ async function loadVideo(videoId)
         await webview.executeJavaScript(`window.videoId = "${videoId}";`, true)
         await webview.executeJavaScript(sourceCode, true)
 
-        webview.openDevTools()
-        document.addEventListener('keypress', e => {if(e.key == 'y' && e.ctrlKey){webview.openDevTools()}})
+        // webview.openDevTools()
+        document.addEventListener('keypress', e => {if(e.key == 'y' && (e.ctrlKey || e.altKey)){webview.openDevTools()}})
 
         // if(event!=null){webview.removeEventListener('dom-ready',event)}
         webview.style.display = 'flex';
