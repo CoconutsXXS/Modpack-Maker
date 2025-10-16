@@ -6,7 +6,6 @@ const fs = require('fs')
 const fsPromise = require('fs/promises')
 const {unzip} = require('unzipit');
 const v8 = require('v8');
-const https = require("https")
 const msgpack = require('@msgpack/msgpack');
 
 const config = require('./config');
@@ -452,13 +451,5 @@ ipcMain.handle('deleteFile', (event, n) => { if(!fs.existsSync(path.join(app.get
 ipcMain.handle('deleteFolder', (event, n) => { if(!fs.existsSync(path.join(app.getPath('appData'), n))){return} try{ fs.rmSync(path.join(app.getPath('appData'), n), { recursive: true, force: true }); }catch(err){console.warn(err)} })
 ipcMain.handle('fetch-text', async (event, url) =>
 {
-    console.log("fetch-text", url)
     return await (await fetch(url)).text();
-    return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-        let data = '';
-        res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => resolve(data));
-        }).on('error', reject);
-    });
 });
