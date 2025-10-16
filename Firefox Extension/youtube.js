@@ -123,8 +123,6 @@ async function modify()
         if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
         document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
         {
-            chapters = [];
-
             for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
             {
                 if(!c.querySelector("#endpoint")) { continue }
@@ -266,14 +264,14 @@ async function modify()
 }
 
 
-function scrapDescription(change = (d)=>{})
+let desc = ""
+async function scrapDescription(change = (d)=>{})
 {
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")) { if(!document.querySelector("#description-interaction")){return false} document.querySelector("#description-interaction").click(); }
 
     if(!document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")){return false;}
 
     let desc = '';
-
     for(let c of document.querySelector("#description-inline-expander > #expanded > yt-attributed-string > span")?.childNodes)
     {
         if(c.nodeName != 'SPAN' && c.nodeName == 'UL')
@@ -287,16 +285,10 @@ function scrapDescription(change = (d)=>{})
 
     document.querySelector("#description-inline-expander > #collapse.button.style-scope.ytd-text-inline-expander").click()
 
-    console.log("description != desc",description != desc)
-    if(desc != '' && description != desc)
-    {
-        description = desc;
-        change(description);
+    description = desc;
+    await change(description);
 
-        return true
-    }
-
-    return false
+    return true
 }
 
 async function handleDescription()
@@ -322,7 +314,7 @@ async function handleDescription()
         if(!e.startsWith('https://') && !e.startsWith('http://')) { e = 'https://'+e; }
 
         let baseUrl = new URL(e);
-        let href = decodeURIComponent(baseUrl.searchParams.get("q"));
+        let href = decodeURIComponent(baseUrl.searchParams.get("q") || baseUrl.searchParams.get("redir_token"));
         let url = (href==null||href=='null')?baseUrl:new URL(href);
 
         // Google Doc Scrapping
@@ -333,6 +325,7 @@ async function handleDescription()
             let linkText = doc.match(urlRegex)
             let nolinkText = doc.split(urlRegex)
             let index2 = 0;
+
             for(let l of linkText)
             {
                 index2++;
@@ -364,7 +357,7 @@ async function handleDescription()
         // MC-MOD.GG Scrapping
         if(url.hostname == "mc-mod.gg")
         {
-            let doc = new DOMParser().parseFromString(await (await fetch(url.href)).text(), "text/html");;
+            let doc = new DOMParser().parseFromString(escapeHTMLPolicy.createHTML(await (await fetch(url.href)).text()), "text/html");
             for(let c of doc.querySelector("#content").childNodes)
             {
                 if(c.nodeName != "DIV" || !c.querySelector("span") || !c.querySelector("a")){continue;}
@@ -384,6 +377,7 @@ async function handleDescription()
             let chapterTime = 0;
             if(url.searchParams.get("t") != null) { chapterTime = Number(url.searchParams.get("t").replace('s','')); }
             chapters.push({name: nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='')[0].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim(), time: chapterTime});
+            console.log(nolinkText.filter(p=>!urlRegex.test(p))[i].split('\n').filter(p=>p!='')[0].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim())
         }
 
         if(url.hostname != 'www.curseforge.com' && url.hostname != 'modrinth.com') { continue; }
@@ -627,15 +621,17 @@ let intervalFunction = () =>
         if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
         { handleDescription() }
     });
-    if(description==null || !scapped){return;}
+    console.log(description==null, !scapped, links.length==0, chapters.length == 0)
+    if(description==null || !scapped || links.length==0 || chapters.length == 0){return;}
 
-    // Filter by #
+        // Filter by #
     let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
 
     clearInterval(interval);
 
     if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && !(description.toLowerCase().includes("minecraft") && description.toLowerCase().includes(" mod")))
     {
+        console.log("No Matching #")
         return;
     }
 
@@ -656,6 +652,7 @@ let intervalFunction = () =>
                     if(gallery){gallery.remove();}
 
                     time = 0;
+                    console.log("reset chapters")
                     chapters = [];
                     currentChapter;
                     links = [];
@@ -675,6 +672,12 @@ let intervalFunction = () =>
                 }
                 update();
             }, 100)
+        }
+        else
+        {
+            console.log("Cannot Setup:", description!=null, modButton!=null, links.length>0, chapters.length > 0)
+            if(interval){clearInterval(interval)}
+            interval = setInterval(intervalFunction, 200);
         }
     }, 100)
 };
@@ -707,6 +710,7 @@ let videoWait = setInterval(() =>
         if(gallery){gallery.remove();}
 
         time = 0;
+        console.log("reset chapters")
         chapters = [];
         currentChapter;
         links = [];

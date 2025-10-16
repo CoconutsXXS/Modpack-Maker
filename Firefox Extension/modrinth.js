@@ -122,9 +122,9 @@ setInterval(async () =>
                 await new Promise((resolve) => setTimeout(resolve, 10));
 
                 // Loader
-                Array.from(document.querySelector("div.rounded-2xl:nth-child(3) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1)").childNodes).filter(c => c.querySelector!=undefined).find(c => c?.querySelector(".truncate .text-sm").innerText.toLowerCase()==instanceData.loader.name.toLowerCase()).querySelector("button").click();
+                Array.from(document.querySelector("div.rounded-2xl:nth-child(2) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1)").childNodes).filter(c => c.querySelector!=undefined).find(c => c?.querySelector(".truncate .text-sm").innerText.toLowerCase()==instanceData.loader.name.toLowerCase()).querySelector("button").click();
                 if(instanceData.mods.find(m => m.sinytra)!=undefined)
-                { Array.from(document.querySelector("div.rounded-2xl:nth-child(3) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1)").childNodes).filter(c => c.querySelector!=undefined).find(c => c?.querySelector(".truncate .text-sm").innerText.toLowerCase()=="fabric").querySelector("button").click(); }
+                { Array.from(document.querySelector("div.rounded-2xl:nth-child(2) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1)").childNodes).filter(c => c.querySelector!=undefined).find(c => c?.querySelector(".truncate .text-sm").innerText.toLowerCase()=="fabric").querySelector("button").click(); }
                 await new Promise((resolve) => setTimeout(resolve, 10));
 
                 c.setAttribute('pressed', 'true')
