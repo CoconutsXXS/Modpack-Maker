@@ -32,7 +32,7 @@ window.setupTab(document.getElementById('top-tab'),
 [
     {select: () => { window.instance.save(window.instance) }, deselect: () => {}},
     {select: () => { openInstanceSelector() }, deselect: () => {}},
-    {select: () => { if(window.instance.save){window.instance.save(window.instance)} window.close() }, deselect: () => {}},
+    {select: () => { if(window.instance.save){window.instance.save(window.instance)} openInstanceSelector(); window.close() }, deselect: () => {}},
 ], 0, false, false, true);
 
 window.setupTab(document.querySelector('#content-editor > .tab'),

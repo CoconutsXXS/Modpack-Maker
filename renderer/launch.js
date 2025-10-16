@@ -2,7 +2,7 @@ let playButton = document.getElementById('play-button');
 let stopButton = document.getElementById('stop-button');
 let consoleContainer = document.getElementById('console-window');
 var classContainer = document.getElementById('class-window').childNodes[3];
-var classShearchInput = document.getElementById('class-window').childNodes[1].childNodes[1];
+var classSearchInput = document.getElementById('class-window').childNodes[1].childNodes[1];
 
 
 // Class Tab Variables & Functions
@@ -19,23 +19,23 @@ function filterClass(classStart)
     }
     classContainer.childNodes[0].innerText = finalUpdated
 }
-function shearchClass()
+function searchClass()
 {
-    if(classShearchInput.value == classFilter){return;}
-    if(classShearchInput.value == '')
+    if(classSearchInput.value == classFilter){return;}
+    if(classSearchInput.value == '')
     {
         classFilter = null;
         classContainer.childNodes[0].innerText = classLog;
     }
-    else { filterClass(classShearchInput.value); }
+    else { filterClass(classSearchInput.value); }
 
     for(let b of document.getElementById('class-window').childNodes[1].childNodes)
     {
-        if(b.nodeType != 1 || b == classShearchInput){continue;}
-        b.style.display = (b.innerText.startsWith(classShearchInput.value) && document.activeElement == classShearchInput && classShearchInput.value != '')?'block':'none'
+        if(b.nodeType != 1 || b == classSearchInput){continue;}
+        b.style.display = (b.innerText.startsWith(classSearchInput.value) && document.activeElement == classSearchInput && classSearchInput.value != '')?'block':'none'
     }
 }
-document.onclick = classShearchInput.oninput = shearchClass;
+document.onclick = classSearchInput.oninput = searchClass;
 
 
 
@@ -245,7 +245,7 @@ playButton.addEventListener('click', async () =>
                             let b = document.createElement('button'); b.innerText = classStart; b.style.display = 'none';
                             document.getElementById('class-window').childNodes[1].appendChild(b);
                 
-                            b.onclick = () => { classShearchInput.value = classStart; shearchClass(); }
+                            b.onclick = () => { classSearchInput.value = classStart; searchClass(); }
                         }
                 
                         // Add Line

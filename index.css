@@ -927,6 +927,8 @@ input[type="range"]::-webkit-slider-thumb
 }
 #popup-container > div > p { margin-bottom: 16px; }
 #popup-container > div > div:first-of-type { display: flex; width: 100%; text-align: center; direction: rtl; }
+#popup-container > div > div:first-of-type > button { margin-left: 8px; }
+#popup-container > div > div:first-of-type > button:last-of-type { margin-left: 0; }
 
 #youtube-search
 {

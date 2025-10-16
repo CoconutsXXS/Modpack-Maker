@@ -10,7 +10,8 @@ window.loadInstance = async (name) =>
 {
     if(!name || name == '')
     {
-        name = await window.popup('text', 'Name the new instance.');
+        name = await window.popup('text', 'Name the new instance.', true);
+        if(name==0){openInstanceSelector(); window.close();return}
         document.getElementById('instance-name').value = name;
     }
 
