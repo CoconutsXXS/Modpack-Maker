@@ -284,6 +284,15 @@ tfoot td
     right: 4px;
     margin-left: 4px;
 }
+.folder-content button > span
+{
+    width: calc(100% - 60px);
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
 .folder-content button[icon]::before
 {
     background-image: var(--custom-icon);
@@ -326,8 +335,8 @@ tfoot td
 .folder-content button > button:hover{opacity: 0.8;}
 .folder-content button > button::before{content: none;}
 
-.folder-content button > button:nth-child(1) { background-image: url(./resources/delete.png); }
-.folder-content button > button:nth-child(2) { background-image: url(./resources/enabled.png); }
+.folder-content button > button:nth-child(2) { background-image: url(./resources/delete.png); }
+.folder-content button > button:nth-child(3) { background-image: url(./resources/enabled.png); }
 .folder-content button > button:hover { background-position: 2.5px 2.5px; background-size: 15px 15px; background-repeat: no-repeat; }
 
 .content-slider

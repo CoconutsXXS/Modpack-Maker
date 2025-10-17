@@ -882,6 +882,11 @@ class Instance
 
                     try
                     {
+                        // Try Logo
+                        try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await r["logo.png"]?.arrayBuffer()))}catch(err){}
+                        try{this.mods[i].icon = await bufferToDataUrl('image/png', Buffer.from(await r["icon.png"]?.arrayBuffer()))}catch(err){}
+
+
                         // Jarjar true content
                         for(let subJarKey of Object.keys(r).filter(k=>k.startsWith('META-INF/jarjar'+sep)&&k!='META-INF/jarjar'+sep&&k.endsWith('.jar')))
                         {
@@ -1195,6 +1200,9 @@ class Instance
     // Download
     setLoading(o)
     {
+        if(!fs.existsSync(path.join(config.directories.instances, this.name)))
+        {fs.mkdirSync(path.join(config.directories.instances, this.name))}
+
         if(this.loading.find(l=>l.index==o.index))
         {
             this.loading[this.loading.findIndex(l=>l.index==o.index)] = o;
@@ -1365,8 +1373,8 @@ class Instance
         console.log("Importing Instance from",link)
         let url = new URL(link);
 
-        let i = new Instance({name: metadata.title});
-        i.icon = metadata?.icon;
+        let meta = {name: metadata.title};
+        meta.icon = metadata?.icon;
 
         // Modrinth
         if(url.hostname == "modrinth.com")
@@ -1378,93 +1386,43 @@ class Instance
 
             // Metadata
             let meta = (await (await fetch('https://api.modrinth.com/v2/project'+'/'+url.pathname.split('/')[url.pathname.split('/').length-1])).json());
-            i.description = meta.description;
-            i.version.number = version.game_versions[0];
-            i.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
+            meta.description = meta.description;
+            meta.version = {}
+            meta.version.number = version.game_versions[0];
+            meta.loader = {}
+            meta.loader.name = version.loaders[0]!=undefined?version.loaders[0]:'vanilla';
             // Set last loader version
-            switch(i.loader.name)
+            switch(meta.loader.name)
             {
                 case 'forge':
                 {
                     const data = new XMLParser().parse(await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text());
-                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == i.version.number.toString())[0].split('-')[1];
+                    meta.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == meta.version.number.toString())[0].split('-')[1];
                     break;
                 }
                 case 'neoforge':
                 {
                     const data = new XMLParser().parse(await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text());
-                    i.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == i.version.number.toString()).reverse()[0];
+                    meta.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == meta.version.number.toString()).reverse()[0];
                     break;
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+i.version.number.toString())).json();
-                    i.loader.version = data[0].loader.version;
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+meta.version.number.toString())).json();
+                    meta.loader.version = data[0].loader.version;
                     break;
                 }
                 default: { break; }
             }
-            i.save();
 
-            ready();
+            let tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "modrinth-instance-download"));
+            await Download.download(decodeURI(file.url), path.join(tmpDir, 'original.zip'))
 
-            let p = path.join(config.directories.instances, i.name);
-            fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
-
-
-            // Downlaod zip
-            await Download.download(decodeURI(file.url), path.join(p, 'original.zip'))
-            let zip = fs.readFileSync(path.join(p, 'original.zip'))
-
-            const {entries} = await unzip(zip);
-            const data = await entries['modrinth.index.json'].json();
-
-            // Download content
-            let total = 0;
-            for(let f of data.files)
+            return new Promise(async (resolve) =>
             {
-                if(entries[f.path] != undefined) { continue; }
-                total += f.fileSize;
-            }
-            let loaded = 0;
-            let loadingIndex = i.setLoading({type: "instance-download", value: 0})
-
-            // Mod Download or Transfert
-            for(let f of data.files)
-            {
-                if(fs.existsSync(path.join(p, 'minecraft', f.path))){loaded+=f.fileSize; continue;}
-
-                if(entries[f.path] != undefined)
-                {
-                    fs.writeFileSync(path.join(p, 'minecraft', f.path), await entries[f.path].arrayBuffer())
-                }
-                else if(f.downloads != undefined)
-                {
-                    if(f.downloads[0] == undefined){continue;}
-
-                    await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path), false, false)
-                }
-
-                loaded+=f.fileSize;
-                i.setLoading({type: "instance-download", value: Math.round((loaded/total)*1000)/1000, index: loadingIndex})
-            }
-            // Other Files
-            for(let e of Object.entries(entries))
-            {
-                if(e[0].startsWith('overrides'+sep) && e[0] != 'overrides'+sep)
-                {
-                    try
-                    {
-                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep)))))
-                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep))), {recursive:true}) }
-                        console.log(e[0].slice(10))
-                        fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
-                    }
-                    catch(err) { console.warn(err) }
-                }
-            }
-
-            i.save();
+                await modrinthDownload(path.join(tmpDir, 'original.zip'), meta, (i) => { ready(i.name); resolve(i)})
+                fs.unlinkSync(tmpDir);
+            })
         }
         // Curseforge
         else if(url.hostname == "www.curseforge.com")
@@ -1479,98 +1437,204 @@ class Instance
             var version = versions[0];
 
             // Metadata
-            i.description = meta.summary;
-            i.version.number = version.gameVersions[0];
-            i.loader.name = version.gameVersions[1].toLowerCase();
+            meta.description = meta.summary;
+            meta.version = {}
+            meta.version.number = version.gameVersions[0];
+            meta.loader = {}
+            meta.loader.name = version.gameVersions[1].toLowerCase();
             // Set last loader version
-            switch(i.loader.name)
+            switch(meta.loader.name)
             {
                 case 'forge':
                 {
                     const data = new XMLParser().parse(await (await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml')).text());
-                    i.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == i.version.number.toString())[0].split('-')[1];
+                    meta.loader.version = data.metadata.versioning.versions.version.filter(e => e.split('-')[0] == meta.version.number.toString())[0].split('-')[1];
                     break;
                 }
                 case 'neoforge':
                 {
                     const data = new XMLParser().parse(await (await fetch('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml')).text());
-                    i.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == i.version.number.toString()).reverse()[0];
+                    meta.loader.version = data.metadata.versioning.versions.version.filter(e => '1.'+e.split('-')[0].substring(0, e.split('-')[0].lastIndexOf('.')) == meta.version.number.toString()).reverse()[0];
                     break;
                 }
                 case 'fabric':
                 {
-                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+i.version.number.toString())).json();
-                    i.loader.version = data[0].loader.version;
+                    const data = await (await fetch('https://meta.fabricmc.net/v2/versions/loader'+'/'+meta.version.number.toString())).json();
+                    meta.loader.version = data[0].loader.version;
                     break;
                 }
                 default: { break; }
             }
-            i.save();
-
-            ready();
-
-            let p = path.join(config.directories.instances, i.name);
-            fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
-
 
             // Download zip
-            if(fs.existsSync(path.join(p, 'original.zip'))){fs.unlinkSync(path.join(p, 'original.zip'))}
-            await Download.download(decodeURI(`https://www.curseforge.com/api/v1/mods/${id}/files/${version.id}/download`), path.join(p, 'original.zip'))
-            let zip = fs.readFileSync(path.join(p, 'original.zip'))
-            const {entries} = await unzip(zip);
+            let tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "curseforge-instance-download"));
+            await Download.download(decodeURI(`https://www.curseforge.com/api/v1/mods/${id}/files/${version.id}/download`), path.join(tmpDir, 'original.zip'))
 
-            const data = await entries['manifest.json'].json();
-
-            if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
-            if(!fs.existsSync(path.join(p, 'minecraft/resourcepacks'))){fs.mkdirSync(path.join(p, 'minecraft/resourcepacks'));}
-            if(!fs.existsSync(path.join(p, 'minecraft/shaderpacks'))){fs.mkdirSync(path.join(p, 'minecraft/shaderpacks'));}
-
-
-            // Download content
-            // Mod Download or Transfert
-            let loadingIndex = i.setLoading({type: "instance-download", value: 0})
-            let downloaded = 0;
-            for(let f of data.files)
+            return new Promise(async (resolve) =>
             {
-                let dest = "mods"
-                let fileUrl = await getRedirectLocation(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`)
-                if(fileUrl.slice(0, fileUrl.lastIndexOf("?")).endsWith(".zip"))
-                {
-                    dest = "resourcepacks";
-                }
-                Download.download(fileUrl, path.join(p, 'minecraft', dest), true, false)
-                .then(async (r) =>
-                {
-                    if(dest == "resourcepacks")
-                    {
-                        const {entries} = await unzip(fs.readFileSync(r));
-                        if(entries["shaders"+sep]){ fs.renameSync(r, path.join(p, 'minecraft', "shaderpacks", r.slice(r.lastIndexOf(sep)))) }
-                    }
-                    
-                    downloaded++;
-                    i.setLoading({type: "instance-download", value: Math.round((downloaded/data.files.length)*1000)/1000, index: loadingIndex})
-                })
-            }
-            // Other Files
-            for(let e of Object.entries(entries))
-            {
-                if(e[0].startsWith('overrides'+sep) && e[0] != 'overrides'+sep && !e[0].endsWith(sep))
-                {
-                    try
-                    {
-                        if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep)))))
-                        { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep))), {recursive:true}) }
-
-                        fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
-                    }
-                    catch(err) { console.warn(err) }
-                }
-            }
-
-            i.save();
+                await curseforgeInstance(path.join(tmpDir, 'original.zip'), meta, (i) => { console.log(i, i.name); ready(i.name); resolve(i) })
+                fs.unlinkSync(tmpDir);
+            })
         }
     }
 }
+
+
+// Instance Download
+async function curseforgeInstance(zipPath, meta, instanceListener)
+{
+    let zip = fs.readFileSync(zipPath)
+    const {entries} = await unzip(zip);
+
+    if(!entries['manifest.json'])
+    {
+        if(entries['modrinth.index.json']) { await modrinthDownload(zipPath, meta); return; }
+        console.error("No manifest.json")
+        return;
+    }
+
+    const manifest = await entries['manifest.json'].json();
+
+    meta.name = manifest.name
+    meta.version.number = manifest.minecraft.version
+    meta.loader.name = manifest.minecraft.modLoaders[0].id.split("-")[0]
+    meta.loader.version = manifest.minecraft.modLoaders[0].id.split("-")[1]
+
+    let i = Object.assign(new Instance({name: meta.name}), meta);
+
+    let p = path.join(config.directories.instances, i.name);
+    fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
+
+    i.save();
+
+    if(instanceListener){instanceListener(i)}
+
+    if(!fs.existsSync(path.join(p, 'minecraft/mods'))){fs.mkdirSync(path.join(p, 'minecraft/mods'));}
+    if(!fs.existsSync(path.join(p, 'minecraft/resourcepacks'))){fs.mkdirSync(path.join(p, 'minecraft/resourcepacks'));}
+    if(!fs.existsSync(path.join(p, 'minecraft/shaderpacks'))){fs.mkdirSync(path.join(p, 'minecraft/shaderpacks'));}
+
+
+    // Download content
+    // Mod Download or Transfert
+    let loadingIndex = i.setLoading({type: "instance-download", value: 0})
+    let downloaded = 0;
+    let total = manifest.files.length+Object.entries(entries).length
+    for(let f of manifest.files)
+    {
+        let dest = "mods"
+        let fileUrl = await getRedirectLocation(`https://www.curseforge.com/api/v1/mods/${f.projectID}/files/${f.fileID}/download`)
+        if(fileUrl.slice(0, fileUrl.lastIndexOf("?")).endsWith(".zip"))
+        {
+            dest = "resourcepacks";
+        }
+        Download.download(fileUrl, path.join(p, 'minecraft', dest), true, false)
+        .then(async (r) =>
+        {
+            if(dest == "resourcepacks")
+            {
+                const {entries} = await unzip(fs.readFileSync(r));
+                if(entries["shaders"+sep]){ fs.renameSync(r, path.join(p, 'minecraft', "shaderpacks", r.slice(r.lastIndexOf(sep)))) }
+            }
+            
+            downloaded++;
+            i.setLoading({type: "instance-download", value: Math.round((downloaded/total)*1000)/1000, index: loadingIndex})
+        })
+    }
+    // Other Files
+    for(let [e, v] of Object.entries(entries))
+    {
+        if(e.startsWith(manifest.overrides+'/') && e != manifest.overrides+'/' && !e.endsWith('/'))
+        {
+            try
+            {
+                e = e.slice(manifest.overrides.length+1, e.length);
+                console.log(e)
+
+                let folderPath = e.split('/')
+                folderPath.pop()
+
+                if(!fs.existsSync(path.join(p, 'minecraft', ...folderPath)))
+                { fs.mkdirSync(path.join(p, 'minecraft', ...folderPath), {recursive:true}) }
+
+                fs.writeFileSync(path.join(p, 'minecraft', ...e.split('/')), Buffer.from(await v.arrayBuffer()))
+
+                downloaded++
+                i.setLoading({type: "instance-download", value: Math.round((downloaded/total)*1000)/1000, index: loadingIndex})
+            }
+            catch(err) { console.warn(err) }
+        }
+    }
+
+    i.save();
+
+    i.setLoading({type: "instance-download", value: 1, index: loadingIndex})
+}
+async function modrinthDownload(zipPath, meta, instanceListener)
+{
+    let zip = fs.readFileSync(zipPath)
+
+    let i = Object.assign(new Instance({name: meta.title}), meta);
+
+    let p = path.join(config.directories.instances, i.name);
+    fs.mkdirSync(path.join(p,'minecraft'),{recursive:true});
+
+    i.save();
+
+    if(instanceListener){instanceListener(i)}
+
+    const {entries} = await unzip(zip);
+    const data = await entries['modrinth.index.json'].json();
+
+    // Download content
+    let total = 0;
+    for(let f of data.files)
+    {
+        if(entries[f.path] != undefined) { continue; }
+        total += f.fileSize;
+    }
+    let loaded = 0;
+    let loadingIndex = i.setLoading({type: "instance-download", value: 0})
+
+    // Mod Download or Transfert
+    for(let f of data.files)
+    {
+        if(fs.existsSync(path.join(p, 'minecraft', f.path))){loaded+=f.fileSize; continue;}
+
+        if(entries[f.path] != undefined)
+        {
+            fs.writeFileSync(path.join(p, 'minecraft', f.path), await entries[f.path].arrayBuffer())
+        }
+        else if(f.downloads != undefined)
+        {
+            if(f.downloads[0] == undefined){continue;}
+
+            await Download.download(decodeURI(f.downloads[0]), path.join(p, 'minecraft', f.path), false, false)
+        }
+
+        loaded+=f.fileSize;
+        i.setLoading({type: "instance-download", value: Math.round((loaded/total)*1000)/1000, index: loadingIndex})
+    }
+    // Other Files
+    for(let e of Object.entries(entries))
+    {
+        if(e[0].startsWith('overrides'+sep) && e[0] != 'overrides'+sep)
+        {
+            try
+            {
+                if(!fs.existsSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep)))))
+                { fs.mkdirSync(path.join(p, 'minecraft', e[0].slice(10).substring(0, e[0].slice(10).lastIndexOf(sep))), {recursive:true}) }
+                console.log(e[0].slice(10))
+                fs.writeFileSync(path.join(p, 'minecraft', e[0].slice(10)), Buffer.from(await e[1].arrayBuffer()))
+            }
+            catch(err) { console.warn(err) }
+        }
+    }
+
+    i.save();
+
+    i.setLoading({type: "instance-download", value: 1, index: loadingIndex})
+}
+
 
 
 async function installLoader(root, loader, version, listeners = null)
@@ -1616,6 +1680,8 @@ async function installLoader(root, loader, version, listeners = null)
             {
                 if(listeners) { listeners.log('loaderProgress', Math.round(progress.percent*100).toString()) }
             }});
+
+            console.log("Downloaded",link,'to',path.join(targetPath, targetName))
 
             if(!fs.existsSync(path.join(targetPath, targetName)))
             {
@@ -1955,6 +2021,8 @@ async function fixLibraries(libraryPath, instance)
 {
     let resourcePath = path.join(__dirname, "lwjgl", `${platform()}-${arch()}.zip`)
     if(!fs.existsSync(resourcePath)){return [];}
+
+    if(platform()!="linux"){return []}
 
     let win = BrowserWindow.getAllWindows()[0] || BrowserWindow.getFocusedWindow();
     let createdWin = win==undefined;

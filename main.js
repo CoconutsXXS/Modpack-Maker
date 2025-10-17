@@ -228,6 +228,7 @@ ipcMain.on('openInstance', async (event, name) =>
 let loadedInstances = [];
 ipcMain.on('getInstance', (event, name) =>
 {
+    console.log("getInstance",name)
     let i = Instance.getInstance(name);
     loadedInstances.push({name: name, instance: i})
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
@@ -311,11 +312,12 @@ ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
 
 ipcMain.handle('importInstance', async (event, link, metadata) =>
 {
-    return await Instance.importInstance(link, metadata, async () =>
+    return JSON.parse(JSON.stringify(await Instance.importInstance(link, metadata, async (name) =>
     {
+        console.log(name)
         let win = await mainWindow();
-        win.webContents.send('openInstance', metadata.title);
-    });
+        win.webContents.send('openInstance', name);
+    })));
 })
 
 let instanceIndex = 0;

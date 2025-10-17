@@ -117,7 +117,9 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
             // Create Element
             let b = document.createElement('button');
-            b.innerText = f.name;
+            let span = document.createElement("span")
+            b.appendChild(span)
+            span.innerText = f.name;
             b.style.opacity = f.disabled?'0.5':'1'
             b.setAttribute('index', f.index)
             files[k].element = b;
