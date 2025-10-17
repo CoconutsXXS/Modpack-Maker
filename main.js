@@ -329,7 +329,7 @@ ipcMain.handle('launch', (event, name, world = null) =>
         {
             log: (t, c) => event.sender.isDestroyed()?null:event.sender.send(i+'log', t, c),
             close: (c) => event.sender.isDestroyed()?null:event.sender.send(i+'close', c),
-            windowOpen: (w, s, k) =>
+            windowOpen: (w, s, k, fk) =>
             {
                 console.log(`Window opened: `, w)
                 event.sender.isDestroyed()?null:event.sender.send(i+'window-open', s, i);
@@ -344,6 +344,11 @@ ipcMain.handle('launch', (event, name, world = null) =>
                     else { w.setBounds({x, y, width, height}); }
                 });
                 ipcMain.on(i+'kill', (event) => { k()});
+            },
+            processLaunch: (p) =>
+            {
+                ipcMain.on(i+'kill-force', (event) => { p.kill("SIGKILL") });
+                event.sender.isDestroyed()?null:event.sender.send(i+'process-launch')
             },
             network: (m) => event.sender.isDestroyed()?null:event.sender.send(i+'network', m)
         }

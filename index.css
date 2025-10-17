@@ -602,6 +602,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
 #game-controls > button[play] { background-image: url(./resources/play.png);}
 #game-controls > button[pause] { background-image: url(./resources/pause.png); background-color: var(--overline); }
 #game-controls > button[stop] { background-image: url(./resources/stop.png);}
+#game-controls > button[kill] { background-image: url(./resources/kill.png) !important;}
 #game-controls > button[load] { animation: loading-circle 1s infinite; background-color: var(--overline); }
 @keyframes loading-circle
 {

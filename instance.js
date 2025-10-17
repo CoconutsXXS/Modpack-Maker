@@ -280,6 +280,7 @@ class Instance
             log: function(type, content){},
             close: function(code){},
             windowOpen: function(window, windowSource, kill){},
+            processLaunch: function(process){},
             network: function(m){}
         }, port = 1337, world = null)
     {
@@ -438,6 +439,8 @@ class Instance
         let windowSource = null;
 
         if(!process) { console.error("No process, crashed") }
+
+        listeners.processLaunch(process);
 
         // Crashlog
         let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});

@@ -229,7 +229,26 @@ playButton.addEventListener('click', async () =>
                 playButton.removeAttribute('pause');
                 playButton.removeAttribute('load');
                 playButton.setAttribute('play', '');      
+                stopButton.removeAttribute("kill")
+                stopButton.setAttribute("soft-hover-info", 'Close');
+                stopButton.onclick = null;
                 closed = true;      
+            },
+            processLaunch: () =>
+            {
+                stopButton.setAttribute("soft-hover-info", 'Kill');
+                stopButton.setAttribute("kill", '');
+                stopButton.onclick = () =>
+                {
+                    killGame(i);
+                    playButton.removeAttribute('pause');
+                    playButton.removeAttribute('load');
+                    playButton.setAttribute('play', '');      
+                    stopButton.removeAttribute("kill")
+                    stopButton.setAttribute("soft-hover-info", 'Close');
+                    stopButton.onclick = null;
+                    closed = true;      
+                }
             },
             network: (i, c) =>
             {
@@ -275,7 +294,25 @@ playButton.addEventListener('click', async () =>
                 playButton.removeAttribute('play');
                 playButton.setAttribute('pause', '');
 
-                stopButton.onclick = () => { closeGame(i); }
+                stopButton.removeAttribute("kill")
+                stopButton.setAttribute("soft-hover-info", 'Close');
+                stopButton.onclick = () =>
+                {
+                    closeGame(i);
+                    stopButton.setAttribute("soft-hover-info", 'Kill');
+                    stopButton.setAttribute("kill", '');
+                    stopButton.onclick = () =>
+                    {
+                        killGame(i);
+                        playButton.removeAttribute('pause');
+                        playButton.removeAttribute('load');
+                        playButton.setAttribute('play', '');      
+                        stopButton.removeAttribute("kill")
+                        stopButton.setAttribute("soft-hover-info", 'Close');
+                        stopButton.onclick = null;
+                        closed = true;      
+                    }
+                }
 
                 // return;
 
