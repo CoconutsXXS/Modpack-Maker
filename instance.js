@@ -2,7 +2,6 @@ const { app, desktopCapturer, BrowserWindow } = require('electron');
 const { download } = require("grape-electron-dl");
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require("msmc");
-const launcher = new Client();
 const path = require('node:path')
 const fs = require('fs')
 const { windowManager } = require('node-window-manager');
@@ -17,11 +16,15 @@ const tar = require("tar")
 const {sep} = require("path")
 const extract = require("extract-zip");
 
+const xmcl = require("@xmcl/core")
+const xmclInstaller = require("@xmcl/installer")
+
 const config = require('./config');
 const Download = require('./download');
 const jarReader = require('./jar-reader');
 const { default: bufferToDataUrl } = require('buffer-to-data-url');
 const { platform, arch } = require('node:os');
+const { EventEmitter } = require('node:stream');
 
 function rootPath()
 {
@@ -286,12 +289,6 @@ class Instance
     {
         if(!fs.existsSync(this.path)){fs.mkdirSync(this.path, {recursive: true});}
 
-        // Install Loader
-        this.version.custom = await installLoader(this.path, this.loader, this.version, listeners)
-
-        if(this.version.custom == undefined && this.loader.name != "vanilla")
-        { console.error("Custom Version Failed!"); return; }
-
         // Resource Path (download optimization)
         let resourcePath = path.join(config.directories.resources, this.version.number+'-'+this.version.type)
         if(!fs.existsSync(resourcePath+sep+'assets')){fs.mkdirSync(resourcePath+sep+'assets', {recursive: true});}
@@ -392,6 +389,344 @@ class Instance
         // const token = await xboxManager.getMinecraft();
         // fs.writeFileSync(path.join(app.getAppPath(), 'account.json'), JSON.stringify(token));
 
+        if(this.loader.name != "fabric" && this.loader.name != "quilt")
+        {
+            let resolvedVersion = null;
+            try
+            {
+                resolvedVersion = await xmcl.Version.parse(this.path, this.version.number)
+            }
+            catch
+            {
+                resolvedVersion = await xmclInstaller.installVersionTask((await xmclInstaller.getVersionList()).versions.find(v=>v.id==this.version.number&&v.type==this.version.type), this.path).startAndWait
+                ({
+                    onStart: (t) => { console.log("Started Minecraft installation.") },
+                    onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Minecraft Installation"}) },
+                    onCancelled: (t) => { console.log("Minecraft installation canceled.") },
+                    onPaused: (t) => { console.log("Minecraft installation paused.") },
+                    onResumed: (t) => { console.log("Minecraft installation resumed.") },
+                    onFailed: (t) => { console.error("Minecraft installation failed.") },
+                    onSucceed: (t) => { console.log("Minecraft installed successfully."); listeners.log('installation', {progress: 100, type: "Minecraft Installation"}) },
+                })
+            }
+            let versionString = this.version.number;
+
+            // Loader Install
+            if(this.loader.name == "forge")
+            {
+                try
+                {
+                    versionString = await xmclInstaller.installNeoForgedTask("forge", this.loader.version, this.path, {side: 'client'}).startAndWait
+                    ({
+                        onStart: (t) => { console.log("Started forge installation.") },
+                        onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Forge Installation"}) },
+                        onCancelled: (t) => { console.log("Forge installation canceled.") },
+                        onPaused: (t) => { console.log("Forge installation paused.") },
+                        onResumed: (t) => { console.log("Forge installation resumed.") },
+                        onFailed: (t) => { console.error("Forge installation failed.") },
+                        onSucceed: (t) => { console.log("Forge installed successfully."); listeners.log('installation', {progress: 100, type: "Forge Installation"}) },
+                    })
+
+                }
+                catch
+                {
+                    versionString = await xmclInstaller.installForgeTask({ version: this.loader.version, mcversion: this.version.number }, this.path).startAndWait
+                    ({
+                        onStart: (t) => { console.log("Started forge installation.") },
+                        onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Forge Installation"}) },
+                        onCancelled: (t) => { console.log("Forge installation canceled.") },
+                        onPaused: (t) => { console.log("Forge installation paused.") },
+                        onResumed: (t) => { console.log("Forge installation resumed.") },
+                        onFailed: (t) => { console.error("Forge installation failed.") },
+                        onSucceed: (t) => { console.log("Forge installed successfully."); listeners.log('installation', {progress: 100, type: "Forge Installation"}) },
+                    })
+                }
+            }
+            else if(this.loader.name == "neoforge")
+            {
+                versionString = await xmclInstaller.installNeoForgedTask("neoforge", this.loader.version, this.path, {side: 'client'}).startAndWait
+                ({
+                    onStart: (t) => { console.log("Started neoforge installation.") },
+                    onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Neoforge Installation"}) },
+                    onCancelled: (t) => { console.log("Neoforge installation canceled.") },
+                    onPaused: (t) => { console.log("Neoforge installation paused.") },
+                    onResumed: (t) => { console.log("Neoforge installation resumed.") },
+                    onFailed: (t) => { console.error("Neoforge installation failed.") },
+                    onSucceed: (t) => { console.log("Neoforge installed successfully."); listeners.log('installation', {progress: 100, type: "Neoforge Installation"}) },
+                })
+            }
+            else if(this.loader.name == "fabric")
+            {
+                console.log("Installing fabric.")
+                versionString = await xmclInstaller.installFabric({minecraftVersion: this.version.number, version: this.loader.version, minecraft: this.path, side: "client"});
+                console.log("Fabric installed.")
+
+                // console.log("Installing fabric.")
+                // versionString = await xmclInstaller.installFabricByLoaderArtifact(await xmclInstaller.getFabricLoaderArtifact(this.version.number, this.loader.version), this.path);
+                // console.log("Fabric installed.")
+            }
+            else if(this.loader.name == "quilt")
+            {
+                console.log("Installing quilt.")
+                versionString = await xmclInstaller.installQuiltVersion({minecraftVersion: this.version.number, version: this.loader.version, minecraft: this.path, side: "client"})
+                console.log("Quilt installed.")
+            }
+
+            await xmclInstaller.installDependenciesTask(resolvedVersion).startAndWait
+            ({
+                onStart: (t) => { console.log("Started dependencies installation.") },
+                onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Dependencies Installation"}) },
+                onCancelled: (t) => { console.log("Dependencies installation canceled.") },
+                onPaused: (t) => { console.log("Dependencies installation paused.") },
+                onResumed: (t) => { console.log("Dependencies installation resumed.") },
+                onFailed: (t) => { console.error("Dependencies installation failed.") },
+                onSucceed: (t) => { console.log("Dependencies installed successfully."); listeners.log('installation', {progress: 100, type: "Dependencies Installation"}) },
+            })
+
+
+            // Issues Tracker
+            for(let issue of (await xmcl.diagnose(resolvedVersion.id, resolvedVersion.minecraftDirectory)).issues)
+            {
+                switch(issue.role)
+                {
+                    case "assetIndex":
+                    {
+                        console.log("Assets index is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installAssetsTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started assets index installation.") },
+                            onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Assets Index Installation"}) },
+                            onCancelled: (t) => { console.log("Assets index installation canceled.") },
+                            onPaused: (t) => { console.log("Assets index installation paused.") },
+                            onResumed: (t) => { console.log("Assets index installation resumed.") },
+                            onFailed: (t) => { console.error("Assets index installation failed.") },
+                            onSucceed: (t) => { console.log("Assets index installed successfully."); listeners.log('installation', {progress: 100, type: "Assets Index Installation"}) },
+                        })
+                        
+                        break;
+                    }
+                    case "asset":
+                    {
+                        console.log("Assets are "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installAssetsTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started assets installation.") },
+                            onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Assets Installation"}) },
+                            onCancelled: (t) => { console.log("Assets installation canceled.") },
+                            onPaused: (t) => { console.log("Assets installation paused.") },
+                            onResumed: (t) => { console.log("Assets installation resumed.") },
+                            onFailed: (t) => { console.error("Assets installation failed.") },
+                            onSucceed: (t) => { console.log("Assets installed successfully."); listeners.log('installation', {progress: 100, type: "Assets Installation"}) },
+                        })
+
+                        break;
+                    }
+                    case "library":
+                    {
+                        console.log("Libraries are "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installLibrariesTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started libraries installation.") },
+                            onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Libraries Installation"}) },
+                            onCancelled: (t) => { console.log("Libraries installation canceled.") },
+                            onPaused: (t) => { console.log("Libraries installation paused.") },
+                            onResumed: (t) => { console.log("Libraries installation resumed.") },
+                            onFailed: (t) => { console.error("Libraries installation failed.") },
+                            onSucceed: (t) => { console.log("Libraries installed successfully."); listeners.log('installation', {progress: 100, type: "Libraries Installation"}) },
+                        })
+                        
+                        break;
+                    }
+                    case "minecraftJar":
+                    {
+                        console.log("Minecraft jar is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        // await xmclInstaller.install(resolvedVersion)
+                        
+                        break;
+                    }
+                    case "versionJson":
+                    {
+                        console.log("Version json is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        // await xmclInstaller.install(resolvedVersion)
+                        
+                        break;
+                    }
+                }
+            }
+
+            console.log("version string:", versionString)
+
+            let process = await xmcl.launch
+            ({
+                gamePath: this.path,
+                javaPath: javaPath?javaPath:'java',
+
+                version: versionString,
+                versionName: this.version.number,
+                versionType: this.version.type,
+
+                minMemory: Number(this.memory.min.slice(0, this.memory.min.length-1))*1024,
+                maxMemory: Number(this.memory.max.slice(0, this.memory.min.length-1))*1024,
+                
+                extraMCArgs: world?["quickPlaySingleplayer", world]:[]
+            })
+
+            let pid = process?.pid;
+
+            // Listeners
+            listeners.processLaunch(process);
+
+            let watcher = xmcl.createMinecraftProcessWatcher(process, new EventEmitter())
+
+            watcher.on('error', (e) => { console.error("error",e); listeners.log('error', e) });
+            watcher.on('minecraft-exit', (e) => { console.log("minecraft-exit",e); listeners.log('close', "Exit code: "+e.code); if(e.crashReport){listeners.log('close', e.crashReport)} });
+
+            watcher.on("message", (e) => listeners.log('message', e))
+            watcher.on("error", (e) => listeners.log('error', e))
+            watcher.on("close", (e) => {listeners.close(e)})
+
+            process.on("message", (e) => listeners.log('message', e))
+            process.on("error", (e) => listeners.log('error', e))
+            process.on("close", (e) => {listeners.close(e)})
+
+            // Window
+            watcher.on('minecraft-window-ready', async (e) =>
+            {
+                console.log("minecraft-window-ready",e);
+                listeners.log('data', "Window ready");
+
+                let sources = await desktopCapturer.getSources({ types: ['window'] });
+        
+                let mcSource = sources.find(source => source.id==pid || source.name.startsWith('Minecraft'));
+                if(!mcSource) { console.warn("Window not found...") }
+
+                listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), mcSource, () => {process.kill('SIGINT')});
+            });
+        }
+        else
+        {
+            const launcher = new Client();
+
+            // Install Loader
+            this.version.custom = await installLoader(this.path, this.loader, this.version, listeners)
+
+            if(this.version.custom == undefined)
+            { console.error("Custom Version Failed!"); return; }
+
+            // Settings
+            let options =
+            {
+                root: this.path,
+                version: this.version,
+                memory: this.memory,
+                authorization: await Authenticator.getAuth("dev"),
+                // authorization: token.mclc(true),
+                quickPlay: world!=undefined?world:null,
+                javaPath: javaPath?javaPath:'java',
+                overrides: {detached: true},
+                os: platform()=="darwin"?"osx":(platform()=="win32"?"windows":"linux"),
+                customArgs
+            }
+            console.log(options)
+
+            // Asset Move
+            launcher.on('debug', (e) =>
+            {
+                if(e == '[MCLC]: Downloaded assets')
+                {
+                    fs.cpSync(path.join(this.path,'assets'), resourcePath+sep+'assets', {recursive:true})
+                    fs.cpSync(path.join(this.path,'libraries'), resourcePath+sep+'libraries', {recursive:true})
+
+                    fs.cpSync(path.join(this.path,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
+                }
+            });
+
+            // Prepare Events
+            launcher.on('progress', (e) => listeners.log('progress', e));
+            launcher.on('debug', (e) => listeners.log('debug', e));
+            launcher.on('data', (e) => listeners.log('data', e));
+            launcher.on('close', (e) => listeners.log('close', e));
+            launcher.on('error', (e) => listeners.log('error', e));
+            launcher.on('close', (e) => {listeners.close(e);launcher.removeAllListeners();})
+
+
+            // Launch
+            let process = await launcher.launch(options);
+            if(!process){console.error("No process, cannot launch..."); return;}
+            process.on("error", (e) => listeners.log('error', e))
+            process.on("close", (e) => {listeners.close(e);launcher.removeAllListeners();})
+            let pid = process?.pid;
+            let windowSource = null;
+
+            if(!process) { console.error("No process, crashed") }
+
+            listeners.processLaunch(process);
+
+            // Crashlog
+            let crashLogWatcher = chokidar.watch(path.join(this.path), {persistent: true});
+            crashLogWatcher.on('add', (p) =>
+            {
+                if(p.split(sep)[p.split(sep).length-1] != `hs_err_pid${pid}.log`){return}
+
+                let s = fs.createReadStream(p)
+                .pipe(es.split())
+                .pipe(es.mapSync(function(line)
+                {
+                    s.pause();
+                    console.log(line)
+                    listeners.log('data', line)
+                    s.resume();
+                }))
+            })
+
+            // Wait for Window
+            async function trySource()
+            {
+                let sources = await desktopCapturer.getSources({ types: ['window'] });
+        
+                let mcSource = sources.find(source => source.name.startsWith('Minecraft'));
+                if(!mcSource) { return false; }
+                    
+                windowSource = mcSource;
+
+                let isAppFocused = false;
+                for(var w of BrowserWindow.getAllWindows()) { if(w.isFocused()){isAppFocused=true;break;} }
+
+                return true;
+            }
+
+            await new Promise((resolve) =>
+            {
+                let listener = async (w) =>
+                {
+                    if(w.processId == process.pid)
+                    {
+                        windowManager.removeListener('window-activated', listener);
+                        await trySource();
+                        resolve();
+                    }
+                }
+    
+                windowManager.addListener('window-activated', listener);
+            })
+            // Check at if window is still not detected
+            if(windowSource == undefined)
+            {
+                await new Promise(async (resolve) =>
+                {
+                    let interval = setInterval(async () =>
+                    {
+                        if(await trySource()) { resolve(); clearInterval(interval); }
+                    }, 1000);
+                })
+            }
+
+            listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), windowSource, () => {process.kill('SIGINT')});
+
+        }
+
+        return;
+
         // Settings
         let options =
         {
@@ -456,8 +791,7 @@ class Instance
                 console.log(line)
                 listeners.log('data', line)
                 s.resume();
-            })
-        );
+            }))
         })
 
         // Network (need java agent)
@@ -1249,9 +1583,6 @@ class Instance
             await Download.download(m.url, path.join(p, m.type, m.filename))
         }
 
-        // Loader
-        version.custom = await installLoader(p, loader, version)
-
         // Java Version
         let javaVersion = (await (await fetch((await (await fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json")).json()).versions.find(v=>v.id==version.number).url)).json()).javaVersion.majorVersion
         let javaPath = findJavaExecutable(javaVersion);
@@ -1313,6 +1644,251 @@ class Instance
         if(fs.existsSync(path.join(config.directories.resources, 'versions', version.number)))
         { fs.cpSync(path.join(config.directories.resources, 'versions', version.number), path.join(p,'versions',version.number), {recursive:true}) }
 
+
+        if(loader.name != "fabric" && loader.name != "quilt")
+        {
+            const resolvedVersion = await xmcl.Version.parse(p, version.number);
+            let versionString = version.number;
+
+            // Loader Install
+            if(loader.name == "forge")
+            {
+                // versionString = await xmclInstaller.installForgeTask({ version: this.loader.version, mcversion: this.version.number }, this.path).startAndWait
+                console.log("forge", loader.version, p, {side: 'client'})
+                versionString = await xmclInstaller.installNeoForgedTask("forge", loader.version, p, {side: 'client'}).startAndWait
+                ({
+                    onStart: (t) => { console.log("Started forge installation.") },
+                    onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                    onCancelled: (t) => { console.log("Forge installation canceled.") },
+                    onPaused: (t) => { console.log("Forge installation paused.") },
+                    onResumed: (t) => { console.log("Forge installation resumed.") },
+                    onFailed: (t) => { console.error("Forge installation failed.") },
+                    onSucceed: (t) => { console.log("Forge installed successfully.") },
+                })
+            }
+            else if(loader.name == "neoforge")
+            {
+                versionString = await xmclInstaller.installNeoForgedTask("neoforge", loader.version, p, {side: 'client'}).startAndWait
+                ({
+                    onStart: (t) => { console.log("Started neoforge installation.") },
+                    onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                    onCancelled: (t) => { console.log("Neoforge installation canceled.") },
+                    onPaused: (t) => { console.log("Neoforge installation paused.") },
+                    onResumed: (t) => { console.log("Neoforge installation resumed.") },
+                    onFailed: (t) => { console.error("Neoforge installation failed.") },
+                    onSucceed: (t) => { console.log("Neoforge installed successfully.") },
+                })
+            }
+            else if(loader.name == "fabric")
+            {
+                console.log("Installing fabric.")
+                versionString = await xmclInstaller.installFabric({minecraftVersion: version.number, version: loader.version, minecraft: p, side: "client"});
+                console.log("Fabric installed.")
+
+                // console.log("Installing fabric.")
+                // versionString = await xmclInstaller.installFabricByLoaderArtifact(await xmclInstaller.getFabricLoaderArtifact(this.version.number, this.loader.version), this.path);
+                // console.log("Fabric installed.")
+            }
+            else if(loader.name == "quilt")
+            {
+                console.log("Installing quilt.")
+                versionString = await xmclInstaller.installQuiltVersion({minecraftVersion: version.number, version: loader.version, minecraft: p, side: "client"})
+                console.log("Quilt installed.")
+            }
+
+            await xmclInstaller.installDependenciesTask(resolvedVersion).startAndWait
+            ({
+                onStart: (t) => { console.log("Started dependencies installation.") },
+                onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                onCancelled: (t) => { console.log("Dependencies installation canceled.") },
+                onPaused: (t) => { console.log("Dependencies installation paused.") },
+                onResumed: (t) => { console.log("Dependencies installation resumed.") },
+                onFailed: (t) => { console.error("Dependencies installation failed.") },
+                onSucceed: (t) => { console.log("Dependencies installed successfully.") },
+            })
+
+
+            // Issues Tracker
+            for(let issue of (await xmcl.diagnose(resolvedVersion.id, resolvedVersion.minecraftDirectory)).issues)
+            {
+                switch(issue.role)
+                {
+                    case "assetIndex":
+                    {
+                        console.log("Assets index is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installAssetsTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started assets index installation.") },
+                            onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                            onCancelled: (t) => { console.log("Assets index installation canceled.") },
+                            onPaused: (t) => { console.log("Assets index installation paused.") },
+                            onResumed: (t) => { console.log("Assets index installation resumed.") },
+                            onFailed: (t) => { console.error("Assets index installation failed.") },
+                            onSucceed: (t) => { console.log("Assets index installed successfully.") },
+                        })
+                        
+                        break;
+                    }
+                    case "asset":
+                    {
+                        console.log("Assets are "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installAssetsTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started assets installation.") },
+                            onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                            onCancelled: (t) => { console.log("Assets installation canceled.") },
+                            onPaused: (t) => { console.log("Assets installation paused.") },
+                            onResumed: (t) => { console.log("Assets installation resumed.") },
+                            onFailed: (t) => { console.error("Assets installation failed.") },
+                            onSucceed: (t) => { console.log("Assets installed successfully.") },
+                        })
+
+                        break;
+                    }
+                    case "library":
+                    {
+                        console.log("Libraries are "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        await xmclInstaller.installLibrariesTask(resolvedVersion).startAndWait
+                        ({
+                            onStart: (t) => { console.log("Started libraries installation.") },
+                            onUpdate: (t, s) => { console.log("Installing...", (t.progress/t.total)*100) },
+                            onCancelled: (t) => { console.log("Libraries installation canceled.") },
+                            onPaused: (t) => { console.log("Libraries installation paused.") },
+                            onResumed: (t) => { console.log("Libraries installation resumed.") },
+                            onFailed: (t) => { console.error("Libraries installation failed.") },
+                            onSucceed: (t) => { console.log("Libraries installed successfully.") },
+                        })
+                        
+                        break;
+                    }
+                    case "minecraftJar":
+                    {
+                        console.log("Minecraft jar is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        // await xmclInstaller.install(resolvedVersion)
+                        
+                        break;
+                    }
+                    case "versionJson":
+                    {
+                        console.log("Version json is "+issue.type+", installing...\n(hint: "+issue.hint+")")
+                        // await xmclInstaller.install(resolvedVersion)
+                        
+                        break;
+                    }
+                }
+            }
+
+            console.log("version string:", versionString)
+
+            a={
+                root: p,
+                version: version,
+                memory: {max: '4G', min: '2G'},
+                authorization: await Authenticator.getAuth("tester"),
+                forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
+                quickPlay: {type: "singleplayer", identifier: "Test World"},
+                javaPath: javaPath?javaPath:'java',
+                overrides: {detached: true}
+            }
+
+            let process = await xmcl.launch
+            ({
+                gamePath: p,
+                javaPath: javaPath?javaPath:'java',
+
+                version: versionString,
+                versionName: this.version.number,
+                versionType: this.version.type,
+
+                minMemory: Number(this.memory.min.slice(0, this.memory.min.length-1))*1024,
+                maxMemory: Number(this.memory.max.slice(0, this.memory.min.length-1))*1024,
+                
+                extraMCArgs: world?["quickPlaySingleplayer", world]:[]
+            })
+
+            let pid = process?.pid;
+
+            // Listeners
+            listeners.processLaunch(process);
+
+            let watcher = xmcl.createMinecraftProcessWatcher(process, new EventEmitter())
+
+            watcher.on('error', (e) => { console.error("error",e); listeners.log('error', e) });
+            watcher.on('minecraft-exit', (e) => { console.log("minecraft-exit",e); listeners.log('close', "Exit code: "+e.code); if(e.crashReport){listeners.log('close', e.crashReport)} });
+
+            watcher.on("message", (e) => listeners.log('message', e))
+            watcher.on("error", (e) => listeners.log('error', e))
+            watcher.on("close", (e) => {listeners.close(e)})
+
+            process.on("message", (e) => listeners.log('message', e))
+            process.on("error", (e) => listeners.log('error', e))
+            process.on("close", (e) => {listeners.close(e)})
+
+            // Window
+            watcher.on('minecraft-window-ready', async (e) =>
+            {
+                console.log("minecraft-window-ready",e);
+                listeners.log('data', "Window ready");
+
+                let sources = await desktopCapturer.getSources({ types: ['window'] });
+        
+                let mcSource = sources.find(source => source.id==pid || source.name.startsWith('Minecraft'));
+                if(!mcSource) { console.warn("Window not found...") }
+
+                listeners.windowOpen(windowManager.getWindows().find(w => w.processId == pid), mcSource, () => {process.kill('SIGINT')});
+            });
+        }
+        else
+        {
+            const launcher = new Client();
+
+            // Install Loader
+            version.custom = await installLoader(p, loader, version)
+
+            if(version.custom == undefined)
+            { console.error("Custom Version Failed!"); return; }
+
+            // Settings
+            let options =
+            {
+                root: p,
+                version: version,
+                memory: {max: '4G', min: '2G'},
+                authorization: await Authenticator.getAuth("tester"),
+                forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
+                quickPlay: {type: "singleplayer", identifier: "Test World"},
+                javaPath: javaPath?javaPath:'java',
+                overrides: {detached: true}
+            }
+            console.log(options)
+
+            // Asset Move
+            launcher.on('debug', (e) =>
+            {
+                if(e == '[MCLC]: Downloaded assets')
+                {
+                    fs.cpSync(path.join(p,'assets'), resourcePath+sep+'assets', {recursive:true})
+                    fs.cpSync(path.join(p,'libraries'), resourcePath+sep+'libraries', {recursive:true})
+
+                    fs.cpSync(path.join(p,'versions'), path.join(config.directories.resources, 'versions'), {recursive:true})
+                }
+            });
+
+            // Prepare Events
+            launcher.on('debug', (e) => console.log('debug', e));
+            launcher.on('data', (e) => console.log('data', e));
+            launcher.on('close', (e) => console.log('close', e));
+            launcher.on('error', (e) => console.log('error', e));
+            launcher.on('close', (e) => {console.close(e);launcher.removeAllListeners();})
+
+
+            // Launch
+            let childProcess = await launcher.launch(options);
+
+            if(!childProcess) { console.error("Process is null..."); return; }
+        }
+
+        return;
 
         // Asset Move
         launcher.on('debug', (e) =>

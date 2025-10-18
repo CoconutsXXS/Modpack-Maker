@@ -143,6 +143,13 @@ async function updateLoaderVersionSelector()
 
             break;
         }
+        case "quilt":
+        {
+            const data = (await (await fetch('https://quiltmc.org/api/v1/latest-version-components')).json())[window.instance.version.number].quilt_loader;
+            versionList.push(data)
+
+            break;
+        }
     }
 
 

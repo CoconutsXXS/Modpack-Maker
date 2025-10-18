@@ -33,7 +33,9 @@
     "@ghostery/adblocker-electron": "^2.12.3",
     "@msgpack/msgpack": "^3.1.2",
     "@spyglassmc/mcfunction": "^0.2.38",
+    "@xmcl/core": "^2.15.1",
     "@xmcl/game-data": "^1.2.6",
+    "@xmcl/installer": "^6.1.2",
     "@xmcl/world": "^1.2.0",
     "buffer-to-data-url": "^1.0.0",
     "chokidar": "^4.0.3",
@@ -79,7 +81,6 @@
         "repo": "Modpack-Maker"
       }
     ],
-
     "mac": {
       "target": [
         "dmg",

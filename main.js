@@ -228,7 +228,6 @@ ipcMain.on('openInstance', async (event, name) =>
 let loadedInstances = [];
 ipcMain.on('getInstance', (event, name) =>
 {
-    console.log("getInstance",name)
     let i = Instance.getInstance(name);
     loadedInstances.push({name: name, instance: i})
     i.onModUpdate = (mods) => event.sender.isDestroyed()?null:event.sender.send('modUpdate', mods);
@@ -337,7 +336,7 @@ ipcMain.handle('launch', (event, name, world = null) =>
                 ipcMain.on(i+'resize', (event, x, y, width, height, windowDependent) =>
                 {
                     if(!w){console.warn("Window not found..."); return;}
-                    
+
                     if(windowDependent)
                     {
                         let focusedAppWindow = BrowserWindow.getFocusedWindow()?BrowserWindow.getFocusedWindow():BrowserWindow.getAllWindows()[0];

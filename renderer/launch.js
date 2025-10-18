@@ -68,9 +68,26 @@ playButton.addEventListener('click', async () =>
                 else if(isNaN(progress)){progress = c/100}
 
                 console.log(t, c)
+
+                var el = document.createElement('p');
+                if(t == "installation")
+                {
+                    let loadText = ''; for (let i = 0; i < 100; i++) { loadText+='·'; }
+                    for (let i = 0; i < Math.floor(c.progress); i++)
+                    {
+                        loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
+                    }
+
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">${c.type}:</span> ${loadText} - ${Math.floor(c.progress)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] ${c.type}: `))
+                    {
+                        consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
+                        el.remove();
+                        return
+                    }
+                }
                 
                 // Prepare Element
-                var el = document.createElement('p');
                 if(t == 'progress')
                 {
                     let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
@@ -95,8 +112,8 @@ playButton.addEventListener('click', async () =>
                         loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
                     }
 
-                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">loader download: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
-                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] loader download: `))
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">Loader Download: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] Loader Download: `))
                     {
                         consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
                         el.remove();
@@ -111,15 +128,15 @@ playButton.addEventListener('click', async () =>
                         loadText = loadText.substring(0, i)+'#'+loadText.substring(i+1);
                     }
 
-                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">java download: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
-                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] java download: `))
+                    el.innerHTML = `<span style="color:#f3f3ff55">[PROGRESS]</span> <span style="color:#f3f3ff55">Java Downloading: :</span> ${loadText} - ${Math.floor(progress * 100)}%`;
+                    if(consoleContainer.childNodes.length > 0 && consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText.startsWith(`[PROGRESS] Java Downloading: `))
                     {
                         consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerHTML = el.innerHTML;
                         el.remove();
                         return
                     }
                 }
-                else { el.innerText = `[${t.toUpperCase()}] ${c}`; }
+                else if(t != "installation") { el.innerText = `[${t.toUpperCase()}] ${c}`; }
 
                 // [DATA] [15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/assets/.mcassetsroot' uses unexpected schema[15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/data/.mcassetsroot' uses unexpected schema
                 if(typeof(c)=='string')
