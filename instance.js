@@ -419,7 +419,7 @@ class Instance
                     versionString = await xmclInstaller.installNeoForgedTask("forge", this.loader.version, this.path, {side: 'client'}).startAndWait
                     ({
                         onStart: (t) => { console.log("Started forge installation.") },
-                        onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Forge Installation"}) },
+                        onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Forge Installation"}, {java: javaPath?javaPath:'java'}) },
                         onCancelled: (t) => { console.log("Forge installation canceled.") },
                         onPaused: (t) => { console.log("Forge installation paused.") },
                         onResumed: (t) => { console.log("Forge installation resumed.") },
@@ -430,7 +430,7 @@ class Instance
                 }
                 catch
                 {
-                    versionString = await xmclInstaller.installForgeTask({ version: this.loader.version, mcversion: this.version.number }, this.path).startAndWait
+                    versionString = await xmclInstaller.installForgeTask({ version: this.loader.version, mcversion: this.version.number }, this.path, {java: javaPath?javaPath:'java'}).startAndWait
                     ({
                         onStart: (t) => { console.log("Started forge installation.") },
                         onUpdate: (t, s) => { listeners.log('installation', {progress: (t.progress/t.total)*100, type: "Forge Installation"}) },
