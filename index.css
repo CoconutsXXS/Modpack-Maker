@@ -1486,7 +1486,7 @@ label:has(#filter-version-browsing)
 
 #content-element-selector { width: 100%; overflow: auto; height: 100%; }
 #content-element-selector > button { position: absolute; left: 50%; translate: -50% 0; }
-#content-element-selector > table { display: none; }
+#content-element-selector > table {display: none;border: none;}
 #content-element-selector > table th { cursor: pointer; }
 
 #content-element-selector > table th { background: #00000000; color: #FFFFFF80; }

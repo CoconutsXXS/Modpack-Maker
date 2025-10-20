@@ -483,6 +483,7 @@ async function jarAnalyseSetup(i)
             {
                 editors.sourceSelection.style.display = "block";
                 let p = document.createElement("p");
+                console.log(keys)
                 p.innerText = `${keys[keys.length-1]} is modified by multiple sources:`;
                 editors.sourceSelection.firstChild.appendChild(p);
                 for(let [i, f] of files.entries())
@@ -533,13 +534,17 @@ async function jarAnalyseSetup(i)
     }
 
     let loadedTable = false;
-    window.jarData.loadTable = async function loadTable()
+    window.jarData.loadTable = async function loadTable(force = false)
     {
-        if(loadedTable){return}
+        if(loadedTable && !force){return}
         loadedTable=true;
 
         document.querySelector("#content-element-selector > button").style.display = "none";
         document.querySelector("#content-element-selector > table").style.display = "block";
+
+        // Clean
+        while(document.querySelector("#content-element-selector thead > tr").children.length > 1){document.querySelector("#content-element-selector thead > tr").lastChild.remove()}
+        document.querySelector("#content-element-selector tbody").innerHTML = ''
         
         let modsMetadata = [];
         let elementGroupMetadata = [];
@@ -728,6 +733,7 @@ async function jarAnalyseSetup(i)
         elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
     }
     document.querySelector("#content-element-selector > button").onclick = window.jarData.loadTable;
+    document.querySelector("#content-element-selector > table > thead > tr > th").onclick = window.jarData.loadTable;
 }
 
 
