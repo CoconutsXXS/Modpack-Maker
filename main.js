@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, screen, session, dialog, shell } = require('electron');
+
 const path = require('node:path')
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
 const crossFetch = require('cross-fetch');
@@ -92,7 +93,11 @@ async function mainWindow()
             webviewTag: true,
             contextIsolation: true,
             sandbox: false,
-        nodeIntegration: false
+            nodeIntegration: false,
+            webgl: true,
+            nodeIntegrationInSubFrames: true,
+            webSecurity: false,
+            
         },
 
         frame: false,
@@ -311,12 +316,13 @@ ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
 
 ipcMain.handle('importInstance', async (event, link, metadata) =>
 {
-    return JSON.parse(JSON.stringify(await Instance.importInstance(link, metadata, async (name) =>
+    return Promise(async (resolve) => JSON.parse(JSON.stringify(await Instance.importInstance(link, metadata, async (name) =>
     {
         console.log(name)
         let win = await mainWindow();
         win.webContents.send('openInstance', name);
-    })));
+        resolve();
+    }))));
 })
 
 let instanceIndex = 0;
@@ -328,7 +334,7 @@ ipcMain.handle('launch', (event, name, world = null) =>
         {
             log: (t, c) => event.sender.isDestroyed()?null:event.sender.send(i+'log', t, c),
             close: (c) => event.sender.isDestroyed()?null:event.sender.send(i+'close', c),
-            windowOpen: (w, s, k, fk) =>
+            windowOpen: (w, s, process) =>
             {
                 console.log(`Window opened: `, w)
                 event.sender.isDestroyed()?null:event.sender.send(i+'window-open', s, i);
@@ -344,7 +350,9 @@ ipcMain.handle('launch', (event, name, world = null) =>
                     }
                     else { w.setBounds({x, y, width, height}); }
                 });
-                ipcMain.on(i+'kill', (event) => { k()});
+                ipcMain.on(i+'kill', (event) => { process.kill('SIGTERM') });
+                ipcMain.on(i+'pause', (event) => { process.kill('SIGSTOP') });
+                ipcMain.on(i+'resume', (event) => { process.kill('SIGCONT') });
             },
             processLaunch: (p) =>
             {
@@ -403,8 +411,8 @@ ipcMain.handle('savedList', (event) =>
 {
     return JSON.parse(JSON.stringify(Saves.saved));
 })
-ipcMain.handle('addSaved', (event, args) => { Saves.addSaved(args[0]) })
-ipcMain.handle('deleteSaved', (event, args) => { Saves.deleteSaved(args[0]) })
+ipcMain.handle('addSaved', (event, ...args) => { Saves.addSaved(args[0]) })
+ipcMain.handle('deleteSaved', (event, ...args) => { Saves.deleteSaved(args[0]) })
 
 
 // Content Edition

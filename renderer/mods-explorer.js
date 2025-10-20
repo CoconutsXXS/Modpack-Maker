@@ -18,6 +18,7 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
             filename: m.filename,
             onSelect: ()=>
             {
+                infoPanel.style.display = "inline-block"
                 // Title, desc, icon
                 infoPanel.querySelector('div:first-of-type > h2').innerText = mods[k]?.title;
                 infoPanel.querySelector('div:first-of-type > img').src = mods[k].icon?m.icon:'';
@@ -37,6 +38,8 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                 }
 
                 // Client, server, dependencies
+                infoPanel.querySelector("#actions").style.display = infoPanel.querySelector("#supporting").style.display = 'grid'
+
                 infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${mods[k].clientRequired?0.8:0.3})`
                 infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', mods[k].clientRequired?'Required in Client Side':'Unrequired in Client Side');
                 infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${mods[k].serverRequired?0.8:0.3})`
@@ -125,7 +128,7 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                 window.instance[setData](mods[k])
             }, onDelete: ()=>
             {
-                console.log('destroy')
+                console.log('destroy!')
 
                 if(m.folder)
                 {
@@ -133,7 +136,7 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
 
                     // Move all children
                     let count = 0;
-                    for(let mod of window.instance.mods)
+                    for(let mod of window.instance[arrayPropertie])
                     {
                         if(mod.virtualPath==undefined){continue}
                         if(m.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf(sep())) && m.name == mod.virtualPath.split(sep())[mod.virtualPath.split(sep()).length-1])
@@ -145,6 +148,7 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                     }
 
                     window.instance.save(window.instance);
+                    window.instance.updateVirtualDirectories();
                     return;
                 }
 
@@ -173,7 +177,26 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                 window.instance.virtualDirectories[k].hierarchyIndex = index;
             },
             onSetActive: (active)=>{console.log(active)},
-            onDelete: ()=>{console.log('destroy')}
+            onDelete: ()=>
+            {
+                window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(dir => dir.filename == d.name && dir.path == d.path), 1)
+
+                // Move all children
+                let count = 0;
+                for(let mod of window.instance[arrayPropertie])
+                {
+                    if(mod.virtualPath==undefined){continue}
+                    if(d.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf(sep())) && d.name == mod.virtualPath.split(sep())[mod.virtualPath.split(sep()).length-1])
+                    {
+                        mod.virtualPath = '';
+                        window.instance.setModData(mod)
+                        count++;
+                    }
+                }
+
+                window.instance.save(window.instance);
+                window.instance.updateVirtualDirectories();
+            }
         })
     }
 
@@ -189,7 +212,26 @@ window.addInstanceListener(() =>
         f.onSelect = ()=> {  }
         f.onMove = (from, to, index)=>{}
         f.onSetActive = (active)=>{}
-        f.onDelete = ()=>{}
+        f.onDelete = ()=>
+        {
+            window.instance.virtualDirectories.splice(window.instance.virtualDirectories.findIndex(dir => dir.filename == f.name && dir.path == f.path), 1)
+
+            // Move all children
+            let count = 0;
+            for(let mod of window.instance.mods)
+            {
+                if(mod.virtualPath==undefined){continue}
+                if(f.path == mod.virtualPath.substring(0, mod.virtualPath.lastIndexOf(sep())) && f.name == mod.virtualPath.split(sep())[mod.virtualPath.split(sep()).length-1])
+                {
+                    mod.virtualPath = '';
+                    window.instance.setModData(mod)
+                    count++;
+                }
+            }
+
+            window.instance.save(window.instance);
+            window.instance.updateVirtualDirectories();
+        }
         return f;
     })
 
@@ -252,8 +294,6 @@ window.addInstanceListener(() =>
         f.onDelete = ()=>{console.log('destroy')}
         return f;
     })
-
-    console.log(filifyMods(window.instance.shaders, 'shaders', 'setShaderData', 'deleteShader', 'shaderpacks'))
 
     explorer.addNewFolderListener((f) =>
     {

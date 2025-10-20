@@ -24,7 +24,7 @@ window.loadInstance = async (name) =>
         }
 
         count.mods++;
-        console.log(count.mods+"<"+window.instance.mods.length+" || "+(window.downloadingInstance!=undefined&&window.downloadingInstance==false))
+        console.log(window.downloadingInstance!=undefined&&window.downloadingInstance==false)
         if(window.downloadingInstance!=undefined&&window.downloadingInstance==false){return;}
 
         window.instance.mods = m;
@@ -72,6 +72,13 @@ window.loadInstance = async (name) =>
         window.instance = r;
         // console.log(JSON.parse(JSON.stringify(instanceListeners)));
         for(let i of instanceListeners) { i(r); }
+
+        window.instance.updateVirtualDirectories = () =>
+        {
+            window.instance.onModUpdate(window.instance, window.instance.mods)
+            window.instance.onRPUpdate(window.instance, window.instance.rp)
+            window.instance.onShaderUpdate(window.instance, window.instance.shaders)
+        }
     })
 }
 

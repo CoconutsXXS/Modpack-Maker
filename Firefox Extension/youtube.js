@@ -627,6 +627,9 @@ let intervalFunction = () =>
     if(!(hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) && !(description.toLowerCase().includes("minecraft") && description.toLowerCase().includes(" mod")))
     {
         console.log("No Matching #")
+        clearInterval(setupInterval);
+        clearInterval(interval);
+
         return;
     }
 

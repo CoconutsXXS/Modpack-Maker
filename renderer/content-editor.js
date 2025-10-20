@@ -11,10 +11,10 @@ import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
 import { parse, stringify } from "cdn/comment-json";
 import Frame from "cdn/canvas-to-buffer";
 
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import * as POSTPROCESSING from "postprocessing"
-import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
+import * as THREE from "../node_modules/three/src/Three.js"
+import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
+// import * as POSTPROCESSING from "postprocessing"
+// import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
 
 import * as msgpack from "https://unpkg.com/@msgpack/msgpack/dist.esm/index.mjs";
 import * as lodash from "cdn/lodash"
@@ -168,11 +168,40 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
                 url,
                 (tex) =>
                 {
+                    if(tex.height > tex.width)
+                    {
+                        let ogHeight = tex.height;
+                        let ogData = tex.source.data;
+
+                        let canvas = document.createElement("canvas")
+                        canvas.width = canvas.height = tex.width
+
+                        let ctx = canvas.getContext("2d")
+                        ctx.drawImage(ogData, 0, 0)
+
+                        canvas.style.position = 'fixed'
+                        canvas.style.top = '0'
+                        canvas.style.left = '0'
+                        
+                        tex = new THREE.Texture(canvas)
+
+                        let currentHeight = 0;
+                        setInterval(() =>
+                        {
+                            currentHeight += tex.width;
+                            if(currentHeight >= ogHeight){currentHeight=0}
+                            ctx.drawImage(ogData, 0, -currentHeight)
+
+                            tex.needsUpdate = true
+                        }, 50)
+                    }
+
                     tex.magFilter = THREE.NearestFilter;
                     tex.minFilter = THREE.NearestFilter;
                     tex.generateMipmaps = false;
                     tex.wrapS = THREE.RepeatWrapping;
                     tex.wrapT = THREE.RepeatWrapping;
+
                     resolve(tex);
                 },
                 undefined,
@@ -205,7 +234,9 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
     for (const p of resolvedPaths)
     {
         const tex = textureCache[p] || null;
-        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true });
+        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true, needsUpdate: true });
+        mat.needsUpdate = mat.map.needsUpdate = true
+        console.log(mat)
         materialCache[p] = mat;
     }
 
@@ -706,6 +737,21 @@ let loadStructure;
 window.addInstanceListener(async (i) => 
 {
     // Setup
+    function isWebGLAvailable()
+    {
+        try {
+            const canvas = document.createElement('canvas');
+            return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')));
+        } catch (e) {
+            return false;
+        }
+    }
+    if (!isWebGLAvailable())
+    {
+        console.error("WebGL is not supported or disabled!");
+        return
+    }
+
     const renderer = new THREE.WebGLRenderer({alpha: true, canvas: document.getElementById("three-file-canvas")});
     document.body.appendChild( renderer.domElement );
 
@@ -1194,6 +1240,24 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
             span.innerText = k;
             b.appendChild(span);
         }
+        else if(k.endsWith(".png"))
+        {
+            let span = document.createElement("span");
+            span.innerText = k;
+            b.appendChild(span);
+
+            let path = lodash.clone(keysPath);
+            path.push(k);
+
+            ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, path).then(file =>
+            {
+                if(!file || file.length == 0 || !file[0].value?.url){return}
+                
+                let i = document.createElement("img");
+                i.src = "data:image/png;base64,"+file[0].value.url;
+                b.insertBefore(i, span);
+            })
+        }
         else
         {
             b.innerText = k;
@@ -1221,8 +1285,6 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
                 directoryPath.pop();
 
                 let index = Array.from(b.parentNode.childNodes).indexOf(b)
-
-                explorer(o, open, {name: null}, directoryPath, iteration);
 
                 s.parentNode.querySelectorAll(":scope > div")[iteration].childNodes.item(index).setAttribute("selected", "")
                 // {name: path[path.length-1]}

@@ -200,6 +200,7 @@ async function viewPack(name)
                 onSelect: ()=>
                 {
                     // Title, desc, icon
+                    infoPanel.style.display = "inline-block"
                     infoPanel.querySelector('div:first-of-type > h2').innerText = pack.content[k]?.title || pack.content[k]?.name || pack.content[k]?.filename;
                     infoPanel.querySelector('div:first-of-type > img').src = pack.content[k].icon?m.icon:'';
                     infoPanel.querySelector('p:first-of-type').innerText = pack.content[k]?.description;
@@ -218,6 +219,7 @@ async function viewPack(name)
                     }
 
                     // Client, server, dependencies
+                    infoPanel.querySelector("#actions").style.display = infoPanel.querySelector("#supporting").style.display = 'grid'
                     infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${pack.content[k].clientRequired?0.8:0.3})`
                     infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', pack.content[k].clientRequired?'Required in Client Side':'Unrequired in Client Side');
                     infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${pack.content[k].serverRequired?0.8:0.3})`
@@ -701,7 +703,10 @@ async function savedList()
 
         b.childNodes[1].onclick = () =>
         {
-            window.web.loadModrinth(document.getElementById('web-window').querySelector('webview'), p.url);
+            if(new URL(p.url).hostname == "modrinth.com")
+            { window.web.loadModrinth(document.getElementById('web-window').querySelector('webview'), p.url); }
+            else
+            { window.web.loadCurseforge(document.getElementById('web-window').querySelector('webview'), p.url); }
             Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
         }
     }

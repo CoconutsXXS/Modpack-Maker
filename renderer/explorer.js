@@ -56,7 +56,9 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
         // Add Button
         let ab = document.createElement('button');
         ab.setAttribute('add', '')
-        ab.innerText = 'New Folder...';
+        let span = document.createElement("span")
+        ab.appendChild(span)
+        span.innerText = 'New Folder...';
         ab.style.minWidth = '100%'
         ab.onclick = () =>
         {

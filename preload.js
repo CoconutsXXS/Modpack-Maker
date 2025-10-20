@@ -188,6 +188,8 @@ contextBridge.exposeInMainWorld('getCombined', (name, version) =>
 contextBridge.exposeInMainWorld('resizeGame', function(i, x, y, width, height, windowDependent){ipcRenderer.send(i+'resize', x, y, width, height, windowDependent)})
 contextBridge.exposeInMainWorld('closeGame', function(i){ipcRenderer.send(i+'kill')})
 contextBridge.exposeInMainWorld('killGame', function(i){ipcRenderer.send(i+'kill-force')})
+contextBridge.exposeInMainWorld('pauseGame', function(i){ipcRenderer.send(i+'pause')})
+contextBridge.exposeInMainWorld('resumeGame', function(i){ipcRenderer.send(i+'resume')})
 contextBridge.exposeInMainWorld('download', (url, directory, filename, createDirectory = true) => { return ipcRenderer.invoke('download', url, directory, filename, createDirectory); })
 
 contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })

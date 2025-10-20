@@ -329,9 +329,11 @@ function quickView(m)
 {
     if(m.loadImages) { m.loadImages().then((r) => {m.loadImages=null;quickView(m)}) }
 
+    infoPanel.style.display = "inline-block"
     infoPanel.querySelector('div:first-of-type > h2').innerText = m.name;
     infoPanel.querySelector('div:first-of-type > img').src = m.icon;
     infoPanel.querySelector('p').innerText = m.description;
+    infoPanel.querySelector("#actions").style.display = infoPanel.querySelector("#supporting").style.display = 'none'
 
     infoPanel.querySelector('.content-slider').innerHTML = '';
     if(m.images)

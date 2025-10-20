@@ -538,8 +538,6 @@ async function getJava(version, listeners = null)
     //         .on("error", reject);
     // });
 
-    console.log(path.join(config.directories.jre, `java-${version}`))
-
     try
     {
         await tar.x

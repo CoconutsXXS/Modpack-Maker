@@ -1,7 +1,7 @@
 // Center Panel Tab
 window.setupTab(document.getElementById('center-panel').childNodes[1],
 [
-    {select: () => {document.getElementById('game-window').style.display = 'block'; }, deselect: () => {document.getElementById('game-window').style.display = 'none';}},
+    {select: () => {document.getElementById('game-container').style.display = 'block'; }, deselect: () => {document.getElementById('game-container').style.display = 'none';}},
     {select: () => {document.getElementById('console-window').style.display = 'block';}, deselect: () => {document.getElementById('console-window').style.display = 'none';}},
     {select: () => {document.getElementById('class-window').style.display = 'block';}, deselect: () => {document.getElementById('class-window').style.display = 'none';}},
     {select: () => {document.getElementById('web-window').style.display = 'block';}, deselect: () => {document.getElementById('web-window').style.display = 'none';}},
@@ -9,7 +9,7 @@ window.setupTab(document.getElementById('center-panel').childNodes[1],
     {select: () => {document.getElementById('config-panel').style.display = 'grid';}, deselect: () => {document.getElementById('config-panel').style.display = 'none';}},
     {select: () => {document.getElementById('saves-panel').style.display = 'grid';}, deselect: () => {document.getElementById('saves-panel').style.display = 'none';}},
     {select: () => {document.getElementById('content-editor').style.display = 'block';}, deselect: () => {document.getElementById('content-editor').style.display = 'none';}},
-], 1);
+], 0);
 
 window.setupTab(document.getElementById('browse-panel').childNodes[1],
 [

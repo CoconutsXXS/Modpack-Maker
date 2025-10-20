@@ -103,7 +103,7 @@ async function networkList(text = '')
 
         b.childNodes[1].onclick = async () =>
         {
-            importInstance(i.url, {icon: i.icon, title: i.name})
+            await importInstance(i.url, {icon: i.icon, title: i.name})
             window.close();
         }
     }

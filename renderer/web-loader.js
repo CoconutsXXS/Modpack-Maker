@@ -119,26 +119,31 @@ window.web =
                         let versions = await findModrinthFile(link.split('/')[link.split('/').length-1], (type=='mod'||type=="datapack"), true);
                         console.log('window.versionSelect('+JSON.stringify(versions).replaceAll(`'`, `\\'`)+')')
                         webview.executeJavaScript('window.versionSelect('+JSON.stringify(versions).replaceAll(`'`, `\\'`)+')')
+                        break;
                     }
                     case 'save':
                     {
                         await ipcInvoke('addSaved', event.args[0]);
+                        break;
                     }
                     case 'unsave':
                     {
                         await ipcInvoke('deleteSaved', event.args[0]);
+                        break;
                     }
                     case "remove":
                     {
-                        if(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)
+                        if(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)
                         { console.log("mod not found")}
                         
-                        window.instance[cleanType=='mods'?"deleteMod":cleanType=='resourcepacks'?"deleteRP":"deleteShader"](window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))).filename);
+                        window.instance[cleanType=='mods'?"deleteMod":cleanType=='resourcepacks'?"deleteRP":"deleteShader"](window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))).filename);
                         window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].splice(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].findIndex(mod => !m.missing&&(m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined)), 1);
+                        break;
                     }
                     case "name":
                     {
                         m.name = event.args[0];
+                        break;
                     }
                 }
             }
@@ -193,11 +198,10 @@ window.web =
             window.instance[cleanType=='mods'?"onModUpdate":cleanType=='resourcepacks'?"onRPUpdate":"onShaderUpdate"] = (i, mods) =>
             {
                 modUpdateOG(i, mods);
-                console.log(mods, m)
-                webview.executeJavaScript(`window.updateDownloaded(${(mods.find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
+                webview.executeJavaScript(`window.updateDownloaded(${(mods.find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
             }
             console.log(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"], m)
-            await webview.executeJavaScript(`window.updateDownloaded(${(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
+            await webview.executeJavaScript(`window.updateDownloaded(${(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
         };
 
     },
@@ -317,26 +321,31 @@ window.web =
                         let versions = await findCurseforgeFile(modId, true, true);
                         console.log(JSON.stringify(versions).replaceAll("\'", "\\\'").replaceAll("\n", "\\n"))
                         webview.executeJavaScript(`window.versionSelect('${JSON.stringify(versions).replaceAll("\'", "\\\'").replaceAll("\n", "\\n")}')`)
+                        break;
                     }
                     case 'save':
                     {
                         await ipcInvoke('addSaved', event.args[0]);
+                        break;
                     }
                     case 'unsave':
                     {
                         await ipcInvoke('deleteSaved', event.args[0]);
+                        break;
                     }
                     case "remove":
                     {
-                        if(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)
+                        if(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)
                         { console.log("mod not found")}
                         
-                        window.instance[cleanType=='mods'?"deleteMod":cleanType=='resourcepacks'?"deleteRP":"deleteShader"](window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))).filename);
+                        window.instance[cleanType=='mods'?"deleteMod":cleanType=='resourcepacks'?"deleteRP":"deleteShader"](window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))).filename);
                         window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].splice(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].findIndex(mod => !m.missing&&(m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined)), 1);
+                        break;
                     }
                     case "name":
                     {
                         m.name = event.args[0];
+                        break;
                     }
                 }
             }
@@ -430,10 +439,10 @@ window.web =
             {
                 modUpdateOG(i, mods);
                 console.log(mods, m)
-                webview.executeJavaScript(`window.updateDownloaded(${(mods.find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
+                webview.executeJavaScript(`window.updateDownloaded(${(mods.find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
             }
             console.log(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"], m)
-            await webview.executeJavaScript(`window.updateDownloaded(${(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !m.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
+            await webview.executeJavaScript(`window.updateDownloaded(${(window.instance[cleanType=="mods"?"mods":cleanType=="resourcepacks"?"rp":"shaders"].find(mod => !mod.missing&&((m.slug == mod.slug&&m.slug!=undefined) || (m.id == mod.id&&m.id!=undefined) || (m.name == mod.title&&m.name!=undefined))) == undefined)?'false':'true'});`, true)
         };
     },
 
@@ -975,3 +984,20 @@ async function loadImages(slug, name)
 
     return i;
 }
+
+
+// Placeholder
+document.querySelectorAll("#web-window > div > div > button")[0].onclick = () =>
+{document.querySelector("#bottom-panel > div > .tab > button:nth-child(4)").click(); document.querySelector("#browse-panel > div.tab > button:nth-child(2)").click()}
+document.querySelectorAll("#web-window > div > div > button")[1].onclick = () =>
+{document.querySelector("#bottom-panel > div > .tab > button:nth-child(4)").click(); document.querySelector("#browse-panel > div.tab > button:nth-child(3)").click()}
+document.querySelectorAll("#web-window > div > div > button")[2].onclick = () =>
+{document.querySelector("#bottom-panel > div > .tab > button:nth-child(4)").click(); document.querySelector("#browse-panel > div.tab > button:nth-child(4)").click()}
+document.querySelectorAll("#web-window > div > div > button")[3].onclick = () =>
+{document.querySelector("#center-panel > .tab > button:nth-child(5)").click();}
+
+let o = new MutationObserver(() =>
+{
+    document.querySelector("#web-window > div").style.display = 'none'
+})
+o.observe(document.querySelector("#web-window > webview"), {childList: true, attributes: true, subtree: true})

@@ -4,6 +4,19 @@ let consoleContainer = document.getElementById('console-window');
 var classContainer = document.getElementById('class-window').childNodes[3];
 var classSearchInput = document.getElementById('class-window').childNodes[1].childNodes[1];
 
+function randomFromSeed(str, extra = 0)
+{
+    let h = BigInt(0x9e3779b97f4a7c15) + BigInt(extra);
+    for (let i = 0; i < str.length; i++) {
+      h ^= BigInt(str.charCodeAt(i));
+      h = (h * BigInt(0xbf58476d1ce4e5b9)) & BigInt("0xFFFFFFFFFFFFFFFF");
+      h ^= h >> 31n;
+      h = (h * BigInt(0x94d049bb133111eb)) & BigInt("0xFFFFFFFFFFFFFFFF");
+      h ^= h >> 27n;
+    }
+    return Number(h & ((1n << 53n) - 1n)) / 2 ** 53; // [0,1)
+  }
+
 
 // Class Tab Variables & Functions
 let classLog = '';
@@ -39,12 +52,15 @@ document.onclick = classSearchInput.oninput = searchClass;
 
 
 
-playButton.addEventListener('click', async () =>
+playButton.onclick = launchTrigger;
+async function launchTrigger()
 {
     // Button Loading
     playButton.removeAttribute('pause');
     playButton.removeAttribute('play');
     playButton.setAttribute('load', '');
+
+    playButton.onclick = null;
 
     // Save
     await window.instance.save(window.instance);
@@ -69,8 +85,19 @@ playButton.addEventListener('click', async () =>
 
                 console.log(t, c)
 
+                // [DATA] [15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/assets/.mcassetsroot' uses unexpected schema[15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/data/.mcassetsroot' uses unexpected schema
+
+                // Prepare Element
                 var el = document.createElement('p');
-                if(t == "installation")
+                if(t == "object-data")
+                {
+                    el.innerHTML = `<span style="opacity: 0.7; color: #${Math.floor(randomFromSeed(c.thread)*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(randomFromSeed(c.thread, 5)*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(randomFromSeed(c.thread, 12)*255/2+255/2).toString(16).padStart(2, '0')}">${c.thread}</span> <span style="opacity: 0.3">at</span> <span style="opacity: 0.5; color: #${Math.floor(randomFromSeed(c.logger)*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(randomFromSeed(c.logger,-2)*255/2+255/2).toString(16).padStart(2, '0')+Math.floor(randomFromSeed(c.logger, 10)*255/2+255/2).toString(16).padStart(2, '0')}">${c.logger}</span><span style="opacity: 0.3">:</span> `;
+                    let coloredSpan = document.createElement("span");
+                    coloredSpan.style.color = c.level=='INFO'?'#f3f3ff90':(c.level=='WARN'?'#ffbb00c0':(c.level=='ERROR'?'#aa3333':'#55dd55a0'));
+                    coloredSpan.innerText = c.text
+                    el.appendChild(coloredSpan)
+                }
+                else if(t == "installation")
                 {
                     let loadText = ''; for (let i = 0; i < 100; i++) { loadText+='·'; }
                     for (let i = 0; i < Math.floor(c.progress); i++)
@@ -86,9 +113,7 @@ playButton.addEventListener('click', async () =>
                         return
                     }
                 }
-                
-                // Prepare Element
-                if(t == 'progress')
+                else if(t == 'progress')
                 {
                     let loadText = ''; for (let i = 0; i < 64; i++) { loadText+='·'; }
                     for (let i = 0; i < Math.floor(progress * 64); i++)
@@ -138,7 +163,6 @@ playButton.addEventListener('click', async () =>
                 }
                 else if(t != "installation") { el.innerText = `[${t.toUpperCase()}] ${c}`; }
 
-                // [DATA] [15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/assets/.mcassetsroot' uses unexpected schema[15:49:36] [Render thread/WARN] [minecraft/VanillaPackResourcesBuilder]: Assets URL 'union:/Users/coconuts/Library/Application%20Support/Modpack%20Maker/instances/Ultra%20Immersive/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar%23205!/data/.mcassetsroot' uses unexpected schema
                 if(typeof(c)=='string')
                 {
                     let finalContent = '';
@@ -220,7 +244,7 @@ playButton.addEventListener('click', async () =>
 
                     el.innerHTML = finalContent;
                 }
-            
+
                 if(consoleContainer.childNodes.length > 0)
                 {
                     let text = consoleContainer.childNodes[consoleContainer.childNodes.length-1].innerText;
@@ -245,11 +269,16 @@ playButton.addEventListener('click', async () =>
             {
                 playButton.removeAttribute('pause');
                 playButton.removeAttribute('load');
-                playButton.setAttribute('play', '');      
+                playButton.removeAttribute('resume');
+                playButton.setAttribute('play', '');
+                playButton.setAttribute("soft-hover-info", 'Launch');
                 stopButton.removeAttribute("kill")
                 stopButton.setAttribute("soft-hover-info", 'Close');
                 stopButton.onclick = null;
-                closed = true;      
+                closed = true;
+                document.querySelector("#game-container > div").style.display = "block"
+
+                playButton.onclick = launchTrigger;
             },
             processLaunch: () =>
             {
@@ -261,10 +290,38 @@ playButton.addEventListener('click', async () =>
                     playButton.removeAttribute('pause');
                     playButton.removeAttribute('load');
                     playButton.setAttribute('play', '');      
+                    playButton.removeAttribute('resume');
                     stopButton.removeAttribute("kill")
                     stopButton.setAttribute("soft-hover-info", 'Close');
+                    playButton.setAttribute("soft-hover-info", 'Launch');
                     stopButton.onclick = null;
                     closed = true;      
+                }
+
+                playButton.removeAttribute('pause');
+                playButton.removeAttribute('play');
+                playButton.removeAttribute('resume');
+                playButton.setAttribute('load', '');
+                playButton.setAttribute("soft-hover-info", 'Pause');
+                playButton.onclick = pause
+                function pause()
+                {
+                    pauseGame(i);
+                    playButton.removeAttribute('pause');
+                    playButton.removeAttribute('load');
+                    playButton.setAttribute('resume', '');
+                    playButton.setAttribute("soft-hover-info", 'Resume');
+                    playButton.onclick = resume
+                }
+                function resume()
+                {
+                    resumeGame(i);
+                    playButton.removeAttribute('load');
+                    playButton.removeAttribute('play');
+                    playButton.removeAttribute('resume');
+                    playButton.setAttribute('pause', '');
+                    playButton.setAttribute("soft-hover-info", 'Pause');
+                    playButton.onclick = pause
                 }
             },
             network: (i, c) =>
@@ -361,11 +418,11 @@ playButton.addEventListener('click', async () =>
                 const gameWindow = document.getElementById('game-window');
                 gameWindow.srcObject = stream;
                 gameWindow.onloadedmetadata = () => gameWindow.play();
-
+                document.querySelector("#game-container > div").style.display = "none"
             },
         }
     )
 
     // Resize
     window.oncenterpanelresize = (rect) => resizeGame(i, rect.x, rect.y+26, rect.width, rect.height-26, true);
-});
+}

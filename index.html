@@ -19,6 +19,7 @@
         }
     }
     </script>
+
     <script src="./renderer/popup.js" type="module"></script>
     <script src="./renderer/instance.js" type="module"></script>
     <script src="./renderer/instance-properties.js" type="module"></script>
@@ -91,7 +92,12 @@
 
     <div id="center-panel">
         <div class="tab"><button>Game</button><button>Console</button><button style="display: none">Class</button><button>Web</button><button>Youtube</button><button style="display: none;">Config</button><button>Collections</button><button>Content</button></div>
-        <video id="game-window" autoplay muted></video>
+        <div id="game-container">
+            <div>
+                <p>No game window...</p>
+            </div>
+            <video id="game-window" autoplay muted></video>
+        </div>
         <div id="console-window"></div>
         <div id="class-window">
             <div>
@@ -100,6 +106,10 @@
             <div><p></p></div>
         </div>
         <div id="web-window">
+            <div>
+                <p>Open a web page:</p>
+                <div><button>Mods</button><button>Resourcepacks</button><button>Shaders</button><button>Youtube</button></div>
+            </div>
             <webview preload="renderer/webview-preload.js"></webview>
         </div>
         <div id="youtube-window">
