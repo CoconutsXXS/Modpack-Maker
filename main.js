@@ -73,7 +73,10 @@ async function mainWindow()
         minimizable: false,
         resizable: false,
         hasShadow: false
-    }); load.loadFile('load.html');
+    });
+    if(process.env.NODE_ENV === 'development') { load.loadURL('http://localhost:5173/load.html') }
+    else { load.loadFile(path.join(__dirname, 'load.html')); }
+
     let finishedLoading = false;
     (async () =>
     {
@@ -127,6 +130,7 @@ async function mainWindow()
     // Debug
     // win.show();
 
+
     win.webContents.on('did-finish-load', async () =>
     {
         while(!finishedLoading){await setTimeout(100)}
@@ -134,7 +138,10 @@ async function mainWindow()
         load.close();
     });
 
-    win.loadFile('index.html')
+
+    if(process.env.NODE_ENV === 'development') { win.loadURL('http://localhost:5173/index.html') }
+    else { win.loadFile(path.join(__dirname, 'index.html')); }
+    // win.loadFile('index.html')
 
     // win.webContents.openDevTools();
     // win.once('closed', () => { if(BrowserWindow.getAllWindows().length==0){selectWindow()} })
@@ -170,7 +177,10 @@ async function selectWindow()
         maximizable: true,
         autoHideMenuBar: true
     });
-    win.loadFile('select.html')
+
+    if(process.env.NODE_ENV === 'development') { win.loadURL('http://localhost:5173/select.html') }
+    else { win.loadFile(path.join(__dirname, 'select.html')); }
+    // win.loadFile('select.html')
 }
 
 async function introImmersionWindow()
@@ -299,6 +309,13 @@ ipcMain.handle('download', async (event, url, directory, filename, createDirecto
 {
     await Download.download(url, path.join(directory, filename));
 })
+ipcMain.handle('listenDownload', async (event, url) =>
+{
+    Download.addDownloadListener(url, (p) =>
+    {
+        event.sender.send('downloadProgress', url, p)
+    });
+})
 ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
 {
     let p = await dialog.showOpenDialog
@@ -323,6 +340,19 @@ ipcMain.handle('importInstance', async (event, link, metadata) =>
         win.webContents.send('openInstance', name);
         resolve();
     }))));
+})
+ipcMain.handle('importInstanceFromFile', async (event) =>
+{
+    return new Promise(async (resolve) => 
+    {
+        await Instance.curseforgeInstance((await dialog.showOpenDialog({filters: [{name: "Modpack", extensions: ["zip", "mrpack"]}]})).filePaths[0], {}, async (i) =>
+        {
+            console.log(i.name)
+            let win = await mainWindow();
+            win.webContents.send('openInstance', i.name);
+            resolve();
+        })
+    });
 })
 
 let instanceIndex = 0;

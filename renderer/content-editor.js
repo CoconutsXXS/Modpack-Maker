@@ -1,23 +1,33 @@
-import {EditorView, basicSetup} from 'cdn/codemirror'
-import {json} from 'cdn/@codemirror/lang-json'
-import {java} from 'cdn/@codemirror/lang-java'
-import {oneDark} from 'cdn/@codemirror/theme-one-dark'
-import { keymap } from "cdn/@codemirror/view";
-import { indentMore, indentLess } from "cdn/@codemirror/commands";
-import { indentUnit } from "cdn/@codemirror/language";
+// import {EditorView, basicSetup} from 'cdn/codemirror'
+// import {json} from 'cdn/@codemirror/lang-json'
+// import {java} from 'cdn/@codemirror/lang-java'
+// import {oneDark} from 'cdn/@codemirror/theme-one-dark'
+// import { keymap } from "cdn/@codemirror/view";
+// import { indentMore, indentLess } from "cdn/@codemirror/commands";
+// import { indentUnit } from "cdn/@codemirror/language";
+// import {StreamLanguage} from "cdn/@codemirror/language"
+// import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
 
-import {StreamLanguage} from "cdn/@codemirror/language"
-import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
-import { parse, stringify } from "cdn/comment-json";
-import Frame from "cdn/canvas-to-buffer";
+import {EditorView, basicSetup} from 'codemirror'
+// import {json} from '../node_modules/@codemirror/lang-json/dist/index.js'
+// import {java} from '../node_modules/@codemirror/lang-java/dist/index.js'
+// import {oneDark} from '../node_modules/@codemirror/theme-one-dark/dist/index.js'
+// import { keymap } from "../node_modules/@codemirror/view/dist/index.js";
+// import { indentMore, indentLess } from "../node_modules/@codemirror/commands/dist/index.js";
+// import { indentUnit } from "../node_modules/@codemirror/language/dist/index.js";
+// import {StreamLanguage} from "../node_modules/@codemirror/language/dist/index.js"
+// import {toml} from "../node_modules/@codemirror/legacy-modes/mode/toml.js"
 
-import * as THREE from "../node_modules/three/src/Three.js"
-import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
-// import * as POSTPROCESSING from "postprocessing"
-// import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
+// import { parse, stringify } from "../node_modules/comment-json/src/index.js";
+// import Frame from "../node_modules/canvas-to-buffer/dist/canvas-to-buffer.esm.js";
 
-import * as msgpack from "https://unpkg.com/@msgpack/msgpack/dist.esm/index.mjs";
-import * as lodash from "cdn/lodash"
+// import * as THREE from "../node_modules/three/src/Three.js"
+// import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
+// // import * as POSTPROCESSING from "postprocessing"
+// // import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
+
+// import * as msgpack from "../node_modules/@msgpack/msgpack/dist.esm/index.mjs";
+// import * as lodash from "../node_modules/lodash/index.js"
 
 async function parseMinecraftModelToThree(modelJson, opts = {})
 {

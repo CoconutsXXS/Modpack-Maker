@@ -24,7 +24,6 @@ window.loadInstance = async (name) =>
         }
 
         count.mods++;
-        console.log(window.downloadingInstance!=undefined&&window.downloadingInstance==false)
         if(window.downloadingInstance!=undefined&&window.downloadingInstance==false){return;}
 
         window.instance.mods = m;

@@ -384,7 +384,7 @@ tfoot td
 #right-panel
 {
     resize: horizontal;
-    min-width: 100px;
+    min-width: 256px;
     max-width: 50%;
     width: 20%;
     right: 0;
@@ -397,14 +397,13 @@ tfoot td
 {
     resize: vertical;
     min-height: 100px;
-    max-height: 50%;
+    max-height: calc(100% - 128px);
     height: 20%;
     bottom: 0;
     width: 100vw;
     direction:rtl;
     /* transform: rotate(180deg); */
     border-bottom: var(--window-border) solid var(--border-width);
-
     transform: scaleY(-1);
 }
 #bottom-panel > *
@@ -528,7 +527,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
     position: absolute;
     top: 50%;
     left: 50%;
-    translate: -50% -50%;
+    translate: -50% 0;
     text-align: center;
 }
 #console-window
@@ -1139,8 +1138,9 @@ label:has(>#synitra) { padding-left: 28px; }
 
 #saves-panel > #select > #container { padding: 8px; }
 #saves-panel > #select > #container > * { vertical-align:top; }
-#saves-panel > #select > #container > button { margin: 4px; }
-#saves-panel > #select > #container > div { display: inline-flex; margin-left: 8px; margin-bottom: 8px; cursor: pointer; }
+#saves-panel > #select > #container > button {margin: 4px;margin-top: 0;}
+#saves-panel > #select > #container > div {display: inline-flex;margin-left: 8px;margin-bottom: 8px;cursor: pointer;max-width: 33%;border: var(--text) 1px solid;}
+#saves-panel > #select > #container > div:hover{background: #ffffff20}
 #saves-panel > #select > #container > div > img
 {
     height: 64px;
@@ -1577,4 +1577,37 @@ div.loading
     background: linear-gradient(to right, var(--overline) 0%, var(--overline) 20%, var(--primary-color) 20%, var(--primary-color) 100%);
     min-height: 12px;
     width: 50vw;
+}
+
+#background-tasks
+{
+    width: calc(50% - 54px);
+    height: calc(100% - 28px);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+#background-tasks > div
+{
+    display: inline-flex;
+    width: fit-content;
+    height: calc(100% - 8px);
+    background-color: #000000a0;
+    background-image: linear-gradient(90deg, var(--overline) 99.9%, #00000000 99.9%);
+    margin: 4px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: -1024px 0;
+    transition: all 100ms;
+}
+#background-tasks > div > span
+{
+    margin-top: 7px;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+#background-tasks > div > img
+{
+    width: 18px;
+    height: 18px;
+    margin: 3px;
 }

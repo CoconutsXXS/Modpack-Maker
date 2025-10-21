@@ -219,23 +219,47 @@ window.updateDownloaded = (l) =>
     }
 }
 
-window.versionSelect = async function(versions)
+window.versionSelect = async function(versions, allVersions)
 {
-    console.log(versions);
-
     let back = document.createElement('div'); back.id = 'panelBack'
     document.body.appendChild(back);
     back.onclick = () => {back.remove(); panel.remove();}
+    document.addEventListener("click", (ev) => {if(!panel.contains(ev.target)){panel.remove();back.remove()}})
     let panel = document.createElement('div'); panel.id = 'versionPanel';
     document.body.appendChild(panel)
 
-    for(let v of versions.reverse())
+    let b = document.createElement("button");
+    b.innerText = "Ignore Compatibility"
+    panel.appendChild(b)
+
+    load()
+    function load(compatible = true)
     {
-        let e = document.createElement('button');
-        panel.appendChild(e);
-        e.innerText = `${v.name}`
-        e.onclick = () => { window.electron.sendToHost('download', v.version_number); back.remove(); panel.remove(); }
+        b.onclick = () => {load(!compatible)}
+
+        b.innerText = compatible?"Ignore Compatibility":"Filter with Compatibility"
+        while(panel.lastChild != b){panel.lastChild.remove()}
+        for(let v of (compatible?versions:allVersions).reverse())
+        {
+            let e = document.createElement('button');
+            panel.appendChild(e);
+            e.innerText = `${v.name}`
+            e.onclick = () => { window.electron.sendToHost('download', v.name); back.remove(); panel.remove(); }
+        }
     }
+}
+
+window.incompatible = () =>
+{
+    let back = document.createElement('div'); back.id = 'panelBack'
+    document.body.appendChild(back);
+    back.onclick = () => {back.remove(); panel.remove();}
+    document.addEventListener("click", (ev) => {if(!panel.contains(ev.target)){panel.remove();back.remove()}})
+    let panel = document.createElement('div'); panel.id = 'versionPanel';
+    document.body.appendChild(panel)
+    let p = document.createElement("p")
+    p.innerText = "No compatible version found... If you still want to download it select a version manually."
+    panel.appendChild(p);
 }
 
 history.replaceState = function(state, title, url)

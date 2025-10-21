@@ -7,6 +7,8 @@ const {sep} = require("path")
 
 const config = require('./config');
 
+let downloadListeners = []
+
 class Download
 {
     static downloadData = null;
@@ -53,21 +55,36 @@ class Download
 
             if(!fs.existsSync(directory+sep)) { await fsPromise.mkdir(directory+sep, {recursive:true}) }
 
-            // Classic
-            // await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i)});
-            // New
-            let r = await fetch(url);
-            await fsPromise.writeFile(path.join(directory, filename), Buffer.from(await r.arrayBuffer()));
-
-            try
+            if(BrowserWindow.getAllWindows().length > 0)
             {
-                await fsPromise.copyFile(dest, path.join(config.directories.download, filename));
-                this.downloadData.push({url: url, path: path.join(config.directories.download, filename)});
-                await fsPromise.writeFile(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
+                // Classic
+                await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i), onProgress: (p) => 
+                {
+                    if(!downloadListeners[url]){return}
+                    for(let c of downloadListeners[url]){c(p)}
+                }});
             }
-            catch(err) { console.warn(err) }
+            else
+            {
+                // New
+                let r = await fetch(url);
+                await fsPromise.writeFile(path.join(directory, filename), Buffer.from(await r.arrayBuffer()));
+
+                try
+                {
+                    await fsPromise.copyFile(path.join(directory, filename), path.join(config.directories.download, filename));
+                    this.downloadData.push({url: url, path: path.join(config.directories.download, filename)});
+                    await fsPromise.writeFile(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
+                }
+                catch(err) { console.warn(err) }
+            }
             resolve(dest);
         })
+    }
+    static addDownloadListener(url, callback)
+    {
+        if(!downloadListeners[url]){downloadListeners[url] = []}
+        downloadListeners[url].push(callback)
     }
 }
 

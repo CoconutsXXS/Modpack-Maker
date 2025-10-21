@@ -190,7 +190,17 @@ contextBridge.exposeInMainWorld('closeGame', function(i){ipcRenderer.send(i+'kil
 contextBridge.exposeInMainWorld('killGame', function(i){ipcRenderer.send(i+'kill-force')})
 contextBridge.exposeInMainWorld('pauseGame', function(i){ipcRenderer.send(i+'pause')})
 contextBridge.exposeInMainWorld('resumeGame', function(i){ipcRenderer.send(i+'resume')})
+
 contextBridge.exposeInMainWorld('download', (url, directory, filename, createDirectory = true) => { return ipcRenderer.invoke('download', url, directory, filename, createDirectory); })
+contextBridge.exposeInMainWorld('listenDownload', (url, callback) =>
+{
+    ipcRenderer.invoke('listenDownload', url);
+    ipcRenderer.on("downloadProgress", (event, u, progress) =>
+    {
+        if(u!=url){return}
+        callback(progress)
+    })
+})
 
 contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })
 

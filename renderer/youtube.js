@@ -1,7 +1,79 @@
 // import ytSearch from 'cdn/youtube-search-api'
-import YouTube from "cdn/youtube-sr";
-import { getSubtitles } from 'cdn/youtube-captions-scraper'
-import similarity from 'cdn/similarity'
+// import YouTube from "cdn/youtube-sr";
+import { getSubtitles } from '../node_modules/youtube-captions-scraper/src/index.js'
+
+function levenshtein(value, other, insensitive)
+{
+  var length
+  var lengthOther
+  var code
+  var result
+  var distance
+  var distanceOther
+  var index
+  var indexOther
+
+  if (value === other) {
+    return 0
+  }
+
+  length = value.length
+  lengthOther = other.length
+
+  if (length === 0) {
+    return lengthOther
+  }
+
+  if (lengthOther === 0) {
+    return length
+  }
+
+  if (insensitive) {
+    value = value.toLowerCase()
+    other = other.toLowerCase()
+  }
+
+  index = 0
+
+  while (index < length) {
+    codes[index] = value.charCodeAt(index)
+    cache[index] = ++index
+  }
+
+  indexOther = 0
+
+  while (indexOther < lengthOther) {
+    code = other.charCodeAt(indexOther)
+    result = distance = indexOther++
+    index = -1
+
+    while (++index < length) {
+      distanceOther = code === codes[index] ? distance : distance + 1
+      distance = cache[index]
+      cache[index] = result =
+        distance > result
+          ? distanceOther > result
+            ? result + 1
+            : distanceOther
+          : distanceOther > distance
+          ? distance + 1
+          : distanceOther
+    }
+  }
+
+  return result
+}
+function similarity(a, b, options)
+{
+  var left = a || ''
+  var right = b || ''
+  var insensitive = !(options || {}).sensitive
+  var longest = Math.max(left.length, right.length)
+
+  return longest === 0
+    ? 1
+    : (longest - levenshtein(left, right, insensitive)) / longest
+}
 
 let webview = document.getElementById('youtube-integration');
 const sourceCode = await (await fetch('renderer/youtube-webview.js')).text();

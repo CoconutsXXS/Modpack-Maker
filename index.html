@@ -5,9 +5,6 @@
     <!-- <meta http-equiv="Content-Security-Policy"> -->
     <title>Modpack Maker</title>
 
-    <link rel="stylesheet" href="./index.css">
-</head>
-<body>
     <script type="importmap">
     {
         "imports": {
@@ -19,7 +16,9 @@
         }
     }
     </script>
-
+    <link rel="stylesheet" crossorigin href="./index.css">
+</head>
+<body>
     <script src="./renderer/popup.js" type="module"></script>
     <script src="./renderer/instance.js" type="module"></script>
     <script src="./renderer/instance-properties.js" type="module"></script>
@@ -27,6 +26,7 @@
     <script src="./renderer/tab.js" type="module"></script>
     <script src="./renderer/tab-setup.js" type="module"></script>
     <script src="./renderer/panels.js" type="module"></script>
+    <script src="./renderer/background-events.js" type="module"></script>
     <script src="./renderer/horizontal-scroll.js" type="module"></script>
     <script src="./renderer/loading.js" type="module"></script>
     <script src="./renderer/mod-browser.js" type="module"></script>
@@ -86,7 +86,7 @@
     <div id="image-zoom">
         <img>
         <button close>x</button>
-        <button left><</button>
+        <button left>&lt;</button>
         <button right>></button>
     </div>
 
@@ -133,7 +133,7 @@
                 <div id="config-container">
                     <button>
                         <h4>Category</h4>
-                        <img src="./resources/arrow.png">
+                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAVUlEQVQ4Ee1QQQ4AIAiq/v/n0hobubQ6FxcFQTdT+ugfqILbVyBTEIQAHtWlV0VFFNTZcDm+cLgL47K3xNORm6o1W87mzIR7DTHPAuZHfXT5aMEjpgbgHFus6wkgngAAAABJRU5ErkJggg==">
                     </button>
                     <div comment><span>I'm a comment...</span></div>
                     <div boolean>
@@ -206,7 +206,7 @@
             </div>
             <div id="view">
                 <div>
-                    <button><b><</b></button>
+                    <button><b>&lt;</b></button>
                     <h2></h2>
                 </div>
                 <div id="pack-explorer" class="folder-content"></div>
@@ -234,7 +234,7 @@
                     <div class="content-explorer-section">
                         <div><img><h3>Content</h3></div>
                     </div>
-                    <button class="unexpend"><</button>
+                    <button class="unexpend">&lt;</button>
                 </div>
                 <div id="apply-editor">
                     <div>
@@ -345,7 +345,7 @@
             <p>Mod description will be displayed here.</p>
             <p>version: </p>
             <div class="content-slider"></div>
-            <div id="supporting"><img src="./resources/client.png" hover-info="Client Side"><img src="./resources/server.png" hover-info="Server Side"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
+            <div id="supporting"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAhElEQVQ4EaVQ0RKAIAzKrv//5RomO9Nx2eLFjjGglc1wGvB+RTGklxGG4IOpbFFd25Cz6KXODSAiOX6PBgwDv3PYL5Nbed1gRRxp3KCvFQkV5wZK8MY/jphp4QbZIxZUzCRjT4aa4cMUAQbsTPh9xMlAJSE6mtUbtGHccSp9E/L/hV7SF5N1PAgAiJOSAAAAAElFTkSuQmCC" hover-info="Client Side"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAcklEQVQ4EaVSQQ6AMAgT//9npSYlzJHNChcIbaFks8Pj8kBWwzw+ifOCqc4N1QG0BtHfIc8J6tY3v+9AtZ/5qE9aIsDMPnLVC3wJBqsuoLXOgHqs2O074AnMigFo4hXwq/KQVZ2x6YkGcGMH3GHrhl/CNyZOe5/35tOwAAAAAElFTkSuQmCC" hover-info="Server Side"><div><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAdklEQVQ4Eb1TQQ6AIAwTw/+/rJuhZjYwSzDuso6x0kIoW4vDAniUi0W39zaMPnIk2WOhYCaZJuBD/iEYXp7JqVES+0NPJsg2goxzqkAhfBAoA6zg21fwS/TAKRFjjXNqQbG0bOH6XU31LZ1leg01bgu4t2967QQyKTAdAFS5PQAAAABJRU5ErkJggg==" hover-info="Dependencies"><span>3</span></div><div><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAZElEQVQ4Ed1S0Q4AEAjE/P8vI2O7tZysNz3p1N0VKQUjS38bcePJI8waTzMTKSbrA1hZ7XaH9jcmfRNHAMk0rnOpFSw8wpEAbaMzfQ49ozWWFqA53YGX3f5dS/dG4t0THeODyw4IXDfwkGAlZwAAAABJRU5ErkJggg==" hover-info="Dependents"><span>2</span></div></div>
             <div id="actions"><button style="display: none;" config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button><button config hover-info="Edit"></button></div>
         </div>
         <div id="general-settings">
@@ -375,13 +375,15 @@
         <div class="resize-hand"></div>
         <div class="tab" id="top-tab" anchor-top anchor-right>
             <div id="drag-window"></div>
-            <button><img src="./resources/save.png"></button>
-            <button><img src="./resources/open.png"></button>
-            <button><img src="./resources/close.png"></button>
+            <button><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAbUlEQVQ4EcVS0QoAIQiz4/7/l6sdDIZ6YfSQLy51w0lmh9HI7zOIV7nNCH0lK/aD6CG0/uijgrGBirwZSQeyPkWQgwCKGemvtm3BC90XCDeoHNDbMJKYw4AUOMN8/wbHG3yfhn7EagnufrpUdACcSzgBvlFeRAAAAABJRU5ErkJggg=="></button>
+            <button><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAUUlEQVQ4EWNgoBAwgvT/BwJ0cxiBAF0MKx+bZpBCXOLohrCgCyDziTKEKEXIpiKxQXoZKTEAbBYlBoD0MiG5iCzmqAEMDBSHAeXpgKy4o6YmAHUtJ/ATcKLAAAAAAElFTkSuQmCC"></button>
+            <button><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANmVYSWZNTQAqAAAAGAAAAEgAAAABAAAASAAAAAEAAgEaAAUAAAABAAAACAEbAAUAAAABAAAAEAAAAACQeO+8AAAACW9GRnMAAAAAAAAAAADaKrbOAAAACXBIWXMAAAsSAAALEgHS3X78AAAAhElEQVQ4Ea2RQQ6AIAwEwf//Wa1xzbYOBBN7AdrZEWJrf9R+16rL+c1DMfAz7SvTBfmgn6W+r8QkkAAJRrMkCJhA6kn8ElSJwFjpaSggCYWDS38hGl8Lb+BvdiHd4iXwsALUkzgJZuBo9ghGgL4UKzGXgAYe9H1l01/Qmz1Q9ytMzUzPB+wyXAHUVJXfAAAAAElFTkSuQmCC"></button>
         </div>
         <div id="game-controls">
             <button id="play-button" play soft-hover-info="Launch"></button>
             <button id="stop-button" stop soft-hover-info="Stop"></button>
+        </div>
+        <div id="background-tasks">
         </div>
     </div>
     <div id="bottom-panel" class="side-panel">

@@ -16,7 +16,7 @@ async function packsList()
         b.childNodes[3].childNodes[5].innerHTML = `${p.content.filter(c=>c.path=='mods').length} mods<br>${p.content.filter(c=>c.path=='resourcepacks').length} resourcepacks<br>${p.content.filter(c=>c.path=='shaderpacks').length} shaders`;
         document.getElementById('container').appendChild(b)
 
-        b.childNodes[1].onclick = () =>
+        b.onclick = () =>
         {
             if(b.hasAttribute('selected'))
             { 
