@@ -182,7 +182,7 @@ tfoot td
 @font-face
 {
     font-family: 'SF Mono';
-    src: url(./resources/sf-mono/SFMonoLight.otf);
+    src: url(../resources/sf-mono/SFMonoLight.otf);
     size-adjust: 75%;
     line-gap-override: 0%;
     descent-override: 25%;
@@ -192,7 +192,7 @@ tfoot td
 @font-face
 {
     font-family: 'minecraft';
-    src: url(./resources/Minecraftia-Regular.ttf);
+    src: url(../resources/Minecraftia-Regular.ttf);
     size-adjust: 75%;
     line-gap-override: 0%;
     descent-override: 25%;
@@ -202,7 +202,7 @@ tfoot td
 @font-face
 {
     font-family: 'minecraft-alt';
-    src: url(./resources/Minecraftia-Regular.ttf);
+    src: url(../resources/Minecraftia-Regular.ttf);
     size-adjust: 75%;
 }
 
@@ -276,7 +276,7 @@ tfoot td
 .folder-content button::before
 {
     font-family: minecraft;
-    content: url(./resources/file.png);
+    content: url(../resources/file.png);
     position:relative; 
     scale: 2;
     image-rendering: pixelated;
@@ -315,10 +315,10 @@ tfoot td
     margin-bottom: 4px;
 }
 .folder-content button[icon]:hover::before { filter: brightness(1.3); }
-.folder-content button[folder]::before { background-image: url(./resources/folder.png); filter: brightness(1) !important }
+.folder-content button[folder]::before { background-image: url(../resources/folder.png); filter: brightness(1) !important }
 .folder-content button[folder]:has(input) { height: 21px; }
 .folder-content button[folder]:has(input)::before { margin-bottom: 1px; }
-.folder-content button[add]::before { background-image: url(./resources/add.png); filter: brightness(1) !important }
+.folder-content button[add]::before { background-image: url(../resources/add.png); filter: brightness(1) !important }
 .folder-content button:hover::before { filter: brightness(0.2); }
 .folder-content button:hover {text-decoration: underline;border: 0px;}
 .folder-content button > input { border: transparent; padding: 0; }
@@ -346,8 +346,8 @@ tfoot td
 .folder-content button > button:hover{opacity: 0.8;}
 .folder-content button > button::before{content: none;}
 
-.folder-content button > button:nth-child(2) { background-image: url(./resources/delete.png); }
-.folder-content button > button:nth-child(3) { background-image: url(./resources/enabled.png); }
+.folder-content button > button:nth-child(2) { background-image: url(../resources/delete.png); }
+.folder-content button > button:nth-child(3) { background-image: url(../resources/enabled.png); }
 .folder-content button > button:hover { background-position: 2.5px 2.5px; background-size: 15px 15px; background-repeat: no-repeat; }
 
 .content-slider
@@ -640,23 +640,23 @@ button:hover:not([current="true"]){opacity: 0.5;}
     background-position: 50% 50%;
     filter: brightness(0.8);
 }
-#game-controls > button[play] { background-image: url(./resources/play.png);}
-#game-controls > button[pause] { background-image: url(./resources/pause.png); background-color: var(--overline); }
-#game-controls > button[stop] { background-image: url(./resources/stop.png);}
-#game-controls > button[kill] { background-image: url(./resources/kill.png) !important;}
+#game-controls > button[play] { background-image: url(../resources/play.png);}
+#game-controls > button[pause] { background-image: url(../resources/pause.png); background-color: var(--overline); }
+#game-controls > button[stop] { background-image: url(../resources/stop.png);}
+#game-controls > button[kill] { background-image: url(../resources/kill.png) !important;}
 #game-controls > button[load] { animation: loading-circle 1s infinite; background-color: var(--overline); }
-#game-controls > button[resume] { background-image: url(./resources/play.png); background-color: var(--overline); }
+#game-controls > button[resume] { background-image: url(../resources/play.png); background-color: var(--overline); }
 @keyframes loading-circle
 {
-    0% { background-image: url(./resources/load_1.png); }
-    12.5% { background-image: url(./resources/load_2.png); }
-    25% { background-image: url(./resources/load_3.png); }
-    37.5% { background-image: url(./resources/load_4.png); }
-    50% { background-image: url(./resources/load_5.png); }
-    62.5% { background-image: url(./resources/load_6.png); }
-    75% { background-image: url(./resources/load_7.png); }
-    82.5% { background-image: url(./resources/load_8.png); }
-    100% { background-image: url(./resources/load_1.png); }
+    0% { background-image: url(../resources/load_1.png); }
+    12.5% { background-image: url(../resources/load_2.png); }
+    25% { background-image: url(../resources/load_3.png); }
+    37.5% { background-image: url(../resources/load_4.png); }
+    50% { background-image: url(../resources/load_5.png); }
+    62.5% { background-image: url(../resources/load_6.png); }
+    75% { background-image: url(../resources/load_7.png); }
+    82.5% { background-image: url(../resources/load_8.png); }
+    100% { background-image: url(../resources/load_1.png); }
 }
 
 #game-controls > button:hover
@@ -743,7 +743,7 @@ button:hover:not([current="true"]){opacity: 0.5;}
 .item-download-list > div[selected] > div > div > h4 { color: var(--important); }
 .item-download-list > div > div > div > div
 {
-    background-image: url('./resources/website-logos/modrinth.png');
+    background-image: url('../resources/website-logos/modrinth.png');
     background-size: contain;
     background-position: 50% 50%;
     min-width: 20px; 
@@ -808,10 +808,10 @@ button:hover:not([current="true"]){opacity: 0.5;}
     filter: brightness(0.8);
 }
 #mod-info-panel > #actions > button:hover { background-color: #00000000; filter: brightness(1); }
-#mod-info-panel > #actions > button[delete] { background-image: url(./resources/delete.png); }
-#mod-info-panel > #actions > button[enable] { background-image: url(./resources/enabled.png); }
-#mod-info-panel > #actions > button[edit] { background-image: url(./resources/edit.png); }
-#mod-info-panel > #actions > button[config] { background-image: url(./resources/config.png); }
+#mod-info-panel > #actions > button[delete] { background-image: url(../resources/delete.png); }
+#mod-info-panel > #actions > button[enable] { background-image: url(../resources/enabled.png); }
+#mod-info-panel > #actions > button[edit] { background-image: url(../resources/edit.png); }
+#mod-info-panel > #actions > button[config] { background-image: url(../resources/config.png); }
 
 
 /* Image Zoom */
@@ -1401,11 +1401,11 @@ label:has(#filter-version-browsing)
     background-repeat: no-repeat;
 }
 #image-editor > div:last-child > button:hover { background-size: cover; }
-#image-editor > div:last-child > button:nth-child(1) { background-image: url(./resources/draw.png); }
-#image-editor > div:last-child > button:nth-child(2) { background-image: url(./resources/erase.png); }
-#image-editor > div:last-child > button:nth-child(5) { background-image: url(./resources/lock\ alpha.png); ; }
-#image-editor > div:last-child > button:nth-child(6) { background-image: url(./resources/lock\ opacity.png); }
-#image-editor > div:last-child > button:nth-child(7) { background-image: url(./resources/paint.png); }
+#image-editor > div:last-child > button:nth-child(1) { background-image: url(../resources/draw.png); }
+#image-editor > div:last-child > button:nth-child(2) { background-image: url(../resources/erase.png); }
+#image-editor > div:last-child > button:nth-child(5) { background-image: url(../resources/lock\ alpha.png); ; }
+#image-editor > div:last-child > button:nth-child(6) { background-image: url(../resources/lock\ opacity.png); }
+#image-editor > div:last-child > button:nth-child(7) { background-image: url(../resources/paint.png); }
 #image-editor input[type="color"]
 {
     display: block;
@@ -1478,9 +1478,9 @@ label:has(#filter-version-browsing)
 }
 #three-editor > div > button { width: 32px; height: 32px; margin: 0; margin-left: 4px; background-size: cover; image-rendering: pixelated; border: none; opacity: 0.5; }
 #three-editor > div > button[selected] { opacity: 1; }
-#three-editor > div > button:nth-child(1) { background-image: url(./resources/wire.png); }
-#three-editor > div > button:nth-child(2) { background-image: url(./resources/flat.png); }
-#three-editor > div > button:nth-child(3) { background-image: url(./resources/shaded.png); }
+#three-editor > div > button:nth-child(1) { background-image: url(../resources/wire.png); }
+#three-editor > div > button:nth-child(2) { background-image: url(../resources/flat.png); }
+#three-editor > div > button:nth-child(3) { background-image: url(../resources/shaded.png); }
 #three-editor > div > select { margin: 0; margin-left: 8px; }
 /* #three-editor > div > button:first-of-type { margin: 0; margin-left: 0; } */
 

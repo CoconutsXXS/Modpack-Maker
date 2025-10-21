@@ -2144,7 +2144,7 @@ async function launchMinecraft(p, version, loader, memory, world, listeners =
         console.log(options)
 
         // Asset Move
-        launcher.on('debug', (e) =>
+        launcher.on('debug', (e, ...args) =>
         {
             if(e == '[MCLC]: Downloaded assets')
             {
@@ -2156,11 +2156,11 @@ async function launchMinecraft(p, version, loader, memory, world, listeners =
         });
 
         // Prepare Events
-        launcher.on('debug', (e) => console.log('debug', e));
-        launcher.on('data', (e) => console.log('data', e));
-        launcher.on('close', (e) => console.log('close', e));
-        launcher.on('error', (e) => console.log('error', e));
-        launcher.on('close', (e) => {console.close(e);launcher.removeAllListeners();})
+        launcher.on('debug', (e) => listeners.log('debug', e));
+        launcher.on('data', (e) => listeners.log('data', e));
+        launcher.on('close', (e) => listeners.log('close', e));
+        launcher.on('error', (e) => listeners.log('error', e));
+        launcher.on('close', (e) => {listeners.close(e);launcher.removeAllListeners();})
 
 
         // Launch

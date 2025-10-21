@@ -668,7 +668,7 @@ async function packsList()
         b.childNodes[3].childNodes[5].innerHTML = `${p.content.filter(c=>c.path=='mods').length} mods<br>${p.content.filter(c=>c.path=='resourcepacks').length} resourcepacks<br>${p.content.filter(c=>c.path=='shaderpacks').length} shaders`;
         packButtonList.appendChild(b)
 
-        b.childNodes[1].onclick = () =>
+        b.onclick = () =>
         {
             viewPack(p.name)
             // importSave(p);
@@ -701,7 +701,7 @@ async function savedList()
         b.childNodes[3].childNodes[5].innerHTML = ``;
         packButtonList.appendChild(b)
 
-        b.childNodes[1].onclick = () =>
+        b.onclick = () =>
         {
             if(new URL(p.url).hostname == "modrinth.com")
             { window.web.loadModrinth(document.getElementById('web-window').querySelector('webview'), p.url); }

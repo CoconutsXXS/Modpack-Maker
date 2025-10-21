@@ -4,12 +4,10 @@
   "description": "Lightweight app to create and launch modpack. Easy debuging that let you combine hundred of mods together while keeping the game fluid.",
   "main": "main.js",
   "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "dist": "electron-builder --publish=never",
-    "dev": "NODE_ENV=development vite --host & electron .",
-    "build": "vite build"
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:ui": "vite build",
+    "build": "vite build && electron-builder",
+    "start": "vite build && electron ."
   },
   "author": {
     "name": "Coconuts XXS",
@@ -79,13 +77,17 @@
     "appId": "fr.coconuts.modpackmaker",
     "productName": "ModpackMaker",
     "directories": {
-      "output": "dist",
+      "output": "release",
       "buildResources": "build"
     },
     "files": [
       "!immersion-intro",
       "!Firefox Extension",
-      "!Firefox\\ Extension"
+      "!Firefox\\ Extension",
+      "dist/**/*",
+      "main.js",
+      "*.js",
+      "renderer/**/*"
     ],
     "publish": [
       {

@@ -23,7 +23,7 @@ window.web =
         if(cleanType=='resourcepack'||cleanType=='mod'){cleanType += 's'} if(cleanType=='shader'){cleanType = 'shaderpacks'} if(cleanType=="datapack"){cleanType="mods"}
 
 
-        const sourceCode = await (await fetch('renderer/modrinth-webview.js')).text();
+        const sourceCode = await (await fetch('scripts/modrinth-webview.js')).text();
 
         webview.addEventListener('dom-ready', modify);
         async function modify()
@@ -207,7 +207,7 @@ window.web =
     },
     loadCurseforge: async function(webview, link)
     {
-        document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
+        // document.addEventListener('keypress', e => {if(e.key == 'f'){webview.openDevTools()}})
 
         webview.src = link;
 
@@ -225,7 +225,7 @@ window.web =
         }
 
 
-        const sourceCode = await (await fetch('renderer/curseforge-webview.js')).text();
+        const sourceCode = await (await fetch('scripts/curseforge-webview.js')).text();
 
         let m = {slug: url.pathname.split('/')[3], id: url.pathname.split('/')[3]};
 

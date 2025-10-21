@@ -41,6 +41,7 @@
     <script src="./renderer/hover-info.js" type="module"></script>
     <script src="./renderer/saves-importer.js" type="module"></script>
     <script src="./renderer/content-editor.js" type="module"></script>
+    <script src="./renderer/scripts-ready.js" type="module"></script>
 
     <!-- <div id="drag-window"></div> -->
     <!-- <div class="panel">
@@ -110,10 +111,10 @@
                 <p>Open a web page:</p>
                 <div><button>Mods</button><button>Resourcepacks</button><button>Shaders</button><button>Youtube</button></div>
             </div>
-            <webview preload="renderer/webview-preload.js"></webview>
+            <webview preload="./scripts/webview-preload.js"></webview>
         </div>
         <div id="youtube-window">
-             <webview id="youtube-integration" style="display: none;" enableblinkfeatures="CSSVariables" preload="renderer/webview-preload.js"></webview>
+             <webview id="youtube-integration" style="display: none;" enableblinkfeatures="CSSVariables" preload="./scripts/webview-preload.js"></webview>
              <div id="youtube-search">
                 <input type="text" placeholder='Search for a mod, a type of mod, a resourcepack style, etc... (ex: "Apocalypse", "RPG", "Cartoon")'>
                 <div>
@@ -334,7 +335,7 @@
             <div><img><h2>Mod</h2></div>
             <p>Mod description will be displayed here.</p>
             <div class="content-slider"></div>
-            <div id="supporting"><img src="./resources/client.png"><img src="./resources/server.png"><div><img src="./resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="./resources/required.png" hover-info="Dependents"><span>2</span></div></div>
+            <div id="supporting"><img src="/resources/client.png"><img src="/resources/server.png"><div><img src="/resources/library.png" hover-info="Dependencies"><span>3</span></div><div><img src="/resources/required.png" hover-info="Dependents"><span>2</span></div></div>
             <div id="actions"><button config hover-info="Open Config File"></button><button enable hover-info="Disable/Enalbe"></button><button delete hover-info="Delete"><button hover-info="Website"></button></div>
         </div> -->
     </div>
@@ -440,7 +441,7 @@
             </div>
 
             <div id="bottom-webview-container">
-                <webview id="bottom-webview" preload="renderer/webview-preload.js"></webview>
+                <webview id="bottom-webview" preload="./scripts/webview-preload.js"></webview>
             </div>
         </div>
         <div class="resize-hand"></div>

@@ -81,7 +81,13 @@ window.loadInstance = async (name) =>
     })
 }
 
-document.addEventListener('DOMContentLoaded', () =>
+window.onscriptsloaded = () =>
 {
     window.loadInstance(window.instanceToLoad)
-})
+}
+
+
+// document.addEventListener('DOMContentLoaded', () =>
+// {
+//     window.loadInstance(window.instanceToLoad)
+// })

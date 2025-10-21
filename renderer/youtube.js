@@ -76,7 +76,7 @@ function similarity(a, b, options)
 }
 
 let webview = document.getElementById('youtube-integration');
-const sourceCode = await (await fetch('renderer/youtube-webview.js')).text();
+const sourceCode = await (await fetch('scripts/youtube-webview.js')).text();
 const urlRegex = /\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?/g;
 
 // Search

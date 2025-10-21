@@ -73,7 +73,7 @@ function similarity(a, b, options)
 }
 let result = [];
 
-let sinytraCompat = JSON.parse(await (await fetch("./renderer/sinytra-compatibilities.json")).text())
+let sinytraCompat = JSON.parse(await (await fetch("../renderer/sinytra-compatibilities.json")).text())
 
 // Web search
 const parser = new DOMParser();

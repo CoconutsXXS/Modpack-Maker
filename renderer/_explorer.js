@@ -168,11 +168,11 @@ window.setupExplorer = (directory = '', container, files, onMove = (from, to) =>
                 }
                 // Active Button
                 let ab = document.createElement('button');
-                ab.style.backgroundImage = `url("./resources/${e.disabled?'disabled':'enabled'}.png")`
+                ab.style.backgroundImage = `url("../resources/${e.disabled?'disabled':'enabled'}.png")`
                 b.appendChild(ab);
                 ab.onclick = () =>
                 {
-                    ab.style.backgroundImage = `url("./resources/${(ab.style.backgroundImage == 'url("./resources/enabled.png")')?'disabled':'enabled'}.png")`;
+                    ab.style.backgroundImage = `url("../resources/${(ab.style.backgroundImage == 'url("../resources/enabled.png")')?'disabled':'enabled'}.png")`;
                     activationEvent(e);
                 }
 
@@ -462,7 +462,7 @@ window.loadModsExplorer = (directory = null) =>
         let dependents = window.instance.mods.filter(mod => mod.dependencies?.find(d=>d.id==m.id||d.filename==m.filename||d.slug==m.slug)!=null).length;
         infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
 
-        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         // Disable
         infoPanel.querySelector('#actions').childNodes[1].onclick = async () =>
         {
@@ -470,7 +470,7 @@ window.loadModsExplorer = (directory = null) =>
             if(m.disabled==undefined){m.disabled = true;}
             await window.instance.setModData(m)
 
-            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         }
         // Config
         infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>
@@ -601,7 +601,7 @@ window.loadShadersExplorer = (directory = null) =>
         let dependents = window.instance.shaders.filter(shader => shader.dependencies?.find(d=>d.id==m.id||d.filename==m.filename||d.slug==m.slug)!=null).length;
         infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
 
-        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         // Disable
         infoPanel.querySelector('#actions').childNodes[1].onclick = async () =>
         {
@@ -609,7 +609,7 @@ window.loadShadersExplorer = (directory = null) =>
             if(m.disabled==undefined){m.disabled = true;}
             await window.instance.setShaderData(m)
 
-            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         }
         // Config
         infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>
@@ -723,7 +723,7 @@ window.loadRPExplorer = (directory = null) =>
         let dependents = window.instance.rp.filter(rp => rp.dependencies?.find(d=>d.id==m.id||d.filename==m.filename||d.slug==m.slug)!=null).length;
         infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
 
-        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+        infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         // Disable
         infoPanel.querySelector('#actions').childNodes[1].onclick = async () =>
         {
@@ -731,7 +731,7 @@ window.loadRPExplorer = (directory = null) =>
             if(m.disabled==undefined){m.disabled = true;}
             await window.instance.setRPData(m)
 
-            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(./resources/${m.disabled?'disabled':'enabled'}.png)`
+            infoPanel.querySelector('#actions').childNodes[1].style.backgroundImage = `url(../resources/${m.disabled?'disabled':'enabled'}.png)`
         }
         // Config
         infoPanel.querySelector('#actions').childNodes[0].onclick = async () =>

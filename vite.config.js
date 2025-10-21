@@ -1,18 +1,20 @@
-import { defineConfig } from 'vite';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
-  root: path.join(__dirname),
-  base: '',
+  root: '.',
+  base: './',
+  publicDir: 'public',
   build: {
-    outDir: path.join(__dirname),
-    emptyOutDir: false
+    outDir: 'dist',
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'), 
+        select: resolve(__dirname, 'select.html'), 
+        saves: resolve(__dirname, 'saves.html'),
+        load: resolve(__dirname, 'load.html')
+      },
+    },
   },
-  server: {
-    port: 5173
-  }
-});
+})

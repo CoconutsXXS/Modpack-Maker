@@ -50,7 +50,6 @@ document.getElementById('finish').onclick = async () =>
     {
         case 'packs':
         {
-            console.log(selected);
             await ipcSend('finishSavesSelection', selected)
             break;
         }

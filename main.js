@@ -63,23 +63,26 @@ app.on('web-contents-created', function (webContentsCreatedEvent, contents)
 
 async function mainWindow()
 {
-    const load = new BrowserWindow
-    ({
-        width: 128,
-        height: 128,
-        frame: false,
-        transparent: true,
-        movable: false,
-        minimizable: false,
-        resizable: false,
-        hasShadow: false
-    });
-    if(process.env.NODE_ENV === 'development') { load.loadURL('http://localhost:5173/load.html') }
-    else { load.loadFile(path.join(__dirname, 'load.html')); }
-
-    let finishedLoading = false;
+    let finishedLoading = true;
+    let loaded = false;
     (async () =>
     {
+        await setTimeout(250);
+        if(loaded){return;}
+        finishedLoading = false
+        const load = new BrowserWindow
+        ({
+            width: 128,
+            height: 128,
+            frame: false,
+            transparent: true,
+            movable: false,
+            minimizable: false,
+            resizable: false,
+            hasShadow: false
+        });
+        load.loadFile(path.join(__dirname, 'dist', 'load.html'));
+
         await setTimeout(1500/2);
         finishedLoading = true
     })()
@@ -133,14 +136,17 @@ async function mainWindow()
 
     win.webContents.on('did-finish-load', async () =>
     {
-        while(!finishedLoading){await setTimeout(100)}
+        if(!finishedLoading)
+        { while(!finishedLoading){await setTimeout(10)} }
+        else { await setTimeout(10) }
+
+        loaded = true;
         win.show();
         load.close();
     });
 
 
-    if(process.env.NODE_ENV === 'development') { win.loadURL('http://localhost:5173/index.html') }
-    else { win.loadFile(path.join(__dirname, 'index.html')); }
+    win.loadFile(path.join(__dirname, 'dist', 'index.html'));
     // win.loadFile('index.html')
 
     // win.webContents.openDevTools();
@@ -178,8 +184,7 @@ async function selectWindow()
         autoHideMenuBar: true
     });
 
-    if(process.env.NODE_ENV === 'development') { win.loadURL('http://localhost:5173/select.html') }
-    else { win.loadFile(path.join(__dirname, 'select.html')); }
+    win.loadFile(path.join(__dirname, 'dist', 'select.html'));
     // win.loadFile('select.html')
 }
 
