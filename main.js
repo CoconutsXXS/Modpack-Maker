@@ -26,18 +26,32 @@ const isSilent = require("./browser-request.js");
 
 app.whenReady().then(async () =>
 {
-    // let data = await require("./content-modifier.js").modData("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar");
-    // let directoryObject = await require("./content-modifier.js").modDataToDirectoryObject(data, "/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar")
-    // await require("./content-modifier.js").writeDirectoryObject(directoryObject, "./Test.zip");
+    // {
+    //     const win = new BrowserWindow
+    //     ({
+    //         width: screen.getAllDisplays()[0].bounds.width,
+    //         height: screen.getAllDisplays()[0].bounds.height,
+    //         webPreferences:
+    //         {
+    //             preload: path.join(__dirname, 'preload.js'),
+    //             webviewTag: true,
+    //             contextIsolation: true
+    //         },
+    //         roundedCorners: false,
+    //         backgroundColor: '#00000000',
+    //         darkTheme: true,
+    //         hasShadow: false,
+    //         closable: true,
+    //         minimizable: true,
+    //         maximizable: true,
+    //         autoHideMenuBar: true,
+    //         frame: false,
+    //         transparent: true,
+    //     });
 
-    // await contentModifier.combineMods("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/")
-
-    // let r = await require("./decompiler.js").decompile(fs.readFileSync("/Users/coconuts/Downloads/Aether.class").buffer);
-
-    // let r = await require("./decompiler.js").decompile("/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/minecraft/mods/aether-1.20.1-1.5.2-neoforge.jar");
-
-    // await require("./decompiler.js").compile("/Users/coconuts/Downloads/Aether.class", "com/aetherteam/aether/Aether.class", "/Users/coconuts/Library/Application Support/Modpack Maker/instances/Structure Test/aether-1.20.1-1.5.2-neoforge.jar");
-    // return;
+    //     win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
+    // }
+    // return
 
     if(isSilent()){return;}
 

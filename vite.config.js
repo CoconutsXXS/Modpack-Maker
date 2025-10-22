@@ -14,7 +14,8 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         select: resolve(__dirname, 'select.html'),
         saves: resolve(__dirname, 'saves.html'),
-        load: resolve(__dirname, 'load.html')
+        load: resolve(__dirname, 'load.html'),
+        "game-launcher": resolve(__dirname, 'game-launcher', 'main.html')
       },
       external: ['plist', 'plist-parse', 'pend', 'fd-slicer']
     },

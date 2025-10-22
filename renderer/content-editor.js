@@ -245,8 +245,9 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
     for (const p of resolvedPaths)
     {
         const tex = textureCache[p] || null;
-        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true });
-        mat.needsUpdate = mat.map.needsUpdate = true
+        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.FrontSide, alphaTest: .5, shadowSide: THREE.FrontSide, clipShadows: true, clipIntersection: true });
+        mat.needsUpdate = true;
+        if(mat.map) { mat.map.needsUpdate = true}
         materialCache[p] = mat;
     }
 
@@ -315,7 +316,7 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
         geom.setAttribute('position', new THREE.Float32BufferAttribute(group.vertices, 3));
         geom.setAttribute('uv', new THREE.Float32BufferAttribute(group.uvs, 2));
         geom.setIndex(new THREE.Uint16BufferAttribute(group.indices, 1));
-        const mat = materialCache[path] || new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        const mat = materialCache[path] || new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide });
         const mesh = new THREE.Mesh(geom, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -328,7 +329,7 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
         geom.setAttribute('position', new THREE.Float32BufferAttribute(missingGroup.vertices, 3));
         geom.setAttribute('uv', new THREE.Float32BufferAttribute(missingGroup.uvs, 2));
         geom.setIndex(new THREE.Uint16BufferAttribute(missingGroup.indices, 1));
-        const mat = new THREE.MeshStandardMaterial({ color: 0xff00ff, side: THREE.DoubleSide });
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff00ff, side: THREE.FrontSide });
         const mesh = new THREE.Mesh(geom, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -528,6 +529,14 @@ async function jarAnalyseSetup(i)
             {
                 let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
                 return files[files.length-1].value;
+            }, async (keys) =>
+            {
+                let value = null;
+                if(!getProp(window.jarData.combined, keys))
+                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+                else { value = getProp(window.jarData.combined, keys) }
+
+                return value;
             }, async (keys) =>
             {
                 let value = null;
@@ -1154,10 +1163,10 @@ window.addInstanceListener(async (i) =>
 
         controls.target.set(data.size[0]/2, data.size[1]/2, data.size[2]/2)
 
-        let finalObject = await mergeGroupOptimizedChunked(lastModel, { tolerance: 1e-5 });
-        finalObject.castShadow = true;
-        finalObject.receiveShadow = true;
-        scene.add(finalObject)
+        lastModel = await mergeGroupOptimizedChunked(lastModel, { tolerance: 1e-5 });
+        lastModel.castShadow = true;
+        lastModel.receiveShadow = true;
+        scene.add(lastModel)
     }
     
     // Shading Select
@@ -1167,12 +1176,22 @@ window.addInstanceListener(async (i) =>
         ev.target.setAttribute("selected", "");
         lastModel.traverse((child) =>
         {
-            if(child.material)
+            if(Array.isArray(child.material))
             {
-                let newMat = new THREE.MeshStandardMaterial({ map: child.material.map, color: 0xffffff, transparent: false, side: THREE.DoubleSide, wireframe: true, alphaMap: child.material.map })
+                for(let m of Object.entries(child.material))
+                {
+                    let newMat = new THREE.MeshStandardMaterial({ map: m[1].map, color: 0xffffff, transparent: false, side: THREE.FrontSide, wireframe: true })
+                    child.castShadow = child.receiveShadow = true;
+                    child.material[m[0]] = newMat;
+                }
+            }
+            else if(child.material)
+            {
+                let newMat = new THREE.MeshStandardMaterial({ map: child.material.map, color: 0xffffff, transparent: false, side: THREE.FrontSide, wireframe: true })
                 child.castShadow = child.receiveShadow = true;
                 child.material = newMat;
             }
+
         })
     }
     editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(2)").onclick = (ev) =>
@@ -1181,9 +1200,18 @@ window.addInstanceListener(async (i) =>
         ev.target.setAttribute("selected", "");
         lastModel.traverse((child) =>
         {
-            if(child.material)
+            if(Array.isArray(child.material))
             {
-                let newMat = new THREE.MeshBasicMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5 })
+                for(let m of Object.entries(child.material))
+                {
+                    let newMat = new THREE.MeshBasicMaterial({ map: m[1].map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5 })
+                    child.castShadow = child.receiveShadow = true;
+                    child.material[m[0]] = newMat;
+                }
+            }
+            else if(child.material)
+            {
+                let newMat = new THREE.MeshBasicMaterial({ map: child.material.map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5 })
                 child.castShadow = child.receiveShadow = true;
                 child.material = newMat;
             }
@@ -1197,7 +1225,7 @@ window.addInstanceListener(async (i) =>
         {
             if(child.material)
             {
-                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5, roughness: 0.2, specularIntensity: 1, reflectivity: 1 });
+                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5, roughness: 0.2, specularIntensity: 1, reflectivity: 1 });
                 child.castShadow = child.receiveShadow = true;
                 child.material = newMat;
             }
@@ -1377,7 +1405,7 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
 
 let closeEditor = () => {};
 let Drawers = {};
-async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {}, reload = () => {}, getFile = (k) => {})
+async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {}, reload = () => {}, getFile = (k) => {}, getGlobalFile = (k) => {})
 {    
     for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
     closeEditor();
@@ -1445,7 +1473,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
             editors.codeEditor.style.display = "none";
             editors.threeEditor.style.display = "block";
 
-            loadModel(JSON.parse(value), getFile);
+            loadModel(JSON.parse(value), getGlobalFile);
         }
     }
     else if(filename.endsWith(".class"))
@@ -2204,6 +2232,16 @@ window.openModContent = async function(path)
             return files[files.length-1].value;
         }, async (keys) =>
         {
+            let value = null;
+            if(!getProp(window.jarData.combined, keys))
+            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+            else { value = getProp(window.jarData.combined, keys) }
+
+            return value;
+        }, async (keys) =>
+        {
+            console.log("Opening", keys)
+            console.log(window.jarData.combined)
             let value = null;
             if(!getProp(window.jarData.combined, keys))
             { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }

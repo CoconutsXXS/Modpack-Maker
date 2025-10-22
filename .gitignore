@@ -5,6 +5,7 @@ Modpack-Maker.code-workspace
 
 node_modules/
 lwjgl/*
+game-launcher/
 
 dist/
 out/

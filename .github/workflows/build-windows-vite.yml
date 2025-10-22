@@ -8,8 +8,8 @@ on:
   #   branches: [ main, master ]
 
 jobs:
-  build-windows-x64:
-    name: windows (x64)
+  build-vite-windows-x64:
+    name: vite windows (x64)
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -36,13 +36,13 @@ jobs:
 
       - name: Build windows App (x64)
         run: |
-          npm run dist -- --win --x64 --publish=never
+          npm run build -- --win --x64 --publish=never
 
       - name: Upload windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: dist/
+          path: release/
 
   # build-windows-arm64:
   #   name: Windows (arm64)

@@ -45,6 +45,7 @@
     "@xmcl/game-data": "^1.2.6",
     "@xmcl/installer": "^6.1.2",
     "@xmcl/world": "^1.2.0",
+    "ammo.js": "^0.0.10",
     "buffer-to-data-url": "^1.0.0",
     "canvas-to-buffer": "^4.1.2",
     "chokidar": "^4.0.3",
