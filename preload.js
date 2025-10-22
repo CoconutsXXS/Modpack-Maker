@@ -202,7 +202,11 @@ contextBridge.exposeInMainWorld('listenDownload', (url, callback) =>
     })
 })
 
-contextBridge.exposeInMainWorld('ephemeralLaunch', (loader, version, mods) => { ipcRenderer.send('ephemeralLaunch', loader, version, mods) })
+contextBridge.exposeInMainWorld('ephemeralLaunch', async (loader, version, mods, progressListener) =>
+{
+    let index = await ipcRenderer.invoke('ephemeralLaunch', loader, version, mods)
+    ipcRenderer.on(index+"-ephemeralInstanceProgress", (event, p) => { progressListener(p) })
+})
 
 // contextBridge.exposeInMainWorld('jarData', async (path, subPath) => { return await ipcRenderer.invoke('jarData', path, subPath); })
 

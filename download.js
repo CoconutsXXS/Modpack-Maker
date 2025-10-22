@@ -6,6 +6,7 @@ const { download } = require("grape-electron-dl");
 const {sep} = require("path")
 
 const config = require('./config');
+const { session } = require('electron/main');
 
 let downloadListeners = []
 
@@ -48,27 +49,76 @@ class Download
 
         return new Promise(async (resolve) =>
         {
-            console.log(dest, dest.substring(0, dest.lastIndexOf(sep)))
             // C:\Users\coconuts\AppData\Roaming\Modpack Maker\instances\Fabulously Optimized\minecraft/mods
             let directory = dest.substring(0, dest.lastIndexOf(sep));
             let filename = dest.replace(/^.*[\\/]/, '');
 
             if(!fs.existsSync(directory+sep)) { await fsPromise.mkdir(directory+sep, {recursive:true}) }
 
-            if(BrowserWindow.getAllWindows().length > 0)
+            if(false)
             {
                 // Classic
-                await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i), onProgress: (p) => 
+                BrowserWindow.getAllWindows()[0].setMaxListeners(0);
+                if(session.setMaxListeners) { session.setMaxListeners(0) }
+
+                let end = false;
+                await download(BrowserWindow.getAllWindows()[0], url, {filename: filename, directory: directory, onCancel: i => console.warn(i), onProgress: async (p) => 
                 {
-                    if(!downloadListeners[url]){return}
-                    for(let c of downloadListeners[url]){c(p)}
+                    if(downloadListeners[url])
+                    {
+                        for(let c of downloadListeners[url]){c(p)}
+                    }
+                    if(p.transferredBytes == p.totalBytes && !end)
+                    {
+                        end = true
+                        try
+                        {
+                            await fsPromise.copyFile(path.join(directory, filename), path.join(config.directories.download, filename));
+                            this.downloadData.push({url: url, path: path.join(config.directories.download, filename)});
+                            await fsPromise.writeFile(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
+                        }
+                        catch(err) { console.warn(err) }
+
+                        resolve(dest);
+                    }
                 }});
             }
             else
             {
                 // New
                 let r = await fetch(url);
-                await fsPromise.writeFile(path.join(directory, filename), Buffer.from(await r.arrayBuffer()));
+
+                const totalBytes = Number(r.headers.get("content-length"));
+                let downloadedBytes = 0;
+
+                const fileStream = fs.createWriteStream(path.join(directory, filename));
+
+                const reader = r.body.getReader();
+                while(true)
+                {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    downloadedBytes += value.length;
+                    fileStream.write(value);
+
+                    if (totalBytes)
+                    {
+                        if(downloadListeners[url])
+                        {
+                            for(let c of downloadListeners[url]){c(downloadedBytes / totalBytes)}
+                        }
+                    }
+                    else
+                    {
+                        if(downloadListeners[url])
+                        {
+                            for(let c of downloadListeners[url]){c(1)}
+                        }
+                    }
+                }
+
+                fileStream.end();
 
                 try
                 {
@@ -77,8 +127,9 @@ class Download
                     await fsPromise.writeFile(path.join(config.directories.download, '.download-data.json'), JSON.stringify(this.downloadData))
                 }
                 catch(err) { console.warn(err) }
+
+                resolve(dest);
             }
-            resolve(dest);
         })
     }
     static addDownloadListener(url, callback)

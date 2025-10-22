@@ -104,13 +104,20 @@ window.web =
                     case 'quick-test':
                     {
                         let mods = [];
+                        let bea = new window.BackgroundEvent("Finding file(s)...")
                         for(var f of await findModrinthFile(m.slug))
                         {
                             if(!f.primary){continue}
                             mods.push({url:f.url, filename:f.filename})
                         }
-                        
-                        await ephemeralLaunch(window.instance.loader, window.instance.version, mods);
+                        bea.delete()
+
+                        let bec = new window.BackgroundEvent("Downloading files...")
+                        await ephemeralLaunch(window.instance.loader, window.instance.version, mods, (p) =>
+                        {
+                            bec.update(p)
+                            if(p==1){bec.delete()}
+                        });
 
                         break;
                     }
@@ -308,15 +315,25 @@ window.web =
                     }
                     case 'quick-test':
                     {
+                        let bea = new window.BackgroundEvent("Finding file(s)...")
+
                         let mods = [];
                         let modId = (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=1&sortField=1&filterText=${(link.split('/')[link.split('/').length-1])}`)).json()).data[0].id
+                        bea.update(0.5)
                         for(var f of await findCurseforgeFile(modId))
                         {
                             if(!f.primary){continue}
                             mods.push({url:f.url, filename:f.filename})
                         }
-                        
-                        await ephemeralLaunch(window.instance.loader, window.instance.version, mods);
+
+                        bea.delete()
+
+                        let bec = new window.BackgroundEvent("Downloading files...")
+                        await ephemeralLaunch(window.instance.loader, window.instance.version, mods, (p) =>
+                        {
+                            bec.update(p)
+                            if(p==1){bec.delete()}
+                        });
 
                         break;
                     }

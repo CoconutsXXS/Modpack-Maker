@@ -183,6 +183,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             // Move
             let fileCurrentPath = folderPath;
             let selected = false;
+            let mouseDownInit = false;
             let moving = false;
             let mouseInit;
             let posInit;
@@ -191,7 +192,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             let closest = [];
 
             // Normal Click Event
-            b.addEventListener('mousedown', (ev) => 
+            b.addEventListener('click', (ev) => 
             {
                 if(selected || ev.target != b){return;}
                 f.onSelect();
@@ -220,37 +221,13 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             b.onmousedown = (e) =>
             {
                 if(e.target != b){return;}
-                selected=true;
-                moving=false;
-                // Init Mouse Position
-                mouseInit =
-                {
-                    x: e.clientX+document.documentElement.scrollLeft-document.body.clientLeft,
-                    y: e.clientY+document.documentElement.scrollTop-document.body.clientTop
-                }
-
-                // Transorm to screen-space
-                b.style.width = b.getBoundingClientRect().width+'px';
-
-                let bodyRect = document.body.getBoundingClientRect(), elemRect = b.getBoundingClientRect(), offset = elemRect.top - bodyRect.top;
-                posInit = 
-                {
-                    x: b.getBoundingClientRect().x - parentDependant?b.parentElement.parentElement.getBoundingClientRect().x:0,
-                    y: parentDependant?(b.getBoundingClientRect().y - b.parentElement.parentElement.getBoundingClientRect().y + b.getBoundingClientRect().height*1.5 - 4):offset
-                }
-
-                ghost = document.createElement('div'); ghost.id = 'file-move-indicator'
-                ogPosGhost = b.cloneNode(true); ogPosGhost.style.opacity = '0';
-                if(b.parentNode != undefined) { b.parentNode.insertBefore(ogPosGhost, b) }
-
-                b.style.position = 'fixed';
-                b.style.left = b.style.top = 0;
-                b.style.transition = 'all 0'
-                b.style.translate = posInit.x + 'px ' + posInit.y + 'px'
+                mouseDownInit=true;
             }
             // Release
             document.addEventListener('mouseup', () =>
             {
+                mouseDownInit=false;
+
                 b.style.position = 'relative';
                 b.style.top = b.style.left ='unset';
                 b.style.opacity = '1';
@@ -277,13 +254,39 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                     return
                 }
 
+
+                // Same filename in same folder = error
+                if(files.find(f=>cleanPath(f.path)==ghost.parentNode.getAttribute('path')&& (f.folder?(f.name==files[k].name):(f.filename==files[k].filename)) ))
+                {
+                    console.log(files[k])
+                    console.log(files.find(f=>cleanPath(f.path)==ghost.parentNode.getAttribute('path')&& (f.folder?(f.name==files[k].name):(f.filename==files[k].filename)) ))
+                    console.log(ghost.parentNode.getAttribute('path'), (f.folder?files[k].name:files[k].filename))
+                    console.log(files)
+
+                    if(ghost.parentNode==null)
+                    {
+                        ghost.remove();
+                        ghost = ogPosGhost;
+                    }
+                    
+                    for(let c of dirElements){c.removeAttribute('highlight')}
+                    for(let c of closest){c.removeAttribute('highlight')}
+
+                    closest = [];
+                    ghost.remove();ghost=undefined;
+                    ogPosGhost.remove();ogPosGhost=undefined
+
+                    return
+                }
+
+                ghost.parentNode.insertBefore(b, ghost)
+
                 // If out
                 if(ghost.parentNode==null)
                 {
                     ghost.remove();
                     ghost = ogPosGhost;
                 }
-                ghost.parentNode.insertBefore(b, ghost)
 
                 for(let c of dirElements){c.removeAttribute('highlight')}
                 for(let c of closest){c.removeAttribute('highlight')}
@@ -311,7 +314,8 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
                     if(files[key] == undefined){continue}
                     files[key].index--;
-                    files[key].element.setAttribute('index', files[key].index)
+                    if(files[key].element.setAttribute)
+                    {files[key].element.setAttribute('index', files[key].index)}
                     files[key].onMove(files[key].path, files[key].path, files[key].index)
                 }
                 let newIndex = Array.from(b.parentNode.childNodes).findIndex(e=>e==b);
@@ -323,7 +327,8 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
 
                     if(files[key] == undefined){continue}
                     files[key].index++;
-                    files[key].element.setAttribute('index', files[key].index)
+                    if(files[key].element.setAttribute)
+                    {files[key].element.setAttribute('index', files[key].index)}
                     files[key].onMove(files[key].path, files[key].path, files[key].index)
                 }
                 files[k].index = newIndex;
@@ -353,6 +358,38 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
             // Move
             document.addEventListener('mousemove', (e) =>
             {
+                if(mouseDownInit)
+                {
+                    mouseDownInit=false;
+                    selected=true;
+                    moving=false;
+                    // Init Mouse Position
+                    mouseInit =
+                    {
+                        x: e.clientX+document.documentElement.scrollLeft-document.body.clientLeft,
+                        y: e.clientY+document.documentElement.scrollTop-document.body.clientTop
+                    }
+
+                    // Transorm to screen-space
+                    b.style.width = b.getBoundingClientRect().width+'px';
+
+                    let bodyRect = document.body.getBoundingClientRect(), elemRect = b.getBoundingClientRect(), offset = elemRect.top - bodyRect.top;
+                    posInit = 
+                    {
+                        x: b.getBoundingClientRect().x - parentDependant?b.parentElement.parentElement.getBoundingClientRect().x:0,
+                        y: parentDependant?(b.getBoundingClientRect().y - b.parentElement.parentElement.getBoundingClientRect().y + b.getBoundingClientRect().height*1.5 - 4):offset
+                    }
+
+                    ghost = document.createElement('div'); ghost.id = 'file-move-indicator'
+                    ogPosGhost = b.cloneNode(true); ogPosGhost.style.opacity = '0';
+                    if(b.parentNode != undefined) { b.parentNode.insertBefore(ogPosGhost, b) }
+
+                    b.style.position = 'fixed';
+                    b.style.left = b.style.top = 0;
+                    b.style.transition = 'all 0'
+                    b.style.translate = posInit.x + 'px ' + posInit.y + 'px'
+                }
+
                 if(!selected){return}
                 moving=true;
 
@@ -452,7 +489,7 @@ window.setupExplorer = (container, files, onNewFolder, onDrop, parentDependant =
                 for(let k in currentOldList)
                 {
                     if(currentNewList[k] == undefined){continue}
-                    currentNewList[k].element = {};
+                    // currentNewList[k].element = {};
                     if(JSON.stringify(currentOldList[k]) != JSON.stringify(currentNewList[k]))
                     {
                         changed = true;

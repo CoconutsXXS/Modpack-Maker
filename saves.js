@@ -79,6 +79,7 @@ class Saves
         })
     {
         data.name = name;
+        if(name==''){return;}
         fs.writeFileSync(path.join(config.directories.saves, 'packs', name+'.json'), JSON.stringify(data));
     }
     static renamePack = async function(oldN, newN)

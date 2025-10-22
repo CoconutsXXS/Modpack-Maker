@@ -188,7 +188,6 @@ async function viewPack(name)
         for(let k in pack.content)
         {
             let m = pack.content[k];
-            console.log(m)
             files.push
             ({
                 name: m.filename || m.name || m.title,
@@ -376,6 +375,7 @@ async function viewPack(name)
         ipcInvoke("addPack", pack.name, pack)
     })
 
+    let updatedCompat = false
     let listeningTo = pack.name;
     addPackListener(pack.name, (p) =>
     {
@@ -397,6 +397,7 @@ async function viewPack(name)
                 let co = document.createElement("td"); co.innerText=c.count; n.appendChild(co)
                 packEditor.querySelector("table > tbody").appendChild(n)
             }
+            updatedCompat=true;
         })
     })
 
@@ -558,7 +559,6 @@ async function viewPack(name)
         compatibilities=compatibilities.sort((a,b) => b.count-a.count)
     }
 
-    console.log(packEditor.querySelectorAll("div:last-of-type > button"))
     packEditor.querySelectorAll("div:last-of-type > button")[1].onclick = () => { packEditor.style.display = 'none'; container.style.display = "block"; }
     packEditor.querySelectorAll("div:last-of-type > button")[3].onclick = async () =>
     {
@@ -576,8 +576,15 @@ async function viewPack(name)
     // Test
     packEditor.querySelectorAll("div:last-of-type > button")[2].onclick = async () =>
     {
-        await updateCompatibility();
-        
+        if(!updatedCompat)
+        {
+            let bew = new window.BackgroundEvent("Finding most compatible version...")
+            while(!updatedCompat) { await new Promise((resolve) => {setTimeout(resolve, 100)}); }
+            bew.delete()
+        }
+
+        let bea = new window.BackgroundEvent("Combining pack content...")
+
         let mods = [];
         for(let c of pack.content)
         {
@@ -602,9 +609,12 @@ async function viewPack(name)
                     break;
                 }
             }
+            bea.update(bea.lastProgress+(1/pack.content.length))
         }
+        bea.delete()
 
         // Loader Last Version
+        let beb = new window.BackgroundEvent("Searching latest loader...")
         let versionList = [];
 
         switch(compatibilities[0].loader.toLowerCase())
@@ -646,8 +656,14 @@ async function viewPack(name)
                 break;
             }
         }
+        beb.delete();
         
-        await ephemeralLaunch({name: compatibilities[0].loader.toLowerCase(), version: versionList[0]}, {number: compatibilities[0].version, type: "release"}, mods);
+        let bec = new window.BackgroundEvent("Downloading content...")
+        await ephemeralLaunch({name: compatibilities[0].loader.toLowerCase(), version: versionList[0]}, {number: compatibilities[0].version, type: "release"}, mods, (p) =>
+        {
+            bec.update(p)
+            if(p==1){bec.delete()}
+        });
     }
 }
 

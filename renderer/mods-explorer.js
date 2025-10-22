@@ -40,13 +40,37 @@ function filifyMods(mods, arrayPropertie = 'mods', setData = 'setModData', delet
                 // Client, server, dependencies
                 infoPanel.querySelector("#actions").style.display = infoPanel.querySelector("#supporting").style.display = 'grid'
 
-                infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${mods[k].clientRequired?0.8:0.3})`
-                infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', mods[k].clientRequired?'Required in Client Side':'Unrequired in Client Side');
-                infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${mods[k].serverRequired?0.8:0.3})`
-                infoPanel.querySelector('#supporting').childNodes[1].setAttribute('hover-info', mods[k].clientRequired?'Required in Server Side':'Unrequired in Server Side');
+                if(mods[k].clientRequired!=undefined && mods[k].clientRequired != null)
+                {
+                    infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(${mods[k].clientRequired?0.8:0.4})`
+                    infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', mods[k].clientRequired?'Required in Client Side':'Unrequired in Client Side');
+                }
+                else
+                {
+                    infoPanel.querySelector('#supporting').childNodes[0].style.filter = `brightness(0.1)`
+                    infoPanel.querySelector('#supporting').childNodes[0].setAttribute('hover-info', "Client Side support not precised");
+                }
+
+                if(mods[k].serverRequired!=undefined && mods[k].serverRequired != null)
+                {
+                    infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(${mods[k].serverRequired?0.8:0.4})`
+                    infoPanel.querySelector('#supporting').childNodes[1].setAttribute('hover-info', mods[k].serverRequired?'Required in Server Side':'Unrequired in Server Side');
+                }
+                else
+                {
+                    infoPanel.querySelector('#supporting').childNodes[1].style.filter = `brightness(0.1)`
+                    infoPanel.querySelector('#supporting').childNodes[1].setAttribute('hover-info', "Server Side support not precised");
+                }
+
                 window.loadHoverInfo();
 
-                infoPanel.querySelector('#supporting').childNodes[2].childNodes[1].innerText = mods[k].dependencies?mods[k].dependencies.length.toString():'0'
+                if(mods[k].dependencies)
+                {
+                    infoPanel.querySelector('#supporting').childNodes[2].style.display = "block"
+                    infoPanel.querySelector('#supporting').childNodes[2].childNodes[1].innerText = mods[k].dependencies.length.toString()
+                }
+                else { infoPanel.querySelector('#supporting').childNodes[2].style.display = "none" }
+
                 let dependents = mods.filter(mod => mod.dependencies?.find(d=>d.id==mods[k].id||d.filename==mods[k].filename||d.slug==mods[k].slug)!=null).length;
                 infoPanel.querySelector('#supporting').childNodes[3].childNodes[1].innerText = dependents.toString();
 

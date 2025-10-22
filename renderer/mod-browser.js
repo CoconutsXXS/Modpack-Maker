@@ -132,7 +132,7 @@ async function searchMod(text = '')
                 case 'neoforge': {flavorIndex=6;break;}
                 case 'quilt': {flavorIndex=5;break;}
             }
-            let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&gameFlavors[0]=${flavorIndex}&classId=6`)).json()
+            let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&gameFlavors[0]=${flavorIndex}${window.instance.sinytra?'%2C4':''}&classId=6`)).json()
             if(!curseforge.data){curseforge.data=[];}
             for(let d of curseforge.data)
             {
@@ -544,7 +544,7 @@ function quickView(m)
 {
     if(m.loadImages) { m.loadImages().then((r) => {m.loadImages=null;quickView(m)}) }
 
-    infoPanel.style.display = 'inline'
+    infoPanel.style.display = 'inline-block'
     infoPanel.querySelector('div:first-of-type > h2').innerText = m.name;
     infoPanel.querySelector('div:first-of-type > img').src = m.icon;
     infoPanel.querySelector('p').innerText = m.description;

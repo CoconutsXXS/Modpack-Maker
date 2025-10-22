@@ -3,7 +3,7 @@ let container = document.getElementById("background-tasks")
 class BackgroundEvent
 {
     div; span; img
-    constructor(text, icon)
+    constructor(text, icon = null)
     {
         this.div = document.createElement("div")
         this.span = document.createElement("span")
@@ -12,14 +12,16 @@ class BackgroundEvent
         this.div.appendChild(this.img)
 
         this.span.innerText = text;
-        this.img.src = icon;
+        if(icon) { this.img.src = icon; }
+        else { this.img.style.display = 'none'; }
 
         container.appendChild(this.div)
     }
 
+    lastProgress = 0
     update(p)
     {
-        console.log(p)
+        this.lastProgress = p
         this.div.style.backgroundPosition = `-${this.div.getBoundingClientRect().width*(1-p)}px 0`
     }
 
@@ -29,8 +31,7 @@ class BackgroundEvent
         setTimeout(() =>
         {
             this.div.remove()
-            delete this
-        }, 200)
+        }, 400)
     }
 }
 

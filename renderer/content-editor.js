@@ -1,34 +1,3 @@
-// import {EditorView, basicSetup} from 'cdn/codemirror'
-// import {json} from 'cdn/@codemirror/lang-json'
-// import {java} from 'cdn/@codemirror/lang-java'
-// import {oneDark} from 'cdn/@codemirror/theme-one-dark'
-// import { keymap } from "cdn/@codemirror/view";
-// import { indentMore, indentLess } from "cdn/@codemirror/commands";
-// import { indentUnit } from "cdn/@codemirror/language";
-// import {StreamLanguage} from "cdn/@codemirror/language"
-// import {toml} from "cdn/@codemirror/legacy-modes/mode/toml"
-
-// import {json} from '../node_modules/@codemirror/lang-json/dist/index.js'
-// import {java} from '../node_modules/@codemirror/lang-java/dist/index.js'
-// import {oneDark} from '../node_modules/@codemirror/theme-one-dark/dist/index.js'
-// import { keymap } from "../node_modules/@codemirror/view/dist/index.js";
-// import { indentMore, indentLess } from "../node_modules/@codemirror/commands/dist/index.js";
-// import { indentUnit } from "../node_modules/@codemirror/language/dist/index.js";
-// import {StreamLanguage} from "../node_modules/@codemirror/language/dist/index.js"
-// import {toml} from "../node_modules/@codemirror/legacy-modes/mode/toml.js"
-
-// import { parse, stringify } from "../node_modules/comment-json/src/index.js";
-// import Frame from "../node_modules/canvas-to-buffer/dist/canvas-to-buffer.esm.js";
-
-// import * as THREE from "../node_modules/three/src/Three.js"
-// import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
-// // import * as POSTPROCESSING from "postprocessing"
-// // import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
-
-// import * as msgpack from "../node_modules/@msgpack/msgpack/dist.esm/index.mjs";
-// import * as lodash from "../node_modules/lodash/index.js"
-
-
 import {EditorView, basicSetup} from 'codemirror'
 import {json} from '@codemirror/lang-json'
 import {java} from '@codemirror/lang-java'
@@ -43,11 +12,17 @@ import Frame from "canvas-to-buffer";
 
 import * as THREE from "three"
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-// import * as POSTPROCESSING from "postprocessing"
-// import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect } from 'realism-effects'
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import * as POSTPROCESSING from "postprocessing"
+
+import { mergeGroupOptimizedChunked } from "./mesh-optimizer"
+// import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect, SSREffect } from 'realism-effects'
 
 import * as msgpack from "@msgpack/msgpack";
 import * as lodash from "lodash"
+
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
 
 
 async function parseMinecraftModelToThree(modelJson, opts = {})
@@ -199,13 +174,16 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
                 url,
                 (tex) =>
                 {
-                    if(tex.height > tex.width)
+                    let width = tex.width | tex.source.data.width;
+                    let height = tex.height | tex.source.data.height;
+
+                    if(height > width)
                     {
-                        let ogHeight = tex.height;
+                        let ogHeight = height;
                         let ogData = tex.source.data;
 
                         let canvas = document.createElement("canvas")
-                        canvas.width = canvas.height = tex.width
+                        canvas.width = canvas.height = width
 
                         let ctx = canvas.getContext("2d")
                         ctx.drawImage(ogData, 0, 0)
@@ -213,13 +191,15 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
                         canvas.style.position = 'fixed'
                         canvas.style.top = '0'
                         canvas.style.left = '0'
+
+                        // document.body.appendChild(canvas)
                         
                         tex = new THREE.Texture(canvas)
 
                         let currentHeight = 0;
                         setInterval(() =>
                         {
-                            currentHeight += tex.width;
+                            currentHeight += width;
                             if(currentHeight >= ogHeight){currentHeight=0}
                             ctx.drawImage(ogData, 0, -currentHeight)
 
@@ -265,9 +245,8 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
     for (const p of resolvedPaths)
     {
         const tex = textureCache[p] || null;
-        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true, needsUpdate: true });
+        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.DoubleSide, alphaTest: .5, shadowSide: THREE.DoubleSide, clipShadows: true, clipIntersection: true });
         mat.needsUpdate = mat.map.needsUpdate = true
-        console.log(mat)
         materialCache[p] = mat;
     }
 
@@ -368,6 +347,7 @@ async function parseMinecraftModelToThree(modelJson, opts = {})
     return parentGroup;
 }
 
+
 // Elements
 let section = document.querySelector(".content-explorer-section").cloneNode(true); document.querySelector(".content-explorer-section").remove();
 let modEditor = document.getElementById("mod-content-editor"); modEditor.style.display = "none";
@@ -461,8 +441,7 @@ async function jarAnalyseSetup(i)
                 window.instance.jarModifications.push(m)
                 window.jarData.modified.splice(i, 1)
             }
-            console.log(groups);
-            for(let g of groups) { console.log("g", g); window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
+            for(let g of groups) { window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
 
             for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:first-of-type")) { b.remove(); }
         }
@@ -479,7 +458,7 @@ async function jarAnalyseSetup(i)
             document.querySelector('#content-editor > .tab > button:first-of-type').click();
         }
     }
-    modEditor.querySelector(":scope > button").onclick = window.jarData.openApplier;
+    modEditor.querySelector(":scope > button").onclick = () => { document.querySelector('#content-editor > .tab > button:last-of-type').click() };
 
     window.jarData.openExplorer = async function(path = "")
     {
@@ -514,7 +493,6 @@ async function jarAnalyseSetup(i)
             {
                 editors.sourceSelection.style.display = "block";
                 let p = document.createElement("p");
-                console.log(keys)
                 p.innerText = `${keys[keys.length-1]} is modified by multiple sources:`;
                 editors.sourceSelection.firstChild.appendChild(p);
                 for(let [i, f] of files.entries())
@@ -789,16 +767,100 @@ window.addInstanceListener(async (i) =>
         return
     }
 
-    const renderer = new THREE.WebGLRenderer({alpha: true, canvas: document.getElementById("three-file-canvas")});
+    const renderer = new THREE.WebGLRenderer
+    ({
+        alpha: false,
+        canvas: document.getElementById("three-file-canvas"), 
+        powerPreference: "high-performance",
+        premultipliedAlpha: false,
+        depth: false,
+        stencil: false,
+        antialias: false,
+        preserveDrawingBuffer: true
+    });
+    renderer.autoClear = false;
+
     document.body.appendChild( renderer.domElement );
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
+
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.castShadow = true;
+    light.shadow.camera.near = 1;
+    light.shadow.camera.far = 50;
+    light.shadow.camera.right = 50;
+    light.shadow.camera.left = -50;
+    light.shadow.camera.top	= 50;
+    light.shadow.camera.bottom = -50;
+    light.shadow.mapSize.width = 1024;
+    light.shadow.mapSize.height = 1024;
+
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
+
+
+    light.position.set(20, 40, 20);
+    light.target.position.set(0, 0, 0);
+    scene.add(light, light.target, new THREE.AmbientLight(0xffffff, 0.5));
+
+    camera.position.z = 5;
+    
+    // Post
+    const composer = new POSTPROCESSING.EffectComposer(renderer)
+
+    if(true)
+    {
+        composer.addPass(new POSTPROCESSING.RenderPass(scene, camera));
+        // const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera)
+
+        const combinedEffects2 = new POSTPROCESSING.EffectPass(camera,
+            // new TRAAEffect(scene, camera, velocityDepthNormalPass),
+            // new HBAOEffect(composer, camera, scene, {power: 0.3, radius: 3, distance: 1}),
+            new POSTPROCESSING.SSAOEffect(camera),
+            new POSTPROCESSING.FXAAEffect(),
+            new POSTPROCESSING.BloomEffect({intensity: 1})
+        );
+        combinedEffects2.renderToScreen = true;
+        composer.addPass(combinedEffects2)
+        // composer.addPass(new MotionBlurEffect(velocityDepthNormalPass, {intensity: 1, jitter: 1}))
+    }
+    else if(false)
+    {
+        const ssrEffect = new SSREffect(scene, camera, new VelocityDepthNormalPass(scene, camera))
+        const ssrPass = new POSTPROCESSING.EffectPass(camera, ssrEffect)
+        composer.addPass(ssrPass)
+    }
+    else
+    {
+        composer.addPass(new POSTPROCESSING.RenderPass(scene, camera));
+        const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera);
+
+        const ssgi = new SSGIEffect(scene, camera, velocityDepthNormalPass, {denoiseIterations: 0, refineSteps: 60, steps: 120, resolutionScale: 1, distance: 40, thickness: 0.01})
+
+        const motionBlur = new MotionBlurEffect(velocityDepthNormalPass);
+        const traa = new TRAAEffect(scene, camera, velocityDepthNormalPass);
+
+        const effectPass = new POSTPROCESSING.EffectPass(camera, ssgi, traa);
+        effectPass.renderToScreen = true;
+        composer.addPass(effectPass);
+    }
+
+    // Resize
     const resizeElement = () =>
     {
-        camera.aspect = renderer.domElement.parentNode.getBoundingClientRect().width / renderer.domElement.parentNode.getBoundingClientRect().height;
-        renderer.setSize(renderer.domElement.parentNode.getBoundingClientRect().width, renderer.domElement.parentNode.getBoundingClientRect().height);
+        const width = Math.max(1, renderer.domElement.parentNode.getBoundingClientRect().width || 800);
+        const height = Math.max(1, renderer.domElement.parentNode.getBoundingClientRect().height || 600);
+
+        camera.aspect = width / height;
+
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
+        composer.setSize(width, height)
+
+        console.log(width, height)
+
         camera.updateProjectionMatrix();
     }
     renderer.domElement.parentNode.onresize = resizeElement;
@@ -813,57 +875,6 @@ window.addInstanceListener(async (i) =>
 
     editors.threeEditor.appendChild(renderer.domElement);
     resizeElement();
-
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.castShadow = true;
-
-    light.shadow.camera.left = -500;
-    light.shadow.camera.right = 500;
-    light.shadow.camera.top = 500;
-    light.shadow.camera.bottom = -500;
-    light.shadow.camera.near = 3;
-    light.shadow.camera.far = camera.far;
-
-    light.shadow.mapSize.width = 2048;
-    light.shadow.mapSize.height = 2048;
-
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.BasicShadowMap;
-
-    light.position.set(50, 100, 50);
-    light.target.position.set(0, 0, 0); // pointer vers le centre de la scène
-    scene.add(light, light.target, new THREE.AmbientLight(0xffffff, 1));
-
-    camera.position.z = 5;
-
-    {
-        // // Post
-        // const composer = new POSTPROCESSING.EffectComposer(renderer)
-
-        // console.log(camera.constructor.name)
-        // camera.constructor.name = "PerspectiveCamera"
-        // const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera)
-        // composer.addPass(velocityDepthNormalPass)
-
-        // // SSGI
-        // const ssgiEffect = new SSGIEffect(scene, camera, velocityDepthNormalPass)
-
-        // // TRAA
-        // const traaEffect = new TRAAEffect(scene, camera, velocityDepthNormalPass)
-
-        // // Motion Blur
-        // const motionBlurEffect = new MotionBlurEffect(velocityDepthNormalPass)
-
-        // // SSAO
-        // const ssaoEffect = new SSAOEffect(composer, camera, scene)
-
-        // // HBAO
-        // const hbaoEffect = new HBAOEffect(composer, camera, scene)
-
-        // const effectPass = new POSTPROCESSING.EffectPass(camera, ssgiEffect, hbaoEffect, ssaoEffect, traaEffect, motionBlur)
-
-        // composer.addPass(effectPass)
-    }
 
     const resolveTexture = async (ref, getFile = (k) => {}, json) =>
     {
@@ -1058,8 +1069,6 @@ window.addInstanceListener(async (i) =>
                         variantData = lodash.merge(variantData, v)
                     }
 
-                    console.log(p.Name, blockPropertiesString, 'from', blockstateJson.variants, '=', variantData)
-
                     if((Object.entries(variantData).length == 0 || !variantData.model) && !blockstateJson.multipart) { files.push({model: p.Name}); }
                     else { files.push(variantData) }
                 }
@@ -1145,7 +1154,10 @@ window.addInstanceListener(async (i) =>
 
         controls.target.set(data.size[0]/2, data.size[1]/2, data.size[2]/2)
 
-        scene.add(lastModel)
+        let finalObject = await mergeGroupOptimizedChunked(lastModel, { tolerance: 1e-5 });
+        finalObject.castShadow = true;
+        finalObject.receiveShadow = true;
+        scene.add(finalObject)
     }
     
     // Shading Select
@@ -1185,7 +1197,7 @@ window.addInstanceListener(async (i) =>
         {
             if(child.material)
             {
-                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5 });
+                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.DoubleSide, shadowSide: THREE.DoubleSide, alphaTest: .5, roughness: 0.2, specularIntensity: 1, reflectivity: 1 });
                 child.castShadow = child.receiveShadow = true;
                 child.material = newMat;
             }
@@ -1200,13 +1212,22 @@ window.addInstanceListener(async (i) =>
     scene.add(new THREE.AxesHelper(1))
 
     renderer.shadowMap.type=THREE.VSMShadowMap;
+
+    const clock = new THREE.Clock();
     // Render Loop
     function animate()
     {
-        if(!editors.threeEditor.checkVisibility()){return;}
-        light.rotateZ(0.1);
+        // if(!editors.threeEditor.checkVisibility()){return;}
+
+        light.rotateY(clock.getDelta());
+        renderer.shadowMap.needsUpdate = true;
+
+        scene.updateMatrixWorld();
+
         controls.update();
-        renderer.render( scene, camera );
+
+        if(composer) { composer.render(clock.getDelta()) }
+        else { renderer.render( scene, camera ) }
     }
     renderer.setAnimationLoop( animate );
 });
@@ -1251,6 +1272,10 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
     {
         s = modEditor.querySelectorAll(".content-explorer-section")[iteration];
         while(modEditor.querySelectorAll(".content-explorer-section")[iteration+1]){modEditor.querySelectorAll(".content-explorer-section")[iteration+1].remove();}
+        for (let index = modEditor.querySelectorAll(".content-explorer-section").length-1; index > iteration; index--)
+        {
+            for(let b of modEditor.querySelectorAll(".content-explorer-section")[index].querySelectorAll("button")){b.removeAttribute("selected")}
+        }
         // while(modEditor.querySelectorAll(".content-explorer-section").length > max){modEditor.querySelectorAll(".content-explorer-section")[0].remove();}
         while(s.querySelector("button")){s.querySelector("button").remove();}
     }
@@ -1322,6 +1347,18 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
                 directoryPath.pop();
 
                 let index = Array.from(b.parentNode.childNodes).indexOf(b)
+
+                for (let i = modEditor.querySelectorAll(".content-explorer-section").length-1; i > iteration; i--)
+                {
+                    for(let b of modEditor.querySelectorAll(".content-explorer-section")[i].querySelectorAll("button")){b.removeAttribute("selected")}
+                }
+                for (let s of modEditor.querySelectorAll(".content-explorer-section"))
+                {
+                    for(let b of Array.from(s.querySelectorAll("button")).filter(b=>/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(b.innerText) || b.querySelector("span")))
+                    {
+                        b.removeAttribute("selected")
+                    }
+                }
 
                 s.parentNode.querySelectorAll(":scope > div")[iteration].childNodes.item(index).setAttribute("selected", "")
                 // {name: path[path.length-1]}
@@ -1690,6 +1727,7 @@ async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () =>
 
         document.getElementById("image-editor").querySelector(".save").onclick = async () =>
         {
+            console.log(canvas, new Frame(canvas, ["png"], 1))
             const buffer = new Frame(canvas, ["png"], 1).toBuffer();
 
             if(!lodash.isEqual(data.buffer, buffer)){data.url = buffer.toString("base64")}
@@ -2098,12 +2136,15 @@ window.openModContent = async function(path)
     // Icon
     let icon = null;
     let modData = await ipcInvoke("extractFileByPath", fullPath, "META-INF/mods.toml");
-    for(let m of modData.parsed.mods)
+    if(modData?.parsed?.mods)
     {
-        if(m.logoFile)
+        for(let m of modData.parsed.mods)
         {
-            let logoData = await ipcInvoke("extractFileByPath", fullPath, m.logoFile);
-            if(logoData) { icon = "data:image/png;base64,"+logoData.url; }
+            if(m.logoFile)
+            {
+                let logoData = await ipcInvoke("extractFileByPath", fullPath, m.logoFile);
+                if(logoData) { icon = "data:image/png;base64,"+logoData.url; }
+            }
         }
     }
 

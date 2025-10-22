@@ -108,6 +108,11 @@ async function networkList(text = '')
         }
     }
 }
+async function importFromFile()
+{
+    let result = await ipcInvoke("importInstanceFromFile");
+    if(result){window.close();}
+}
 
 document.getElementById('main').querySelector('input').onkeydown = (ev) =>
 {
@@ -122,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () =>
     [
         {select: () => { browser = false; list(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
         {select: () => { browser = true; document.getElementById('container').style.display = 'block'; networkList(); }, deselect: () => {document.getElementById('container').style.display = 'none';}},
-        {select: () => { openInstance('');window.close();}, deselect: () => {}}
+        {select: () => { openInstance('');window.close();}, deselect: () => {}},
+        {select: () => { importFromFile();}, deselect: () => {}}
     ]);
 })

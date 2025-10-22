@@ -15,6 +15,10 @@ const Download = require('./download');
 const Saves = require('./saves.js');
 const contentModifier = require("./content-modifier.js")
 
+process.setMaxListeners(0)
+app.setMaxListeners(0)
+require('events').EventEmitter.defaultMaxListeners = 0
+
 ElectronBlocker.fromPrebuiltFull(crossFetch).then(b=>b.enableBlockingInSession(session.defaultSession))
 
 // Extension Host
@@ -65,12 +69,13 @@ async function mainWindow()
 {
     let finishedLoading = true;
     let loaded = false;
+    let load = null;
     (async () =>
     {
         await setTimeout(250);
         if(loaded){return;}
         finishedLoading = false
-        const load = new BrowserWindow
+        load = new BrowserWindow
         ({
             width: 128,
             height: 128,
@@ -142,7 +147,7 @@ async function mainWindow()
 
         loaded = true;
         win.show();
-        load.close();
+        load?.close();
     });
 
 
@@ -350,12 +355,14 @@ ipcMain.handle('importInstanceFromFile', async (event) =>
 {
     return new Promise(async (resolve) => 
     {
-        await Instance.curseforgeInstance((await dialog.showOpenDialog({filters: [{name: "Modpack", extensions: ["zip", "mrpack"]}]})).filePaths[0], {}, async (i) =>
+        let d = await dialog.showOpenDialog({filters: [{name: "Modpack", extensions: ["zip", "mrpack"]}]})
+        if(d.canceled){resolve(false); return}
+
+        await Instance.curseforgeDownload(d.filePaths[0], {}, async (i) =>
         {
-            console.log(i.name)
             let win = await mainWindow();
             win.webContents.send('openInstance', i.name);
-            resolve();
+            resolve(true);
         })
     });
 })
@@ -400,9 +407,22 @@ ipcMain.handle('launch', (event, name, world = null) =>
     return i
 })
 
-ipcMain.on('ephemeralLaunch', async (event, loader, version, mods) =>
+let ephemeralIndex = 0;
+ipcMain.handle('ephemeralLaunch', async (event, loader, version, mods) =>
 {
-    await Instance.ephemeralInstance(loader, version, mods);
+    ephemeralIndex++
+    const index = ephemeralIndex;
+    return new Promise(async (resolve) =>
+    {
+        resolve(index)
+        await Instance.ephemeralInstance(loader, version, mods,
+        {
+            download: (p) =>
+            {
+                event.sender.send(index+"-ephemeralInstanceProgress", p)
+            }
+        });
+    })
 })
 
 ipcMain.on("sep", (e) => {e.returnValue = path.sep})

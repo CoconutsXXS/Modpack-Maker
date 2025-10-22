@@ -5,17 +5,7 @@
     <!-- <meta http-equiv="Content-Security-Policy"> -->
     <title>Modpack Maker</title>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "cdn/": "https://esm.sh/",
-            "three": "https://esm.sh/three",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three/examples/jsm/",
-            "realism-effects": "https://cdn.jsdelivr.net/npm/realism-effects/+esm",
-            "postprocessing": "https://esm.sh/postprocessing"
-        }
-    }
-    </script>
+    <script type="importmap"></script>
     <link rel="stylesheet" crossorigin href="./index.css">
 </head>
 <body>
@@ -42,6 +32,12 @@
     <script src="./renderer/saves-importer.js" type="module"></script>
     <script src="./renderer/content-editor.js" type="module"></script>
     <script src="./renderer/scripts-ready.js" type="module"></script>
+
+    <!-- <div id="app"></div>
+    <style>
+      html,body, #app { width:100%; height:100%; margin:0; padding:0; display: block; position: fixed; z-index: 2000; }
+      canvas { display:block; }
+    </style> -->
 
     <!-- <div id="drag-window"></div> -->
     <!-- <div class="panel">

@@ -320,11 +320,13 @@ tfoot td
 .folder-content button[folder]:has(input)::before { margin-bottom: 1px; }
 .folder-content button[add]::before { background-image: url(../resources/add.png); filter: brightness(1) !important }
 .folder-content button:hover::before { filter: brightness(0.2); }
-.folder-content button:hover {text-decoration: underline;border: 0px;}
+.folder-content button:hover {text-decoration: underline;border: 0px; background: #ffffff18;}
+.folder-content button[selected]:hover {text-decoration: underline;border: 0px; background: #ffffff88;}
+.folder-content button[in-path]:hover {text-decoration: underline;border: 0px; background: #ffffff60;}
 .folder-content button > input { border: transparent; padding: 0; }
 
 .folder-content button[icon][selected]::before { filter: brightness(1.3); }
-.folder-content button[selected] {text-decoration: underline;}
+.folder-content button[selected] {text-decoration: underline; background: #ffffff60;}
 .folder-content button[selected]::before { filter: brightness(0.2); }
 .folder-content:has(>*[highlight]) button:hover { background: transparent; color: var(--text); text-decoration: none; }
 .folder-content:has(>*[highlight]) button:hover::before { filter: brightness(1); }
