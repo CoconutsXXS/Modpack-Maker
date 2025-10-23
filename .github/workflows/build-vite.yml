@@ -12,7 +12,27 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            arch: x64
+          - os: ubuntu-latest
+            arch: arm64
+
+          # Windows builds
+          - os: windows-latest
+            arch: x64
+          - os: windows-latest
+            arch: arm64
+
+          # macOS builds (macOS runners are arm64 Apple Silicon by default)
+          - os: macos-latest
+            arch: arm64
+          - os: macos-latest
+            arch: x64
+          - os: macos-latest
+            arch: universal
+
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -29,16 +49,27 @@ jobs:
 
       - name: Install dependencies (clean per OS)
         run: |
-          rm -rf node_modules package-lock.json
+          npx rimraf node_modules package-lock.json
           npm install --no-audit --prefer-offline
 
       - name: Build and package Electron app
-        run: npm run build
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            npx electron-builder --linux --${{ matrix.arch }} --publish never
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            if [[ "${{ matrix.arch }}" == "universal" ]]; then
+              npx electron-builder --mac universal --publish never
+            else
+              npx electron-builder --mac --${{ matrix.arch }} --publish never
+            fi
+          else
+            npx electron-builder --win --${{ matrix.arch }} --publish never
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-build
+          name: ${{ matrix.os }}-${{ matrix.arch }}-build
           path: dist/
 
   publish:
