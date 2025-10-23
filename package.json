@@ -7,7 +7,8 @@
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build:ui": "vite build",
     "build": "vite build && electron-builder",
-    "start": "vite build && electron ."
+    "start": "vite build && electron .",
+    "postinstall": "electron-builder install-app-deps"
   },
   "author": {
     "name": "Coconuts XXS",

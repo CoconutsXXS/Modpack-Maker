@@ -9,71 +9,83 @@ on:
     types: [published]
 
 jobs:
-  build:
+  build-matrix:
+    name: Build ${{ matrix.platform }} (${{ matrix.os }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # Linux builds
+          # reliable builds on hosted runners:
           - os: ubuntu-latest
-            arch: x64
-          - os: ubuntu-latest
-            arch: arm64
-
-          # Windows builds
-          - os: windows-latest
+            platform: linux
             arch: x64
           - os: windows-latest
-            arch: arm64
-
-          # macOS builds (macOS runners are arm64 Apple Silicon by default)
-          - os: macos-latest
-            arch: arm64
-          - os: macos-latest
+            platform: win
             arch: x64
+          # macOS: produce a "universal" build from the mac runner
           - os: macos-latest
+            platform: mac
             arch: universal
 
       fail-fast: false
-
-    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache node modules (per OS + lockfile)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: "npm"
 
-      - name: Install dependencies (clean per OS)
+      - name: Install dependencies (clean node_modules if present)
         run: |
-          npx rimraf node_modules package-lock.json
-          npm install --no-audit --prefer-offline
+          # Use rimraf (cross-platform) to remove node_modules if present
+          npx rimraf node_modules
+          npm ci
+        env:
+          CI: true
 
-      - name: Build and package Electron app
+      - name: Build UI (Vite)
+        run: npm run build:ui
+
+      # Build for non-universal platforms (linux / win)
+      - name: Package Electron (non-universal)
+        if: ${{ matrix.arch != 'universal' }}
         run: |
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            npx electron-builder --linux --${{ matrix.arch }} --publish never
-          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            if [[ "${{ matrix.arch }}" == "universal" ]]; then
-              npx electron-builder --mac universal --publish never
-            else
-              npx electron-builder --mac --${{ matrix.arch }} --publish never
-            fi
-          else
-            npx electron-builder --win --${{ matrix.arch }} --publish never
-          fi
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        env:
+          # improve native module compatibility
+          npm_config_build_from_source: "false"
+
+      # Special mac universal build step
+      - name: Package Electron (mac universal)
+        if: ${{ matrix.arch == 'universal' && matrix.platform == 'mac' }}
+        run: |
+          # Build both architectures; electron-builder will emit universal DMG/App
+          npx electron-builder --mac --x64 --arm64 --publish never
+        env:
+          npm_config_build_from_source: "false"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}-build
-          path: dist/
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-build
+          path: release/
+          # optionally: retention-days, if you want shorter lifetime
 
   publish:
-    needs: build
+    name: Publish release artifacts
+    needs: build-matrix
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
     steps:
@@ -89,7 +101,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish Electron release
+      - name: Publish artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Let electron-builder attach artifacts to the existing GitHub Release
         run: npx electron-builder --publish always
