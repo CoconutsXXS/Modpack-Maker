@@ -657,11 +657,6 @@ module.exports =
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
         }
-        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
-        {
-            if(p == ".DS_Store"){continue;}
-            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
-        }
 
         for(let p of sub)
         {
@@ -707,11 +702,6 @@ module.exports =
         {
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
-        }
-        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
-        {
-            if(p == ".DS_Store"){continue;}
-            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
         }
 
 
@@ -764,11 +754,6 @@ module.exports =
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
         }
-        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
-        {
-            if(p == ".DS_Store"){continue;}
-            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
-        }
 
         let result = [];
 
@@ -815,11 +800,6 @@ module.exports =
         {
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
-        }
-        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
-        {
-            if(p == ".DS_Store"){continue;}
-            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
         }
 
         let result = [];

@@ -110,14 +110,12 @@
         "dmg",
         "zip"
       ],
-      "arch": ["x64", "arm64", "universal"],
       "icon": "icon/icon.icns"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "arch": ["x64", "arm64"],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "icon/icon.ico"
     },
@@ -138,7 +136,6 @@
       "target": [
         "deb"
       ],
-      "arch": ["x64", "arm64"],
       "icon": "icon/icon.png"
     },
     "deb": {
@@ -150,5 +147,6 @@
         "libnotify4"
       ]
     }
-  }
+  },
+  "postinstall": "electron-builder install-app-deps"
 }
