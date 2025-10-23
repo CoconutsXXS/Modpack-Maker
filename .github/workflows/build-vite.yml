@@ -10,38 +10,27 @@ on:
 
 jobs:
   build-matrix:
-    name: Build ${{ matrix.platform }} (${{ matrix.os }}, ${{ matrix.arch }})
+    name: Build (${{ matrix.platform }}) ${{ matrix.os }} / ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          # reliable builds on hosted runners:
           - os: ubuntu-latest
             platform: linux
             arch: x64
           - os: windows-latest
             platform: win
             arch: x64
-          # macOS: produce a "universal" build from the mac runner
           - os: macos-latest
             platform: mac
             arch: universal
-
       fail-fast: false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache node modules (per OS + lockfile)
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Setup Node.js
+      - name: Setup Node.js (and enable setup-node npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -49,29 +38,39 @@ jobs:
 
       - name: Install dependencies (clean node_modules if present)
         run: |
-          # Use rimraf (cross-platform) to remove node_modules if present
+          # Remove node_modules for a clean install (cross-platform)
           npx rimraf node_modules
           npm ci
         env:
           CI: true
 
-      - name: Build UI (Vite)
-        run: npm run build:ui
-
-      # Build for non-universal platforms (linux / win)
-      - name: Package Electron (non-universal)
-        if: ${{ matrix.arch != 'universal' }}
+      - name: Apply electron native deps / install-app-deps
         run: |
-          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+          # Ensures native modules are prepared for Electron
+          npx electron-builder install-app-deps
         env:
-          # improve native module compatibility
           npm_config_build_from_source: "false"
 
-      # Special mac universal build step
-      - name: Package Electron (mac universal)
+      - name: Setup Rosetta 2 (required to build x64 on Apple Silicon mac runners)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license || true
+
+      - name: Build front-end (Vite)
+        run: npm run build:ui
+
+      - name: Package Electron (Linux / Windows host-arch)
+        if: ${{ matrix.arch != 'universal' }}
+        run: |
+          # platform is one of: linux, win
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        env:
+          npm_config_build_from_source: "false"
+
+      - name: Package Electron (mac universal on mac runner)
         if: ${{ matrix.arch == 'universal' && matrix.platform == 'mac' }}
         run: |
-          # Build both architectures; electron-builder will emit universal DMG/App
+          # Build both architectures — electron-builder will create universal outputs
           npx electron-builder --mac --x64 --arm64 --publish never
         env:
           npm_config_build_from_source: "false"
@@ -81,7 +80,6 @@ jobs:
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-build
           path: release/
-          # optionally: retention-days, if you want shorter lifetime
 
   publish:
     name: Publish release artifacts
@@ -101,8 +99,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish artifacts to GitHub Release
+      - name: Publish artifacts to Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Let electron-builder attach artifacts to the existing GitHub Release
         run: npx electron-builder --publish always
