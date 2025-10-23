@@ -26,32 +26,32 @@ const isSilent = require("./browser-request.js");
 
 app.whenReady().then(async () =>
 {
-    // {
-    //     const win = new BrowserWindow
-    //     ({
-    //         width: screen.getAllDisplays()[0].bounds.width,
-    //         height: screen.getAllDisplays()[0].bounds.height,
-    //         webPreferences:
-    //         {
-    //             preload: path.join(__dirname, 'preload.js'),
-    //             webviewTag: true,
-    //             contextIsolation: true
-    //         },
-    //         roundedCorners: false,
-    //         backgroundColor: '#00000000',
-    //         darkTheme: true,
-    //         hasShadow: false,
-    //         closable: true,
-    //         minimizable: true,
-    //         maximizable: true,
-    //         autoHideMenuBar: true,
-    //         frame: false,
-    //         transparent: true,
-    //     });
+    {
+        const win = new BrowserWindow
+        ({
+            width: screen.getAllDisplays()[0].bounds.width,
+            height: screen.getAllDisplays()[0].bounds.height,
+            webPreferences:
+            {
+                preload: path.join(__dirname, 'preload.js'),
+                webviewTag: true,
+                contextIsolation: true
+            },
+            roundedCorners: false,
+            backgroundColor: '#00000000',
+            darkTheme: true,
+            hasShadow: false,
+            closable: true,
+            minimizable: true,
+            maximizable: true,
+            autoHideMenuBar: true,
+            frame: false,
+            transparent: true,
+        });
 
-    //     win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
-    // }
-    // return
+        win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
+    }
+    return
 
     if(isSilent()){return;}
 
@@ -499,7 +499,7 @@ ipcMain.handle('addEditionWorld', async (event, instanceName) =>
 })
 ipcMain.handle('getCombined', async (event, name, version) =>
 {
-    const combined = await contentModifier.combineMods(name, version);
+    const combined = await contentModifier.combineContent(name, version);
 
     const serialized = msgpack.encode(combined);
     const totalSize = serialized.byteLength;
@@ -516,9 +516,9 @@ ipcMain.handle('getCombined', async (event, name, version) =>
     event.sender.send('shared-buffer-end');
 })
 ipcMain.handle('isMinecraftInstalled', (event, name, version) => { return contentModifier.isMinecraftInstalled(name, version) })
-ipcMain.handle('retrieveFileById', (event, name, version, id) => { return contentModifier.retrieveModFileById(name, version, id) })
-ipcMain.handle('retrieveFileByKeys', (event, name, version, keys) => { return contentModifier.retrieveModFileByKeys(name, version, keys) })
-ipcMain.handle('retrieveFileByPath', (event, name, version, path) => { return contentModifier.retrieveModFileByPath(name, version, path) })
+ipcMain.handle('retrieveFileById', (event, name, id, version) => { return contentModifier.retrieveModFileById(name, id, version) })
+ipcMain.handle('retrieveFileByKeys', (event, name, keys, version) => { return contentModifier.retrieveModFileByKeys(name, keys, version) })
+ipcMain.handle('retrieveFileByPath', (event, name, path, version) => { return contentModifier.retrieveModFileByPath(name, path, version) })
 ipcMain.handle('extractFileByKeys', (event, jarPath, keys) => { return contentModifier.extractFileByKeys(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), keys) })
 ipcMain.handle('extractFileByPath', (event, jarPath, p) => { return contentModifier.extractFileByPath(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), p) })
 

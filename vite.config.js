@@ -1,11 +1,17 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import commonjs from '@rollup/plugin-commonjs'
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
 
 export default defineConfig({
   root: '.',
   base: './',
   publicDir: 'public',
+  plugins: [
+    wasm(),
+    topLevelAwait(),
+  ],
   build: {
     outDir: 'dist',
     emptyOutDir: false, // clean old build files
@@ -19,6 +25,7 @@ export default defineConfig({
       },
       external: ['plist', 'plist-parse', 'pend', 'fd-slicer']
     },
+    target: 'esnext'
   },
   resolve: {
     alias: {

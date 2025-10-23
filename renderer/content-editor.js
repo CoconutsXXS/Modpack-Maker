@@ -480,7 +480,7 @@ async function jarAnalyseSetup(i)
             keys = lodash.clone(keys);
 
             let selectedFile = null;
-            let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
+            let files = await ipcInvoke("retrieveFileByKeys", i.name, keys, i.version.number);
 
             if(files.length == 0)
             {
@@ -527,13 +527,13 @@ async function jarAnalyseSetup(i)
                 }
             }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, async () =>
             {
-                let files = await ipcInvoke("retrieveFileByKeys", i.name, i.version.number, keys);
+                let files = await ipcInvoke("retrieveFileByKeys", i.name, keys, i.version.number);
                 return files[files.length-1].value;
             }, async (keys) =>
             {
                 let value = null;
                 if(!getProp(window.jarData.combined, keys))
-                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
                 else { value = getProp(window.jarData.combined, keys) }
 
                 return value;
@@ -541,7 +541,7 @@ async function jarAnalyseSetup(i)
             {
                 let value = null;
                 if(!getProp(window.jarData.combined, keys))
-                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
                 else { value = getProp(window.jarData.combined, keys) }
 
                 return value;
@@ -1339,7 +1339,7 @@ function explorer(o, open, display, keysPath = [], iteration = 0, startingPath =
             let path = lodash.clone(keysPath);
             path.push(k);
 
-            ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, path).then(file =>
+            ipcInvoke("retrieveFileByKeys", window.instance.name, path, window.instance.version.number).then(file =>
             {
                 if(!file || file.length == 0 || !file[0].value?.url){return}
                 
@@ -2186,7 +2186,7 @@ window.openModContent = async function(path)
 
         if(!getProp(window.jarData.combined, keys))
         {
-            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number);
 
             if(files.length == 0)
             {
@@ -2228,13 +2228,13 @@ window.openModContent = async function(path)
             }
         }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); }, async () =>
         {
-            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys);
+            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number);
             return files[files.length-1].value;
         }, async (keys) =>
         {
             let value = null;
             if(!getProp(window.jarData.combined, keys))
-            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
             else { value = getProp(window.jarData.combined, keys) }
 
             return value;
@@ -2244,7 +2244,7 @@ window.openModContent = async function(path)
             console.log(window.jarData.combined)
             let value = null;
             if(!getProp(window.jarData.combined, keys))
-            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, window.instance.version.number, keys); if(files.length==0){return null;} value = files[files.length-1].value; }
+            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
             else { value = getProp(window.jarData.combined, keys) }
 
             return value;

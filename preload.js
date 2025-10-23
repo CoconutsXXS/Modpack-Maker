@@ -144,7 +144,7 @@ contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, 
     return i;
 })
 
-contextBridge.exposeInMainWorld('getCombined', (name, version) => 
+contextBridge.exposeInMainWorld('getCombined', (name, version = null) => 
 {
     // const msgpack = require('@msgpack/msgpack');
 

@@ -636,9 +636,13 @@ module.exports =
         const content = await main.generateAsync({type:"arraybuffer"});
         fs.writeFileSync(path, Buffer.from(content))
     },
-    combineMods: async (name, version, parseFiles = false) =>
+    combineContent: async (name, version, parseFiles = false) =>
     {
         let r = {};
+
+        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
+        else { console.error("Cannot resolve",name,"version..."); return }
 
         // List every Jar including Minecraft
         let sub = [];
@@ -648,17 +652,28 @@ module.exports =
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
         }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/resourcepacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
+        }
 
         for(let p of sub)
         {
             let jar = await getJar(p);
-            if(!jar || jar == null)
-            {
-                if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
-                else { jar = await getJar(p+'.disasbled') }
-            }
+            // Ignore disableds
+            // if(!jar || jar == null)
+            // {
+            //     if(p.endsWith(".disabled")) { jar = await getJar(p.slice(0, p.lastIndexOf("."))) }
+            //     else { jar = await getJar(p+'.disasbled') }
+            // }
             if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
-            if(!jar || jar == null){console.error("Invalid .jar path:", p); continue;}
+            if(!jar || jar == null){console.warn("Invalid/Disabled .jar/.zip path:", p); continue;}
 
             if(p == minecraftVersion(name, version))
             {
@@ -674,8 +689,12 @@ module.exports =
         return r;
     },
 
-    retrieveModFileById: async (name, version, id = "minecraft:worldgen/placed_feature/basalt_blobs") =>
+    retrieveModFileById: async (name, id = "minecraft:worldgen/placed_feature/basalt_blobs", version) =>
     {
+        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
+        else { console.error("Cannot resolve",name,"version..."); return }
+
         // List every Jar including Minecraft
         let sub = [];
         sub.push(minecraftVersion(name, version))
@@ -683,6 +702,16 @@ module.exports =
         {
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/resourcepacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
         }
 
 
@@ -716,8 +745,12 @@ module.exports =
 
         return result;
     },
-    retrieveModFileByPath: async (name, version, truePath = "") =>
+    retrieveModFileByPath: async (name, truePath = "", version) =>
     {
+        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
+        else { console.error("Cannot resolve",name,"version..."); return }
+
         // List every Jar including Minecraft
         let sub = [];
         sub.push(minecraftVersion(name, version))
@@ -725,6 +758,16 @@ module.exports =
         {
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/resourcepacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
         }
 
         let result = [];
@@ -754,8 +797,12 @@ module.exports =
 
         return result;
     },
-    retrieveModFileByKeys: async (name, version, keys = []) =>
+    retrieveModFileByKeys: async (name, keys = [], version) =>
     {
+        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
+        else { console.error("Cannot resolve",name,"version..."); return }
+
         // List every Jar including Minecraft
         let sub = [];
         sub.push(minecraftVersion(name, version))
@@ -763,6 +810,16 @@ module.exports =
         {
             if(p == ".DS_Store"){continue;}
             sub.push(path.join(config.directories.instances, name, "minecraft/mods", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/resourcepacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/resourcepacks", p))
+        }
+        for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/shaderpacks")))
+        {
+            if(p == ".DS_Store"){continue;}
+            sub.push(path.join(config.directories.instances, name, "minecraft/shaderpacks", p))
         }
 
         let result = [];
