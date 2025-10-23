@@ -15,9 +15,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
           - os: windows-latest
             platform: win
             arch: x64
@@ -30,48 +27,71 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (and enable setup-node npm cache)
+      # Cache the npm cache per-OS + lockfile to avoid cross-OS cache mixing
+      - name: Cache ~/.npm (per OS + lockfile)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Setup Node.js (with setup-node npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies (clean node_modules if present)
+      - name: Clean node_modules & install dependencies
         run: |
-          # Remove node_modules for a clean install (cross-platform)
+          # cross-platform removal of node_modules
           npx rimraf node_modules
-          npm ci
+          # reproducible install
+          npm ci --no-audit --prefer-offline
         env:
           CI: true
 
-      - name: Apply electron native deps / install-app-deps
+      # Windows-only: ensure Windows rollup native binary is installed if npm missed it
+      - name: Ensure rollup native binary on Windows (workaround)
+        if: runner.os == 'Windows'
         run: |
-          # Ensures native modules are prepared for Electron
+          echo "Checking for @rollup/rollup-win32-x64-msvc..."
+          node -e "try { require('@rollup/rollup-win32-x64-msvc'); console.log('present'); process.exit(0) } catch(e) { console.error('missing'); process.exit(1) }" || npm install --no-save @rollup/rollup-win32-x64-msvc
+        shell: pwsh
+
+      - name: Apply patches / postinstall (if you use patch-package)
+        # only runs if you have a postinstall in package.json (safe to include)
+        run: |
+          if [ -f package.json ]; then
+            # npm ci will already run postinstall; this is idempotent if you need to re-run
+            echo "postinstall will have been run by npm ci; nothing to do"
+          fi
+        shell: bash
+
+      - name: Ensure native deps for Electron
+        run: |
           npx electron-builder install-app-deps
         env:
           npm_config_build_from_source: "false"
 
-      - name: Setup Rosetta 2 (required to build x64 on Apple Silicon mac runners)
-        if: ${{ matrix.os == 'macos-latest' }}
+      - name: Setup Rosetta (mac only — allows building x64 parts on macOS arm runners)
+        if: runner.os == 'macOS'
         run: |
           sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license || true
 
-      - name: Build front-end (Vite)
+      - name: Build UI (Vite)
         run: npm run build:ui
 
-      - name: Package Electron (Linux / Windows host-arch)
+      - name: Package Electron (Linux/Windows host arch)
         if: ${{ matrix.arch != 'universal' }}
-        run: |
-          # platform is one of: linux, win
-          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           npm_config_build_from_source: "false"
 
-      - name: Package Electron (mac universal on mac runner)
+      - name: Package Electron (mac universal)
         if: ${{ matrix.arch == 'universal' && matrix.platform == 'mac' }}
-        run: |
-          # Build both architectures — electron-builder will create universal outputs
-          npx electron-builder --mac --x64 --arm64 --publish never
+        run: npx electron-builder --mac --x64 --arm64 --publish never
         env:
           npm_config_build_from_source: "false"
 
