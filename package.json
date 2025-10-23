@@ -81,8 +81,7 @@
     "vite": "^7.1.11",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0",
-    "wrappy": "^1.0.2",
-    "youtube-captions-scraper": "^2.0.3"
+    "wrappy": "^1.0.2"
   },
   "build": {
     "appId": "fr.coconuts.modpackmaker",

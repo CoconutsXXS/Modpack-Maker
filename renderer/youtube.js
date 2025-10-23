@@ -1,6 +1,6 @@
 // import ytSearch from 'cdn/youtube-search-api'
 // import YouTube from "cdn/youtube-sr";
-import { getSubtitles } from '../node_modules/youtube-captions-scraper/src/index.js'
+// import { getSubtitles } from '../node_modules/youtube-captions-scraper/src/index.js'
 
 function levenshtein(value, other, insensitive)
 {
@@ -361,9 +361,9 @@ async function loadVideo(videoId)
             #subscribe-button > ytd-subscribe-button-renderer > yt-smartimation > div.smartimation__border { pointer-events: none; }
         `)
 
-        // Cations
-        let captions = await getSubtitles({videoID: videoId})
-        await webview.executeJavaScript('window.captions = JSON.parse(`'+JSON.stringify(captions)+'`);', true)
+        // // Cations
+        // let captions = await getSubtitles({videoID: videoId})
+        // await webview.executeJavaScript('window.captions = JSON.parse(`'+JSON.stringify(captions)+'`);', true)
     }
     webview.addEventListener('dom-ready', event)
 
