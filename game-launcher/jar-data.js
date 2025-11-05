@@ -13,19 +13,19 @@ export class ModpackJar
 
     getFile = async function(keys, multipleResolver = (files) => { return files[0] })
     {
-        let value = null;
         if(!getProp(this.data, keys))
         {
             let files = await ipcInvoke("retrieveFileByKeys", this.name, keys);
             if(files.length==0){return null;}
-            value = multipleResolver(files);
+            let value = multipleResolver(files);
+            setProp(this.data, keys, value)
+
+            return value;
         }
         else
         {
-            value = getProp(this.data, keys)
+            return getProp(this.data, keys)
         }
-
-        return value;
     }
     resolveAsset = async function(ref, prefixKeys = [])
     {

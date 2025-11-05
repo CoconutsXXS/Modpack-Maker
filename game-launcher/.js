@@ -1,13 +1,16 @@
 import * as THREE from "three"
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import pako from "pako";
+import * as nbt from "nbt-ts"
+import * as path from "path"
 import * as lodash from "lodash-es"
 import { ModpackJar } from "./jar-data";
 import { mergeGroupOptimizedChunked } from "../renderer/mesh-optimizer"
 import RAPIER from '@dimforge/rapier3d-compat';
 
-import similarity from "similarity";
-import { diagnose342Case, runUnitTest } from "./ChunkSectionDecoder";
+import { decodeSectionFromObject } from "./diagnostic/chunkDecoder"
+import { color } from "@codemirror/theme-one-dark";
 
 let cache =
 {
@@ -690,7 +693,6 @@ export class BlockModel
     aabb
 
     coveredFaces = [false, false, false, false, false, false]
-    tinted = false
 
     physicGeometry
 
@@ -787,22 +789,10 @@ export class BlockModel
             // Colormap
             if(model.elements?.find(e=>Object.entries(e?.faces).find(([,f])=>f?.tintindex!=undefined)) && !result.colormapContext)
             {
-                result.tinted = true
-                let colormapName = "grass";
-                const possibilities = [{name: 'grass', keys: ['grass']}, {name: 'foliage', keys: ['leaves']}];
+                console.log(model, "is tinted")
+                let name = "grass";
 
-                let simil = 0;
-                for(const p of possibilities)
-                {
-                    for(const k of p.keys)
-                    {
-                        const v = similarity(name.split(':')[name.split(':').length-1], k);
-                        if(simil<v){simil=v; colormapName = p.name;}
-                    }
-                }
-
-                const colormap = await sourceJar.resolveAsset(colormapName, ['textures', 'colormap'])
-
+                const colormap = await sourceJar.resolveAsset(name, ['textures', 'colormap'])
                 if(colormap?.url)
                 {
                     const resolved = `data:image/png;base64,${colormap?.url}`
@@ -815,6 +805,8 @@ export class BlockModel
                     })
 
                     const canvas = document.createElement("canvas");
+                    canvas.style.position = 'fixed'; canvas.style.left = canvas.style.top = 0;
+                    document.body.appendChild(canvas)
 
                     result.colormapContext = canvas.getContext("2d")
                     canvas.width = tex.width
@@ -1075,16 +1067,22 @@ export class BlockModel
                     group.uvs.push(u2, v1);
                     group.uvs.push(u2, v2);
 
+                    const colors = new Array(group.vertices.length*3);
                     if(face.tintindex != undefined)
                     {
-                        const colors = new Array(group.vertices.length*3);
-                        for (let i = 0; i < colors.length; i++)
+                        for (let i = 0; i < group.vertices.length; i++)
                         {
                             colors[i] = 0
                         }
-
-                        group.color = colors;
                     }
+                    else
+                    {
+                        for (let i = 0; i < group.vertices.length; i++)
+                        {
+                            colors[i] = 255
+                        }
+                    }
+                    group.color = colors;
                 }
             }
 
@@ -1097,8 +1095,7 @@ export class BlockModel
                 let geom = new THREE.BufferGeometry();
                 geom.setAttribute('position', new THREE.Float32BufferAttribute(group.vertices, 3));
                 geom.setAttribute('uv', new THREE.Float32BufferAttribute(group.uvs, 2));
-                if(group.color)
-                { geom.setAttribute('color', new THREE.Float32BufferAttribute(group.color, 3)); }
+                geom.setAttribute('color', new THREE.Float32BufferAttribute(group.color, 3));
                 geom.setIndex(new THREE.Uint16BufferAttribute(group.indices, 1));
 
                 const tempTranslationMatrix = new THREE.Matrix4();
@@ -1143,21 +1140,20 @@ export class BlockModel
                     const v1Corner = Math.abs(Math.abs(x1) - 0.5) < EPS && Math.abs(Math.abs(y1) - 0.5) < EPS && Math.abs(Math.abs(z1) - 0.5) < EPS;
                     const v2Corner = Math.abs(Math.abs(x2) - 0.5) < EPS && Math.abs(Math.abs(y2) - 0.5) < EPS && Math.abs(Math.abs(z2) - 0.5) < EPS;
 
-                    const fullFace = v0Corner && v1Corner && v2Corner
-                    // if (!(v0Corner && v1Corner && v2Corner))
-                    // {
-                    //     groups[0].push(x0, y0, z0, x1, y1, z1, x2, y2, z2);
-                    //     const ub = vi * 2;
-                    //     if (hasUV)
-                    //     {
-                    //         groupUVs[0].push(uvArray[ub], uvArray[ub + 1], uvArray[ub + 2], uvArray[ub + 3], uvArray[ub + 4], uvArray[ub + 5]);
-                    //     }
-                    //     if(hasColor)
-                    //     {
-                    //         groupColor[0].push(colorArray[ub], colorArray[ub + 1], colorArray[ub + 2], colorArray[ub + 3], colorArray[ub + 4], colorArray[ub + 5])
-                    //     }
-                    //     continue;
-                    // }
+                    if (!(v0Corner && v1Corner && v2Corner))
+                    {
+                        groups[0].push(x0, y0, z0, x1, y1, z1, x2, y2, z2);
+                        const ub = vi * 2;
+                        if (hasUV)
+                        {
+                            groupUVs[0].push(uvArray[ub], uvArray[ub + 1], uvArray[ub + 2], uvArray[ub + 3], uvArray[ub + 4], uvArray[ub + 5]);
+                        }
+                        if(hasColor)
+                        {
+                            groupColor[0].push(colorArray[ub], colorArray[ub + 1], colorArray[ub + 2], colorArray[ub + 3], colorArray[ub + 4], colorArray[ub + 5])
+                        }
+                        continue;
+                    }
 
                     const isPosX = Math.abs(x0 - 0.5) < EPS && Math.abs(x1 - 0.5) < EPS && Math.abs(x2 - 0.5) < EPS;
                     const isNegX = Math.abs(x0 + 0.5) < EPS && Math.abs(x1 + 0.5) < EPS && Math.abs(x2 + 0.5) < EPS;
@@ -1166,12 +1162,12 @@ export class BlockModel
                     const isPosZ = Math.abs(z0 - 0.5) < EPS && Math.abs(z1 - 0.5) < EPS && Math.abs(z2 - 0.5) < EPS;
                     const isNegZ = Math.abs(z0 + 0.5) < EPS && Math.abs(z1 + 0.5) < EPS && Math.abs(z2 + 0.5) < EPS;
 
-                    if (isPosX)       { if(fullFace){coveredFaces[0]++} groups[1].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[1].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[1].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
-                    else if (isNegX)  { if(fullFace){coveredFaces[1]++} groups[2].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[2].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[2].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
-                    else if (isPosY)  { if(fullFace){coveredFaces[2]++} groups[3].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[3].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[3].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
-                    else if (isNegY)  { if(fullFace){coveredFaces[3]++} groups[4].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[4].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[4].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
-                    else if (isPosZ)  { if(fullFace){coveredFaces[4]++} groups[5].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[5].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[5].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
-                    else if (isNegZ)  { if(fullFace){coveredFaces[5]++} groups[6].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[6].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[6].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    if (isPosX)       { coveredFaces[0]++; groups[1].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[1].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[1].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    else if (isNegX)  { coveredFaces[1]++; groups[2].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[2].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[2].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    else if (isPosY)  { coveredFaces[2]++; groups[3].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[3].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[3].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    else if (isNegY)  { coveredFaces[3]++; groups[4].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[4].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[4].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    else if (isPosZ)  { coveredFaces[4]++; groups[5].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[5].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[5].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
+                    else if (isNegZ)  { coveredFaces[5]++; groups[6].push(x0,y0,z0,x1,y1,z1,x2,y2,z2); if (hasColor) groupColor[6].push(colorArray[vi*2],colorArray[vi*2+1],colorArray[vi*2+2],colorArray[vi*2+3],colorArray[vi*2+4],colorArray[vi*2+5]); if (hasUV) groupUVs[6].push(uvArray[vi*2],uvArray[vi*2+1],uvArray[vi*2+2],uvArray[vi*2+3],uvArray[vi*2+4],uvArray[vi*2+5]); }
                     else
                     {
                         groups[0].push(x0,y0,z0,x1,y1,z1,x2,y2,z2);
@@ -1180,6 +1176,8 @@ export class BlockModel
                     }
                 }
 
+                console.log(hasColor, groupColor)
+
                 // Build geometries
                 for (let i = 0; i < 7; i++)
                 {
@@ -1187,7 +1185,6 @@ export class BlockModel
                     {
                         continue;
                     }
-                    
                     const newG = new THREE.BufferGeometry();
                     newG.setAttribute('position', new THREE.Float32BufferAttribute(groups[i], 3));
 
@@ -1195,13 +1192,12 @@ export class BlockModel
                     if (hasUV) newG.setAttribute('uv', new THREE.Float32BufferAttribute(groupUVs[i], 2));
                     newG.computeVertexNormals();
 
-                    splittedGeometries[i].push({geometry: newG, materialPath: path, tinted: hasColor});
+                    splittedGeometries[i].push({geometry: newG, materialPath: path});
                 }
 
                 // Shader Culling
 
                 let material = materialCache[path] || new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide });
-
                 materials.push(material)
             }
 
@@ -1212,79 +1208,14 @@ export class BlockModel
         {
             if(splittedGeometries[i].length == 0) { splittedGeometries[i] = null; continue }
 
-            // Splitted by Tint dependence
-            let meshes = []
-
-            let tintedGeom = splittedGeometries[i].filter(g=>g.tinted)
-            if(tintedGeom.length>0)
-            {
-                const sideMaterials = tintedGeom.map(o => materials.find(m=>m?.map?.source?.data?.currentSrc == o.materialPath));
-                tintedGeom = BufferGeometryUtils.mergeVertices( BufferGeometryUtils.mergeGeometries(tintedGeom.map(o => o.geometry), true));
-
-                const mesh = new THREE.InstancedMesh(tintedGeom, sideMaterials.length?sideMaterials:materials, capacity)
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mesh.frustumCulled = false;
-                mesh.receiveShadow = mesh.castShadow = true;
-
-                mesh.userData.tinted = true;
-                meshes.push(mesh)
-            }
-
-            let untintedGeom = splittedGeometries[i].filter(g=>!g.tinted)
-            if(untintedGeom.length>0)
-            {
-                const sideMaterials = untintedGeom.map(o => materials.find(m=>m?.map?.source?.data?.currentSrc == o.materialPath));
-                untintedGeom = BufferGeometryUtils.mergeVertices( BufferGeometryUtils.mergeGeometries(untintedGeom.map(o => o.geometry), true));
-
-                const mesh = new THREE.InstancedMesh(untintedGeom, sideMaterials.length?sideMaterials:materials, capacity)
-                mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-                mesh.frustumCulled = false;
-                mesh.receiveShadow = mesh.castShadow = true;
-
-                mesh.userData.tinted = false;
-                meshes.push(mesh)
-            }
-
-            result.parts[i] =
-            {
-                meshes,
-                capacity: capacity,
-                instancedCount: 0,
-                indexToPosition: new Array(capacity)
-            }
-
-
-            continue
-            // Splitted by Mat
-            // let meshes = new Array(splittedGeometries[i].length)
-            // for (let splittedIndex = 0; splittedIndex < splittedGeometries[i].length; splittedIndex++)
-            // {
-            //     const geom = splittedGeometries[i][splittedIndex];
-
-            //     const mesh = new THREE.InstancedMesh(geom.geometry, materials.find(m=>m?.map?.source?.data?.currentSrc == geom.materialPath), capacity)
-            //     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-            //     mesh.frustumCulled = false;
-            //     mesh.userData.tinted = geom.tinted;
-            //     meshes[splittedIndex] = mesh
-            // }
-
-            // result.parts[i] =
-            // {
-            //     meshes,
-            //     capacity: capacity,
-            //     instancedCount: 0,
-            //     indexToPosition: new Array(capacity)
-            // }
-
-            continue
-            // Combined Methode
             const sideMaterials = splittedGeometries[i].map(o => materials.find(m=>m?.map?.source?.data?.currentSrc == o.materialPath));
-            splittedGeometries[i] = BufferGeometryUtils.mergeVertices( BufferGeometryUtils.mergeGeometries(splittedGeometries[i].map(o => o.geometry), true));
+            splittedGeometries[i] = BufferGeometryUtils.mergeVertices( BufferGeometryUtils.mergeGeometries(splittedGeometries[i].map(o => o.geometry), true) );
 
+            console.log(splittedGeometries)
             const mesh = new THREE.InstancedMesh(splittedGeometries[i], sideMaterials.length?sideMaterials:materials, capacity)
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
- 
+
             result.parts[i] =
             {
                 mesh,
@@ -1301,17 +1232,17 @@ export class BlockModel
     async create(x, y, z, faces = [true, true, true, true, true, true], biomes)
     {
         // Biomes
-        const color = faces.includes(true) ? await this.computeBiomeColor(biomes) : 0xffffff
+        await this.computeBiomeColor(biomes)
 
         // Parts
-        this.createPart(x, y, z, 0, color)
+        this.createPart(x, y, z, 0)
         for (let i = 0; i < 6; i++)
         {
             if(!faces[i]){continue}
-            this.createPart(x, y, z, i+1, color)
+            this.createPart(x, y, z, i+1)
         }
     }
-    createPart(x, y, z, index, color = 0xffffff)
+    createPart(x, y, z, index)
     {
         if (!this.parts[index]) return;
         const key = `${x},${y},${z}`;
@@ -1322,84 +1253,49 @@ export class BlockModel
         const part = this.parts[index];
         if(part.instancedCount >= part.capacity) { this.extendCapacity(index, Math.max(1, part.capacity * 2)); }
 
-        if(!part.meshes) {return}
+        const mesh = part.mesh;
+        if(!mesh) {return}
+
         const idx = part.instancedCount;
 
         const tmp = this._tmpMatrix || (this._tmpMatrix = new THREE.Matrix4());
         tmp.makeTranslation(x, y, z);
+        mesh.setMatrixAt(idx, tmp);
 
-        for(const mesh of part.meshes)
+        if(mesh.geometry.getAttribute("color").array[0] == 0)
         {
-            mesh.setMatrixAt(idx, tmp);
-
-            if(mesh.userData.tinted)
-            {
-                mesh.setColorAt(idx, new THREE.Color(color));
-                mesh.instanceColor.needsUpdate = true;
-            }
-
-            mesh.count = part.instancedCount+1;
-            mesh.instanceMatrix.needsUpdate = true;
+            mesh.setColorAt(idx, new THREE.Color(1, 1, 1));
+            mesh.instanceColor.needsUpdate = true;
+            console.log(mesh)
         }
+
 
         if(!posToIdx) { posToIdx = new Array(7); }
         posToIdx[index] = idx;
         this.positionToIndex.set(key, posToIdx);
 
         part.indexToPosition[idx] = key;
-        part.instancedCount++;
 
+        part.instancedCount++;
+        mesh.count = part.instancedCount;
+        mesh.instanceMatrix.needsUpdate = true;
     }
     extendCapacity(index, newCapacity)
     {
-        if(!this.parts[index] || !this.parts[index].meshes || this.parts[index].capacity >= newCapacity){return}
+        if(!this.parts[index] || !this.parts[index].mesh || this.parts[index].capacity >= newCapacity){return}
         
-        for(const mesh of this.parts[index].meshes)
-        {
-            // Resize
-            const oldMatrices = new Float32Array(this.parts[index].capacity * 16);
-            mesh.instanceMatrix.array.slice(0, oldMatrices.length).forEach((v, i) => oldMatrices[i] = v);
+        // Resize
+        const oldMatrices = new Float32Array(this.parts[index].capacity * 16);
+        this.parts[index].mesh.instanceMatrix.array.slice(0, oldMatrices.length).forEach((v, i) => oldMatrices[i] = v);
 
-            // Create new larger buffer
-            const newArray = new Float32Array(newCapacity * 16);
-            newArray.set(oldMatrices);
+        // Create new larger buffer
+        const newArray = new Float32Array(newCapacity * 16);
+        newArray.set(oldMatrices);
 
-            // Replace GPU attribute
-            mesh.instanceMatrix = new THREE.InstancedBufferAttribute(newArray, 16);
-            mesh.geometry.setAttribute('instanceMatrix', mesh.instanceMatrix);
-            mesh.instanceMatrix.needsUpdate = true;
-
-            if(mesh.userData.tinted)
-            {
-                const oldColorArr = mesh.instanceColor && mesh.instanceColor.array ? mesh.instanceColor.array : null;
-                const newColorArr = new Float32Array(newCapacity * 3);
-
-                if (oldColorArr)
-                {
-                    newColorArr.set(oldColorArr);
-                    for (let i = oldColorArr.length; i < newColorArr.length; i += 3)
-                    {
-                        newColorArr[i] = 1.0;
-                        newColorArr[i + 1] = 1.0;
-                        newColorArr[i + 2] = 1.0;
-                    }
-                }
-                else
-                {
-                    for (let i = 0; i < newColorArr.length; i += 3)
-                    {
-                        newColorArr[i] = 1.0;
-                        newColorArr[i + 1] = 1.0;
-                        newColorArr[i + 2] = 1.0;
-                    }
-                }
-
-                mesh.instanceColor = new THREE.InstancedBufferAttribute(newColorArr, 3);
-                if (THREE.DynamicDrawUsage) mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-                mesh.geometry.setAttribute('instanceColor', mesh.instanceColor);
-                mesh.instanceColor.needsUpdate = true;
-            }
-        }
+        // Replace GPU attribute
+        this.parts[index].mesh.instanceMatrix = new THREE.InstancedBufferAttribute(newArray, 16);
+        this.parts[index].mesh.geometry.setAttribute('instanceMatrix', this.parts[index].mesh.instanceMatrix);
+        this.parts[index].mesh.instanceMatrix.needsUpdate = true;
 
         this.parts[index].indexToPosition = this.parts[index].indexToPosition.concat(new Array(newCapacity))
 
@@ -1448,47 +1344,36 @@ export class BlockModel
         if (!keysData || keysData[i] === undefined || keysData[i] === null) return;
 
         const meshData = this.parts[i];
-
+        const mesh = meshData.mesh;
         const index = keysData[i];
         const last = meshData.instancedCount - 1;
+
         if (index < 0 || last < 0) return;
 
-        for(const mesh of meshData.meshes)
+        if (index !== last)
         {
-            if (index !== last)
+            const tmp = this._tmpMatrix || (this._tmpMatrix = new THREE.Matrix4());
+            mesh.getMatrixAt(last, tmp);
+            mesh.setMatrixAt(index, tmp);
+
+            const movedKey = meshData.indexToPosition[last];
+            if (movedKey !== undefined)
             {
-                const tmp = this._tmpMatrix || (this._tmpMatrix = new THREE.Matrix4());
-                mesh.getMatrixAt(last, tmp);
-                mesh.setMatrixAt(index, tmp);
+                const movedKeysData = this.positionToIndex.get(movedKey);
+                if (movedKeysData) movedKeysData[i] = index;
 
-                if(mesh.userData.tinted)
-                {
-                    const tmpColor = new THREE.Color();
-                    mesh.getColorAt(last, tmpColor);
-                    mesh.setColorAt(index, tmpColor);
-                    mesh.instanceColor.needsUpdate = true
-                }
-
-
-                const movedKey = meshData.indexToPosition[last];
-                if (movedKey !== undefined)
-                {
-                    const movedKeysData = this.positionToIndex.get(movedKey);
-                    if (movedKeysData) movedKeysData[i] = index;
-
-                    meshData.indexToPosition[index] = movedKey;
-                }
+                meshData.indexToPosition[index] = movedKey;
             }
-            
-            mesh.count = meshData.instancedCount-1;
-            mesh.instanceMatrix.needsUpdate = true;
         }
 
         meshData.indexToPosition.pop();
         keysData[i] = undefined;
         this.positionToIndex.set(key, keysData);
-        meshData.instancedCount--;
 
+        meshData.instancedCount--;
+        mesh.count = meshData.instancedCount;
+
+        mesh.instanceMatrix.needsUpdate = true;
     }
 
     // Masking
@@ -1543,47 +1428,29 @@ export class BlockModel
 
     // Biome
     colormapContext
-    async computeBiomeColor(biomes)
+    async computeBiomeColor(biomes, block = 'minecraft:grass')
     {
-        const ctx = this.colormapContext;
-        if (!ctx) return this._blackColor ??= new THREE.Color(0x000000);
+        if(!this.colormapContext){return new THREE.Color(0x000000);}
 
-        if(!this._colormapCache)
+        let r = 0
+        let g = 0
+        let b = 0
+        for(let biome of biomes)
         {
-            const { width, height } = ctx.canvas;
-            this._colormapCache =
-            {
-                width,
-                height,
-                data: ctx.getImageData(0, 0, width, height).data
-            };
+            if(!biome.data){continue}
+            var p = this.colormapContext.getImageData(Math.floor(256 - (biome.data.temperature * 256)), Math.floor(256-(biome.data.downfall * 256)), 1, 1).data;
+            r += p[0] * biome.weight
+            g += p[1] * biome.weight
+            b += p[2] * biome.weight
         }
 
-        const { width, data } = this._colormapCache;
-        let r = 0, g = 0, b = 0;
-
-        for (let i = 0, len = biomes.length; i < len; i++)
-        {
-            const biome = biomes[i];
-            const bd = biome.data;
-            if (!bd) continue;
-
-            const t = bd.temperature;
-            const adjustedHum = bd.downfall * t;
-            const x = 256 - (t * 255 | 0);
-            const y = 256 - (adjustedHum * 255 | 0);
-            const idx = ((y * width) + x) << 2;
-
-            const w = biome.weight;
-            r += data[idx] * w;
-            g += data[idx + 1] * w;
-            b += data[idx + 2] * w;
-        }
-
-        (this._color ??= new THREE.Color()).setRGB(r / 255, g / 255, b / 255);
-        return this._color;
+        return new THREE.Color(r, g, b);
     }
-
+}
+function rgbToHex(r, g, b)
+{
+    if (r > 255 || g > 255 || b > 255) {throw "Invalid color component"}
+    return ((r << 16) | (g << 8) | b).toString(16);
 }
 
 
@@ -2491,13 +2358,9 @@ export class World
     biomePalette = []
 
     group = new THREE.Group()
-    camera = window.mainCamera
 
     location
-    world
     modpackJar
-
-    level
 
     scene
     addRenderListener = window.addRenderListener
@@ -2506,30 +2369,12 @@ export class World
     sectionsPerChunk = 24
     chunkSectionY = -4;
     
-    constructor(modpackJar = new ModpackJar(), location, addRenderListener = window.addRenderListener, camera = null, physic = true)
+    constructor(modpackJar = new ModpackJar(), location, addRenderListener = window.addRenderListener, physic = true)
     {
         this.addRenderListener = addRenderListener
         this.modpackJar = modpackJar;
         this.location = location
         this.physic = physic
-        this.camera = camera ? camera : window.mainCamera
-
-        let lastCameraPosition = {x: 0, y: 0, z: 0}
-        this.addRenderListener((clock, frustum) =>
-        {
-            let cameraPosition = {x: Math.floor(this.camera.position.x), y: Math.floor(this.camera.position.y), z: Math.floor(this.camera.position.z)}
-
-            if(Math.abs(lastCameraPosition.x-cameraPosition.x) + Math.abs(lastCameraPosition.y-cameraPosition.y) + Math.abs(lastCameraPosition.z-cameraPosition.z) < 4)
-            { return }
-            lastCameraPosition = cameraPosition;
-
-            // Chunk load
-            this.loadChunksFromPos(cameraPosition.x, cameraPosition.z, 3)
-            
-            // // Floodfill culling
-            // for(const chunk of this.chunks.values?this.chunks.values():this.chunks) { if(!chunk){continue} for(const b of chunk.blocks.filter(b=>b?.graphic?.geometry?.index)){b.graphic.visible = false} }
-            // this.cull(cameraPosition.x, cameraPosition.y, cameraPosition.z, 50000)
-        })
 
         // Sections Culling
         // this.addRenderListener((clock, frustum) =>
@@ -2545,6 +2390,23 @@ export class World
         //         }
         //     })
         // })
+
+        let lastCameraPosition = {x: 0, y: 0, z: 0}
+        this.addRenderListener((clock, frustum) =>
+        {
+            let cameraPosition = {x: Math.floor(window.mainCamera.position.x), y: Math.floor(window.mainCamera.position.y), z: Math.floor(window.mainCamera.position.z)}
+
+            if(Math.abs(lastCameraPosition.x-cameraPosition.x) + Math.abs(lastCameraPosition.y-cameraPosition.y) + Math.abs(lastCameraPosition.z-cameraPosition.z) < 4)
+            { return }
+            lastCameraPosition = cameraPosition;
+
+            // Chunk load
+            this.loadChunksFromPos(cameraPosition.x, cameraPosition.z, 3)
+            
+            // // Floodfill culling
+            // for(const chunk of this.chunks.values?this.chunks.values():this.chunks) { if(!chunk){continue} for(const b of chunk.blocks.filter(b=>b?.graphic?.geometry?.index)){b.graphic.visible = false} }
+            // this.cull(cameraPosition.x, cameraPosition.y, cameraPosition.z, 50000)
+        })
     }
 
     loadChunksFromPos(cx, cz, r)
@@ -2561,71 +2423,42 @@ export class World
         }
     }
     
-
-    async loadLevel()
+    getBlockFromPos(x, y, z)
     {
-        if(!this.world){return null}
-
-        this.level = (await ipcInvoke('readDat', this.location+sep()+'saves'+sep()+this.world+sep()+'level.dat', false))?.Data;
-        return this.level
+        let chunk = this.chunks.get(`${Math.floor(x/16)},${Math.floor(z/16)}`)
+        if(!chunk){ return 0}
+        return chunk.blocks[ ((y - chunk.level.yPos*16) << 8) | ((z - chunk.level.zPos*16) << 4) | ( x - chunk.level.xPos*16) ]
     }
     
-    // Region & Chunks
+
     async readRegion(x, z)
     {
-        if(!this.world){return null}
-
         const existing = this.regions.get(`${x},${z}`);
-        if(existing!=undefined)
-        {
-            if(existing == false)
-            {
-                while(this.regions.get(`${x},${z}`) == false) { await new Promise(resolve => setTimeout(resolve, 100)) }
-                return this.regions.get(`${x},${z}`);
-            }
-            return existing;
-        }
-
+        if(existing!=undefined) { return existing; }
         this.regions.set(`${x},${z}`, false)
 
-        const getChunk = await readRegion(this.location+sep()+'saves'+sep()+this.world+sep()+'region'+sep()+`r.${x}.${z}.mca`);
+        const getChunk = await readRegion(this.location+sep()+'region'+sep()+`r.${x}.${z}.mca`);
         if(!getChunk){return getChunk}
 
         this.regions.set(`${x},${z}`, getChunk);
         return getChunk;
     }
+
+
     async loadChunk(x, z)
     {
         const existing = this.chunks.get(`${x},${z}`)
-        if(existing!=undefined)
-        {
-            while(this.chunks.get(`${x},${z}`)==false) { await new Promise(resolve => setTimeout(resolve, 250)) }
-            return this.chunks.get(`${x},${z}`)
-        }
+        if(existing!=undefined) { return existing }
 
         this.chunks.set(`${x},${z}`, false)
 
-        const aabb = new THREE.Box3(new THREE.Vector3(x, this.chunkSectionY*16, z), new THREE.Vector3(x+16, this.chunkSectionY*16 + this.sectionsPerChunk*16, z+16));
-
         const region = await this.readRegion(Math.floor(x/32), Math.floor(z/32))
-        if(!region)
-        {
-            const airIndex = (await this.loadPalette('minecraft:air', {}, this.sectionsPerChunk * 4096)).index;
-            const plainIndex = (await this.loadBiomePalette('minecraft:plains', {}, this.sectionsPerChunk * 64)).index;
-            const d = {level: {xPos: x, zPos: z}, aabb, collider: null, blocks: new Array(this.sectionsPerChunk * 4096).fill(airIndex), biomes: new Array(this.sectionsPerChunk * 64).fill(plainIndex)};
-            this.chunks.set(`${x},${z}`, d)
-            return d;
-        }
+        if(!region) { return false; }
 
         const chunk = await region(x, z)
-        if(!chunk)
-        {
-            const airIndex = (await this.loadPalette('minecraft:air', {}, this.sectionsPerChunk * 4096)).index;
-            const plainIndex = (await this.loadBiomePalette('minecraft:plains', {}, this.sectionsPerChunk * 64)).index;
-            const d = {level: {xPos: x, zPos: z}, aabb, collider: null, blocks: new Array(this.sectionsPerChunk * 4096).fill(airIndex), biomes: new Array(this.sectionsPerChunk * 64).fill(plainIndex)};
-            this.chunks.set(`${x},${z}`, d)
-            return d;
-        }
+        if(!chunk) { return false; }
+
+        const aabb = new THREE.Box3(new THREE.Vector3(chunk.xPos*16, chunk.yPos*16, chunk.zPos*16), new THREE.Vector3(chunk.xPos*16+16, chunk.yPos*16 + chunk.sections.length*16, chunk.zPos*16+16));
 
         // Palette
         let totalPalette = [];
@@ -2640,10 +2473,8 @@ export class World
                 totalPalette.push(p);
             }
         }
-
+ 
         let paletteIndexes = new Array(chunk.sections.length*4096)
-        const entriesPerLongCache = new Map();
-        const maskCache = new Map();
         for (let i = 0; i < chunk.sections.length; i++)
         {
             const s = chunk.sections[i];
@@ -2660,7 +2491,6 @@ export class World
                 }
                 continue
             }
-            if(s.block_states.data.length > 256){continue}
 
             // Model Palette
             let paletteRedirection = []
@@ -2672,74 +2502,97 @@ export class World
             const paletteLen = Math.max(1, (s.block_states && s.block_states.palette || []).length);
             const bitsPerBlock = Math.max(4, Math.ceil(Math.log2(paletteLen)));
 
-            const longs = s.block_states.data;
+            const mask = (1n << BigInt(bitsPerBlock)) - 1n;
 
-            // Cache entriesPerLong and mask calculations
-            let entriesPerLong, mask;
-            if(entriesPerLongCache.has(bitsPerBlock))
+            const candLH = [];
+            const candHL = [];
+
+            for (const d of s.block_states.data)
             {
-                entriesPerLong = entriesPerLongCache.get(bitsPerBlock);
-                mask = maskCache.get(bitsPerBlock);
-            }
-            else
-            {
-                entriesPerLong = Math.floor(64 / bitsPerBlock);
-                mask = (1n << BigInt(bitsPerBlock)) - 1n;
-                entriesPerLongCache.set(bitsPerBlock, entriesPerLong);
-                maskCache.set(bitsPerBlock, mask);
+                // robust conversion for each data entry d:
+                const low32  = BigInt.asUintN(32, BigInt(d[0]));
+                const high32 = BigInt.asUintN(32, BigInt(d[1]));
+                candLH.push((high32 << 32n) | low32);
+                candHL.push((low32  << 32n) | high32);
             }
 
+            const entriesPerLong = Math.floor(64 / bitsPerBlock);
             const requiredLongsAligned = Math.ceil(4096 / entriesPerLong);
             const requiredLongsStraddle = Math.ceil(4096 * bitsPerBlock / 64);
 
+            let longs = null;
             let mode = null;
-            // Alligned Check
-            if(longs.length >= requiredLongsAligned)
+
+            function sanityAligned(candidateLongs)
             {
-                let valid = true;
+                if (candidateLongs.length < requiredLongsAligned) return false;
+                // sample first 64 indices to check indices fall in palette range
                 for (let i = 0; i < Math.min(64, 4096); i++)
                 {
                     const longIndex = Math.floor(i / entriesPerLong);
                     const within = i % entriesPerLong;
                     const offset = within * bitsPerBlock;
-                    const val = Number((longs[longIndex] >> BigInt(offset)) & mask);
-                    if (!Number.isFinite(val) || val < 0 || val >= paletteLen) {valid = false; break;}
+                    const val = Number((candidateLongs[longIndex] >> BigInt(offset)) & mask);
+                    if (!Number.isFinite(val) || val < 0 || val >= paletteLen) return false;
                 }
-                if(valid) { mode = "aligned" }
+                return true;
             }
-            // Straddle Check
-            if(!mode && longs.length >= requiredLongsStraddle)
+
+
+            function sanityStraddle(candidateLongs)
             {
+                if (candidateLongs.length < requiredLongsStraddle) return false;
+                // do a short sequential decode for first 256 indices and verify palette bounds
                 let state = 0;
-                let data = longs[0];
+                let data = candidateLongs[0];
                 let dataLength = 64n;
-                let valid = true;
-                for (let j = 0; j < Math.min(256, 4096); j++) 
-                {
+                for (let j = 0; j < Math.min(256, 4096); j++) {
                     const bits = bitsPerBlock;
                     if (dataLength < bits) {
                         state += 1;
-                        if (state >= longs.length) {valid = false; break;}
-                        const newData = longs[state];
+                        if (state >= candidateLongs.length) return false;
+                        const newData = candidateLongs[state];
+                        // For straddling behavior, append the new long above the existing bits
                         data = (newData << dataLength) | data;
                         dataLength += 64n;
                     }
                     const paletteId = Number(data & mask);
-                    if (!Number.isFinite(paletteId) || paletteId < 0 || paletteId >= paletteLen) {valid = false; break}
+                    if (!Number.isFinite(paletteId) || paletteId < 0 || paletteId >= paletteLen) return false;
                     data >>= BigInt(bits);
                     dataLength -= BigInt(bits);
                 }
-                if(valid) { mode = "straddle" }
+                return true;
             }
 
-            if(!mode)
+            if (sanityAligned(candLH))
             {
-                if (longs.length >= requiredLongsAligned)
+                longs = candLH;
+                mode = "aligned";
+            }
+            else if (sanityAligned(candHL))
+            {
+                longs = candHL;
+                mode = "aligned";
+            }
+            else if (sanityStraddle(candLH))
+            {
+                longs = candLH;
+                mode = "straddle";
+            }
+            else if (sanityStraddle(candHL))
+            {
+                longs = candHL;
+                mode = "straddle";
+            }
+            else
+            {
+                if (candLH.length >= requiredLongsAligned)
                 {
+                    longs = candLH;
                     mode = "aligned";
                     console.warn("block_states: pair-order and mode ambiguous — defaulting to [low,high]/aligned. You should verify results.");
                 }
-                else { throw new Error(`block_states.data seems invalid or truncated. Need at least ${Math.max(requiredLongsAligned, requiredLongsStraddle)} longs (aligned=${requiredLongsAligned}, straddle=${requiredLongsStraddle}) but got ${longs.length}.`); }
+                else { throw new Error(`block_states.data seems invalid or truncated. Need at least ${Math.max(requiredLongsAligned, requiredLongsStraddle)} longs (aligned=${requiredLongsAligned}, straddle=${requiredLongsStraddle}) but got ${candLH.length}.`); }
             }
 
             if(mode === "aligned")
@@ -2783,7 +2636,7 @@ export class World
                     paletteIndexes[baseIndex+idx] = redirected;
                 }
             }
-            else if(mode == "straddle")
+            else
             {
                 if (longs.length < requiredLongsStraddle) {
                     throw new Error(`block_states.data too short for straddle mode: need ${requiredLongsStraddle}, got ${longs.length}`);
@@ -2809,13 +2662,13 @@ export class World
                     if(paletteIndex >= paletteLen)
                     {
                         console.warn(`${paletteIndex} out of range.`)
-                        paletteIndexes[baseIndex+j] = null
+                        paletteIndexes[baseIndex+idx] = null
                         continue;
                     }
                     else if(paletteIndex > paletteRedirection)
                     {
                         console.warn(`${paletteIndex} is not included in the palette redirector...`)
-                        paletteIndexes[baseIndex+j] = null
+                        paletteIndexes[baseIndex+idx] = null
                         continue;
                     }
 
@@ -3071,11 +2924,13 @@ export class World
             }
         }
 
+        console.log("biomePaletteIndexes", biomePaletteIndexes)
+
 
         const blockIndexToPaletteIndex = new Array(chunk.sections.length * 4096);
         const instancesByPalette = new Map();
 
-        const biomeIndexToPaletteIndex = new Array(chunk.sections.length * 64);
+        const biomeIndexToPaletteIndex = new Array(chunk.sections.length * 4096);
         const instancesByBiomePalette = new Map();
 
         const baseX = chunk.xPos * 16;
@@ -3117,17 +2972,19 @@ export class World
 
         // Load Palette to World
         const loadedPalette = new Array(instancesByPalette.length)
-        for(const [i] of instancesByPalette)
+        for(const [i, indexes] of instancesByPalette)
         {
             if(!totalPalette[i]){continue}
-            loadedPalette[i] = await this.loadPalette(totalPalette[i].Name, totalPalette[i].Properties, 32);
+            loadedPalette[i] = await this.loadPalette(totalPalette[i].Name, totalPalette[i].Properties, indexes.length);
         }
         const loadedBiomePalette = new Array(instancesByBiomePalette.length)
-        for(const [i] of instancesByBiomePalette)
+        for(const [i, indexes] of instancesByBiomePalette)
         {
             if(!totalBiomePalette[i]){continue}
             loadedBiomePalette[i] = await this.loadBiomePalette(totalBiomePalette[i]);
         }
+
+        console.log("loadedBiomePalette", loadedBiomePalette)
 
         // Write & Place
         let chunkData = {level: chunk, aabb, collider: null, blocks: new Array(blockIndexToPaletteIndex.length), biomes: new Array(biomeIndexToPaletteIndex.length)}
@@ -3168,7 +3025,7 @@ export class World
                     z!=0 &&loadedPalette[paletteIndexes[ index-16 ]]?.value?.model?.coveredFaces?.[4]==false,
                 ]
                 
-                if(x==15 && neighboorChunks[0]?.blocks?.[this.positionToIndex(0, y, z%16)])
+                if(x==15 && neighboorChunks[0]?.blocks[this.positionToIndex(0, y, z%16)])
                 {
                     const n = this.palette[neighboorChunks[0]?.blocks[this.positionToIndex(0, y, z%16)]]?.model;
 
@@ -3176,7 +3033,7 @@ export class World
                     { n?.createPart(0 + (neighboorChunks[0]?.level.xPos ?? 0) * 16, y, z + (neighboorChunks[0]?.level.zPos ?? 0) * 16, 2) }
                     faces[0] = n?.coveredFaces[1]==false
                 }
-                if(x==0 && neighboorChunks[1]?.blocks?.[this.positionToIndex(15, y, z%16)])
+                if(x==0 && neighboorChunks[1]?.blocks[this.positionToIndex(15, y, z%16)])
                 {
                     const n = this.palette[ neighboorChunks[1]?.blocks[this.positionToIndex(15, y, z%16)] ]?.model;
 
@@ -3184,7 +3041,7 @@ export class World
                     { n?.createPart(15+neighboorChunks[1].level.xPos*16, y, z+neighboorChunks[1].level.zPos*16, 1) }
                     faces[1] = n?.coveredFaces[0]==false
                 }
-                if(z==15 && neighboorChunks[2]?.blocks?.[this.positionToIndex(x%16, y, 0)])
+                if(z==15 && neighboorChunks[2]?.blocks[this.positionToIndex(x%16, y, 0)])
                 {
                     const n = this.palette[ neighboorChunks[2]?.blocks[this.positionToIndex(x%16, y, 0)] ]?.model;
 
@@ -3195,7 +3052,7 @@ export class World
 
                     faces[4] = n?.coveredFaces[5]==false
                 }
-                if(z==0 && neighboorChunks[3]?.blocks?.[this.positionToIndex(x%16, y, 15)])
+                if(z==0 && neighboorChunks[3]?.blocks[this.positionToIndex(x%16, y, 15)])
                 {
                     const n = this.palette[ neighboorChunks[3]?.blocks[this.positionToIndex(x%16, y, 15)] ]?.model;
 
@@ -3207,174 +3064,36 @@ export class World
                     faces[5] = n?.coveredFaces[4]==false
                 }
 
-                let biomes = []
-                if(model.tinted)
-                {
-                    const nearBiomes = this.getNearbyBiomes(x,y,z)
-                    biomes = new Array(nearBiomes.length)
-                    for (let i = 0; i < nearBiomes.length; i++)
+                const paletteIndex = ((x/64) + ((y-this.chunkSectionY*16)/64)/256 + (z/64)/16);
+                const biomes =
+                [
                     {
-                        const b = nearBiomes[i];
-                        biomes[i] =
-                        {
-                            weight: b.weight,
-                            data: this.biomePalette[ chunkData.biomes[b.biome] ].data
-                        }
-                    }
-                }
-                
+                        data: this.biomePalette[ Math.floor(paletteIndex) ].data,
+                        weight: paletteIndex - Math.floor(paletteIndex)
+                    },
+                    {
+                        data: this.biomePalette[ Math.ceil(paletteIndex) ]?.data,
+                        weight: Math.ceil(paletteIndex) - paletteIndex
+                    },
+                ]
                 model.create(x+baseX, y, z+baseZ, faces, biomes)
-
-                if(this.physic)
-                {
-                    const col = RAPIER.ColliderDesc.cuboid(.5, .5, .5);
-                    col.translation = new RAPIER.Vector3(x+baseX, y, z+baseZ)
-                    window.world.createCollider(col)
-                }
             }
         }
+
 
         this.chunks.set(`${chunk.xPos},${chunk.zPos}`, chunkData)
 
         return chunkData
-    }
-    async importStructure(id, baseX, baseY, baseZ)
-    {
-        // Read
-        let data = (await this.modpackJar.resolveData(id)).parsed
-
-        // Palette
-        let palette = [];
-        for(let p of data.palette) { palette.push(await this.loadPalette(p.Name, p.Properties, 16)) }
-
-        // Writing
-        let oldBlocks = new Array(data.blocks.length)
-        for(const i in data.blocks)
-        {
-            const b = data.blocks[i]
-            if(!b){continue;}
-            const x = baseX+b.pos[0]; const y = baseY+b.pos[1]; const z = baseZ+b.pos[2]
-            const key = `${Math.floor(x/16)},${Math.floor(z/16)}`;
-                        
-            const newV = this.chunks.get(key) || await this.loadChunk(Math.floor((x)/16), Math.floor((baseX+b.pos[2])/16))
-            oldBlocks[i] = newV.blocks[this.positionToIndex(x%16, y, z%16)];
-
-            newV.blocks[this.positionToIndex(x%16, y, z%16)] = palette?.[b.state]?.index;
-
-            this.chunks.set(key, newV);
-        }
-
-        // Placing
-        for(let i in data.blocks)
-        {
-            const b = data.blocks[i];
-            if(!b || !palette[b.state]){ continue;}
-            
-            const x = baseX+b.pos[0]; const y = baseY+b.pos[1]; const z = baseZ+b.pos[2]
-
-            this.palette?.[oldBlocks[i]]?.delete && this.palette[oldBlocks[i]]?.delete(x, y, z)
-
-            let faces =
-            [
-                this.getBlock(x+1, y, z)?.paletteData?.model?.coveredFaces?.[1]==false,
-                this.getBlock(x-1, y, z)?.paletteData?.model?.coveredFaces?.[0]==false,
-                this.getBlock(x, y+1, z)?.paletteData?.model?.coveredFaces?.[3]==false,
-                this.getBlock(x, y-1, z)?.paletteData?.model?.coveredFaces?.[2]==false,
-                this.getBlock(x, y, z+1)?.paletteData?.model?.coveredFaces?.[5]==false,
-                this.getBlock(x, y, z-1)?.paletteData?.model?.coveredFaces?.[4]==false,
-            ]
-
-            const model = palette[b.state].value.model;
-            
-            const neighboorChunks = [await this.loadChunk(Math.floor(x/16) +1, Math.floor(z/16)), await this.loadChunk(Math.floor(x/16) -1, Math.floor(z/16)), await this.loadChunk(Math.floor(x/16), Math.floor(z/16) +1), await this.loadChunk(Math.floor(x/16),Math.floor(z/16) -1)]
-
-            if((x%16)==15 && neighboorChunks[0]?.blocks?.[this.positionToIndex(0, y, z%16)])
-            {
-                const n = this.palette[neighboorChunks[0]?.blocks[this.positionToIndex(0, y, z%16)]]?.model;
-
-                if(model?.coveredFaces?.[0]==false)
-                { n?.createPart(0 + ((neighboorChunks[0]?.level.xPos) ?? 0) * 16, y, (z%16) + (neighboorChunks[0]?.level.zPos ?? 0) * 16, 2) }
-                faces[0] = n?.coveredFaces[1]==false
-            }
-            if((x%16)==0 && neighboorChunks[1]?.blocks?.[this.positionToIndex(15, y, z%16)])
-            {
-                const n = this.palette[ neighboorChunks[1]?.blocks[this.positionToIndex(15, y, z%16)] ]?.model;
-
-                if(model?.coveredFaces?.[1]==false)
-                { n?.createPart(15+neighboorChunks[1].level.xPos*16, y, (z%16)+neighboorChunks[1].level.zPos*16, 1) }
-                faces[1] = n?.coveredFaces[0]==false
-            }
-            if((z%16)==15 && neighboorChunks[2]?.blocks?.[this.positionToIndex(x%16, y, 0)])
-            {
-                const n = this.palette[ neighboorChunks[2]?.blocks[this.positionToIndex(x%16, y, 0)] ]?.model;
-
-                if(model?.coveredFaces?.[4]==false)
-                {
-                    n?.createPart((x%16)+neighboorChunks[2].level.xPos*16, y, 0+neighboorChunks[2].level.zPos*16, 6)
-                }
-
-                faces[4] = n?.coveredFaces[5]==false
-            }
-            if((z%16)==0 && neighboorChunks[3]?.blocks?.[this.positionToIndex(x%16, y, 15)])
-            {
-                const n = this.palette[ neighboorChunks[3]?.blocks[this.positionToIndex(x%16, y, 15)] ]?.model;
-
-                if(model?.coveredFaces?.[5]==false)
-                {
-                    n?.createPart((x%16)+neighboorChunks[3].level.xPos*16, y, 15+neighboorChunks[3].level.zPos*16, 5)
-                }
-
-                faces[5] = n?.coveredFaces[4]==false
-            }
-
-            let biomes = []
-            if(model.tinted)
-            {
-                const nearBiomes = this.getNearbyBiomes(x,y,z)
-                biomes = new Array(nearBiomes.length)
-                for (let i = 0; i < nearBiomes.length; i++)
-                {
-                    const b = nearBiomes[i];
-                    biomes[i] =
-                    {
-                        weight: b.weight,
-                        data: this.biomePalette[ this.chunks.get(`${Math.floor(x/16)},${Math.floor(z/16)}`)?.biomes?.[b.biome] ]?.data
-                    }
-                }
-            }
-
-            model.create(x, y, z, faces, biomes)
-
-            if(this.physic)
-            {
-                const col = RAPIER.ColliderDesc.cuboid(.5, .5, .5);
-                col.translation = new RAPIER.Vector3(x, y, z)
-                window.world.createCollider(col)
-            }
-        }
     }
 
     // Blocks
     async loadPalette(id, properties = {}, capacity = 32)
     {
         const existing = this.palette.findIndex(p => p.id == id && JSON.stringify(p.properties) == JSON.stringify(properties));
-        if(existing > -1)
-        {
-            const existingValue = this.palette[existing];
-            if(existingValue==0)
-            {
-                while(this.palette[existing]==0) { await new Promise(resolve => setTimeout(resolve, 100)) }
-                return {index: existing, value: this.palette[existing]}
-            }
-
-            return {index: existing, value: existingValue}
-        }
-
-        const index = Math.max(0, this.palette.length)
-        this.palette.push(0)
+        if(existing > -1) { return {index: existing, value: this.palette[existing]} }
         
         const model = await BlockModel.from(id, properties, this.modpackJar, capacity);
-        for (let i = 0; i < 7; i++) { if(model.parts?.[i]?.meshes) { this.group.add(...model.parts[i].meshes); } }
+        for (let i = 0; i < 7; i++) { if(model.parts?.[i]?.mesh) { this.group.add(model.parts[i].mesh); } }
         const element = 
         {
             model,
@@ -3382,7 +3101,7 @@ export class World
             properties: properties
         }
 
-        this.palette[index] = element
+        this.palette.push(element)
         return {index: this.palette.length-1, value: element};
     }
     async placeBlock(x, y, z, id, properties = {}, replace = true, updateCulling = true)
@@ -3471,12 +3190,12 @@ export class World
         const chunkZ = Math.floor(z/16)
 
         let chunk = this.chunks.get(`${chunkX},${chunkZ}`)
-        if(!chunk || !chunk.blocks){ return 0 }
+        if(!chunk){ return 0 }
 
-        const idx = this.positionToIndex(x%16, y%16, z%16);
+        const idx = this.positionToIndex(x, y, z);
 
         const paletteIndex = chunk.blocks[idx];
-        if(paletteIndex==undefined) { return -1 }
+        if(paletteIndex==undefined) { return 0 }
 
         const index = chunk.blocks.slice(0, idx).length;
         const paletteData = this.palette[paletteIndex]
@@ -3495,7 +3214,6 @@ export class World
         return {x, y: (index >> 8)+this.chunkSectionY*16, z: (index >> 4) & 15}
     }
 
-
     // Biome
     async loadBiomePalette(id)
     {
@@ -3503,6 +3221,7 @@ export class World
         if(existing > -1) { return {index: existing, value: this.biomePalette[existing]} }
         
         const data = JSON.parse(await this.modpackJar.resolveData(id+'.json', ["worldgen", "biome"]));
+        console.log(data)
         const element = 
         {
             data,
@@ -3512,450 +3231,389 @@ export class World
         this.biomePalette.push(element)
         return {index: this.biomePalette.length-1, value: element};
     }
-    biomePositionToIndex(x, y, z, local = true)
+
+    async parseMca(filePath, position = {x: 0, y: 0}, size = {x: 1, y: 1}, modpackJar = new ModpackJar(), physic = false)
     {
-        const bx = Math.floor((x - (local ? Math.floor(x / 16) * 16 : 0)) / 4);
-        const by = Math.floor(((y - this.chunkSectionY * 16) % 16) / 4);
-        const bz = Math.floor((z - (local ? Math.floor(z / 16) * 16 : 0)) / 4);
+        console.group("Reading Region")
+        
+        // Read Region
+        const region = Object.values( await ipcInvoke("readRegion", filePath) );
 
-        return (by << 4) | (bz << 2) | bx;
-    }
-    getNearbyBiomes(x, y, z)
-    {
-        const localY = y - this.chunkSectionY * 16;
-
-        const bx = Math.floor(x / 4);
-        const by = Math.floor(localY / 4);
-        const bz = Math.floor(z / 4);
-
-        const fx = (x / 4) - bx;
-        const fy = (localY / 4) - by;
-        const fz = (z / 4) - bz;
-
-        const wx = [1 - fx, fx];
-        const wy = [1 - fy, fy];
-        const wz = [1 - fz, fz];
-
-        const result = [];
-
-        for (let dx = 0; dx <= 1; dx++)
+        // Read chunks
+        console.group("Getting chunks")
+        let chunks = []
+        for (let x = position.x; x < size.x+position.x; x++)
         {
-            for (let dy = 0; dy <= 1; dy++)
+            for (let y = position.y; y < size.y+position.y; y++)
             {
-                for (let dz = 0; dz <= 1; dz++)
+                console.log(x, y)
+                chunks.push(region.find(r=>r.xPos==x&&r.zPos==y))
+            }
+        }
+        console.groupEnd()
+
+        // Palette
+        let totalPalette = []
+        for(const c of chunks)
+        {
+            for(const s of c.sections)
+            {
+                for(const p of s.block_states.palette)
                 {
-                    const weight = wx[dx] * wy[dy] * wz[dz];
-                    if (weight <= 0) continue;
-
-                    const nx = bx + dx;
-                    const ny = by + dy;
-                    const nz = bz + dz;
-
-                    // index within this section’s 4x4x4 biome grid
-                    const biomeIndex = (ny << 4) | (nz << 2) | nx;
-                    const globalIndex = biomeIndex;
-
-                    const biome = globalIndex;
-                    if (biome == null) continue;
-
-                    result.push({ biome, weight });
+                    if(totalPalette.findIndex(pal => lodash.isEqual(pal, p)) >= 0){continue}
+                    totalPalette.push(p)
                 }
             }
         }
+        let loadedModelPalette = []
+        for(let p of totalPalette)
+        {
+            loadedModelPalette.push(await Block.from(p.Name, p.Properties, modpackJar))
+        }
 
-        const total = result.reduce((a, b) => a + b.weight, 0);
-        for (const r of result) r.weight /= total;
+        // Build
+        let chunksContent = new Map()
 
-        return result;
+        for (let levelIndex = 0; levelIndex < chunks.length; levelIndex++)
+        {
+            const level = chunks[levelIndex];
+            console.groupCollapsed("Chunk #"+levelIndex, level)
+
+            let chunkGroup = new THREE.Group();
+            window.scene.add(chunkGroup)
+            chunkGroup.position.set(level.xPos*16, level.yPos*16, level.zPos*16)
+
+            // Helper
+            let helper = new THREE.Mesh(new THREE.BoxGeometry(16, level.sections.length*16, 16), new THREE.MeshBasicMaterial({wireframe: true, color: 0xA00000}))
+            // chunkGroup.add(helper)
+            helper.position.set(7.5, level.sections.length*8-0.5, 7.5)
+            const aabb = new THREE.Box3(new THREE.Vector3(level.xPos*16, level.yPos*16, level.zPos*16), new THREE.Vector3(level.xPos*16+16, level.yPos*16 + level.sections.length*16, level.zPos*16+16));
+            
+            // Get Palette Indexes
+            let paletteIndexes = []
+            for(const s of level.sections)
+            {
+                if(!s?.block_states?.data || !s?.block_states?.palette) { continue }
+                if(s.block_states.palette.length==1&&(s.block_states.palette[0].Name == "air"||s.block_states.palette[0].Name == "minecraft:air")) { continue }
+
+                // Model Palette
+                let paletteRedirection = []
+                for(let p of s.block_states.palette)
+                {
+                    paletteRedirection.push(totalPalette.findIndex(pal => lodash.isEqual(pal, p)))
+                }
+
+                const paletteLen = Math.max(1, (s.block_states && s.block_states.palette || []).length);
+                const bitsPerBlock = Math.max(4, Math.ceil(Math.log2(paletteLen)));
+                const mask = (1n << BigInt(bitsPerBlock)) - 1n;
+
+                const candLH = s.block_states.data.map(d =>
+                {
+                    const low = BigInt.asUintN(32, BigInt(d[0]));
+                    const high = BigInt.asUintN(32, BigInt(d[1]));
+                    return (high << 32n) | low;
+                });
+                const candHL = s.block_states.data.map(d =>
+                {
+                    const low = BigInt.asUintN(32, BigInt(d[0]));
+                    const high = BigInt.asUintN(32, BigInt(d[1]));
+                    return (low << 32n) | high;
+                });
+
+                const entriesPerLong = Math.floor(64 / bitsPerBlock);
+                const requiredLongsAligned = Math.ceil(4096 / entriesPerLong);
+                const requiredLongsStraddle = Math.ceil((4096 * bitsPerBlock) / 64);
+
+                let longs = null;
+                let mode = null;
+
+                function sanityAligned(candidateLongs)
+                {
+                    if (candidateLongs.length < requiredLongsAligned) return false;
+                    // sample first 64 indices to check indices fall in palette range
+                    for (let i = 0; i < Math.min(64, 4096); i++)
+                    {
+                        const longIndex = Math.floor(i / entriesPerLong);
+                        const within = i % entriesPerLong;
+                        const offset = within * bitsPerBlock;
+                        const val = Number((candidateLongs[longIndex] >> BigInt(offset)) & mask);
+                        if (!Number.isFinite(val) || val < 0 || val >= paletteLen) return false;
+                    }
+                    return true;
+                }
+
+                function sanityStraddle(candidateLongs)
+                {
+                    if (candidateLongs.length < requiredLongsStraddle) return false;
+                    // do a short sequential decode for first 256 indices and verify palette bounds
+                    let state = 0;
+                    let data = candidateLongs[0];
+                    let dataLength = 64n;
+                    for (let j = 0; j < Math.min(256, 4096); j++) {
+                        const bits = bitsPerBlock;
+                        if (dataLength < bits) {
+                            state += 1;
+                            if (state >= candidateLongs.length) return false;
+                            const newData = candidateLongs[state];
+                            // For straddling behavior, append the new long above the existing bits
+                            data = (newData << dataLength) | data;
+                            dataLength += 64n;
+                        }
+                        const paletteId = Number(data & mask);
+                        if (!Number.isFinite(paletteId) || paletteId < 0 || paletteId >= paletteLen) return false;
+                        data >>= BigInt(bits);
+                        dataLength -= BigInt(bits);
+                    }
+                    return true;
+                }
+
+                if (sanityAligned(candLH))
+                {
+                    longs = candLH;
+                    mode = "aligned";
+                }
+                else if (sanityAligned(candHL))
+                {
+                    longs = candHL;
+                    mode = "aligned";
+                }
+                else if (sanityStraddle(candLH))
+                {
+                    longs = candLH;
+                    mode = "straddle";
+                }
+                else if (sanityStraddle(candHL))
+                {
+                    longs = candHL;
+                    mode = "straddle";
+                }
+                else
+                {
+                    if (candLH.length >= requiredLongsAligned)
+                    {
+                        longs = candLH;
+                        mode = "aligned";
+                        console.warn("block_states: pair-order and mode ambiguous — defaulting to [low,high]/aligned. You should verify results.");
+                    }
+                    else { throw new Error(`block_states.data seems invalid or truncated. Need at least ${Math.max(requiredLongsAligned, requiredLongsStraddle)} longs (aligned=${requiredLongsAligned}, straddle=${requiredLongsStraddle}) but got ${candLH.length}.`); }
+                }
+
+                if(mode === "aligned")
+                {
+                    if (longs.length < requiredLongsAligned)
+                    {
+                        throw new Error(`block_states.data too short for aligned mode: need ${requiredLongsAligned}, got ${longs.length}`);
+                    }
+                    for (let idx = 0; idx < 4096; idx++)
+                    {
+                        const longIndex = Math.floor(idx / entriesPerLong);
+                        const within = idx % entriesPerLong;
+                        const offset = within * bitsPerBlock;
+                        const paletteIndex = Number((longs[longIndex] >> BigInt(offset)) & mask);
+
+                        if(paletteIndex >= paletteLen)
+                        {
+                            // console.warn(`${paletteIndex} out of range.`)
+                            paletteIndexes.push(null)
+                            continue;
+                        }
+                        else if(paletteIndex > paletteRedirection)
+                        {
+                            console.warn(`${paletteIndex} is not included in the palette redirector...`)
+                            paletteIndexes.push(null)
+                            continue;
+                        }
+                        if(!loadedModelPalette[ paletteRedirection[paletteIndex] ]){paletteIndexes.push(null); continue}
+
+                        paletteIndexes.push(paletteRedirection[paletteIndex]);
+                    }
+                }
+                else
+                {
+                    if (longs.length < requiredLongsStraddle) {
+                        throw new Error(`block_states.data too short for straddle mode: need ${requiredLongsStraddle}, got ${longs.length}`);
+                    }
+                    longs.push(0n, 0n);
+
+                    let state = 0;
+                    let data = longs[0];
+                    let dataLength = 64n;
+                    for (let j = 0; j < 4096; j++)
+                    {
+                        if (dataLength < bitsPerBlock)
+                        {
+                            state += 1;
+                            const newData = longs[state];
+                            data = (newData << dataLength) | data;
+                            dataLength += 64n;
+                        }
+                        const paletteIndex = Number(data & mask);
+
+                        if(paletteIndex >= paletteLen)
+                        {
+                            console.warn(`${paletteIndex} out of range.`)
+                            paletteIndexes.push(null)
+                            continue;
+                        }
+                        else if(paletteIndex > paletteRedirection)
+                        {
+                            console.warn(`${paletteIndex} is not included in the palette redirector...`)
+                            paletteIndexes.push(null)
+                            continue;
+                        }
+                        if(!loadedModelPalette[ paletteRedirection[paletteIndex] ]){paletteIndexes.push(null); continue}
+
+                        paletteIndexes.push(paletteRedirection[paletteIndex]);
+
+                        data >>= BigInt(bitsPerBlock);
+                        dataLength -= BigInt(bitsPerBlock);
+                    }
+                }
+            }
+
+            // Placing Blocks
+            let sections = []
+            // let blocks = []
+            const blocks = new Array(level.sections.length * 4096);
+
+            for (let sectionIndex = 0; sectionIndex < level.sections.length; sectionIndex++)
+            {
+                const s = level.sections[sectionIndex]
+
+                let sectionGroup = new THREE.Group();
+                chunkGroup.add(sectionGroup)
+                sectionGroup.position.set(0, (s.Y+4)*16, 0)
+
+                const baseX = level.xPos * 16;
+                const baseY = level.yPos * 16;
+                const baseZ = level.zPos * 16;
+
+                // Helper & AABB
+                let helper = new THREE.Mesh(new THREE.BoxGeometry(16, 16, 16), new THREE.MeshBasicMaterial({wireframe: true, color: 0xA0A000}))
+                // sectionGroup.add(helper)
+                helper.position.set(7.5, 7.5, 7.5)
+                const aabb = new THREE.Box3(new THREE.Vector3(baseX, baseY + (s.Y + 4) * 16, baseZ), new THREE.Vector3(baseX + 16, baseY + (s.Y + 4) * 16 + 16, baseZ + 16));
+
+                sections.push({group: sectionGroup, aabb})
+
+
+                if(!s?.block_states?.data || !s?.block_states?.palette || s.block_states.palette.length==1&&(s.block_states.palette[0].Name == "air"||s.block_states.palette[0].Name == "minecraft:air"))
+                {
+                    // blocks = blocks.concat(new Array(4096).map(() => null))
+                    continue
+                }
+
+                for(let idx = sectionIndex*4096; idx < sectionIndex*4096+4096; idx++)
+                {
+                    const paletteIndex = paletteIndexes[idx]
+                    if(paletteIndex==null || !loadedModelPalette[ paletteIndex ])
+                    {
+                        blocks.push(null)
+                        continue
+                    }
+
+                    const y = idx >> 8;
+                    const z = (idx >> 4) & 15;
+                    const x = idx & 15;
+
+                    let b = loadedModelPalette[ paletteIndex ].clone()
+                    b.position = {x: baseX + x, y: baseY + y, z: baseZ + z}
+
+                    blocks[idx] = b
+                    // blocks.push(b)
+                    b.add(sectionGroup)
+                }
+            }
+
+            chunksContent.set(`${level.xPos},${level.zPos}`, {level, aabb, group: chunkGroup, blocks, sections, collider: null})
+            console.groupEnd()
+        }
+
+        // Culling
+        chunksContent.forEach((chunk, k) =>
+        {
+            // Culling
+            for(let b of chunk.blocks)
+            {
+                if(!b){continue}
+                const px = getBlockFromPos(b.position.x+1, b.position.y, b.position.z)
+                const nx = getBlockFromPos(b.position.x-1, b.position.y, b.position.z)
+                const py = getBlockFromPos(b.position.x, b.position.y+1, b.position.z)
+                const ny = getBlockFromPos(b.position.x, b.position.y-1, b.position.z)
+                const pz = getBlockFromPos(b.position.x, b.position.y, b.position.z+1)
+                const nz = getBlockFromPos(b.position.x, b.position.y, b.position.z-1)
+
+                b.updateSide
+                ([
+                    px ? !px.coveredFaces[1] : px!=0,
+                    nx ? !nx.coveredFaces[0] : nx!=0,
+                    py ? !py.coveredFaces[3] : py!=0,
+                    ny ? !ny.coveredFaces[2] : ny!=0,
+                    pz ? !pz.coveredFaces[5] : pz!=0,
+                    nz ? !nz.coveredFaces[4] : nz!=0,
+                ])
+            }
+
+            // Physic
+            if(physic)
+            {
+                const geoms = [];
+                for (let i = 0; i < chunk.blocks.length; i++)
+                {
+                    const b = chunk.blocks[i];
+                    if (!b || !b.graphic?.geometry?.index || !b.physicGeometry?.index && !b.physicGeometry?.attributes?.position) {continue}
+
+                    const vs = b.visibleSides;
+                    let anyVisible = false;
+                    for (let j = 0; vs && j < vs.length; j++) { if (vs[j]) { anyVisible = true; break } }
+                    if (!anyVisible) {continue}
+
+                    const g = b.physicGeometry.clone();
+                    const pos = g.attributes.position.array;
+                    const tx = b.position.x, ty = b.position.y, tz = b.position.z;
+                    for (let k = 0; k < pos.length; k += 3)
+                    {
+                        pos[k] += tx; pos[k+1] += ty; pos[k+2] += tz;
+                    }
+                    g.attributes.position.needsUpdate = true;
+
+                    geoms.push(g);
+                }
+
+
+                if(geoms.length > 0)
+                {
+                    // const chunkColliderGeom = BufferGeometryUtils.mergeGeometries(geoms, false);
+                    const chunkColliderGeom = BufferGeometryUtils.mergeVertices(BufferGeometryUtils.mergeGeometries(geoms, false))
+
+                    const chunkCollider = RAPIER.ColliderDesc.trimesh(chunkColliderGeom.attributes.position.array, chunkColliderGeom.index.array);
+                    window.world.createCollider(chunkCollider)
+                    
+                    chunksContent.set(k, Object.assign(chunk, {collider: chunkCollider}))
+                }
+            }
+
+
+            // Render Otpimization
+            window.addRenderListener((clock, frustum) =>
+            {
+                chunk.group.visible = frustum.intersectsBox(chunk.aabb)
+                if(!chunk.group.visible){return}
+                for(let s of chunk.sections)
+                {
+                    s.group.visible = frustum.intersectsBox(s.aabb)
+                }
+            })
+        })
+
+        for(const chunk of chunksContent.values?chunksContent.values():chunksContent) { for(const b of chunk.blocks.filter(b=>b?.graphic?.geometry?.index)){b.graphic.visible = false} }
+
+        console.log("%cWorld parsed", "color: green")
+        console.groupEnd();
     }
 
 
     // Old
-    // async parseMca(filePath, position = {x: 0, y: 0}, size = {x: 1, y: 1}, modpackJar = new ModpackJar(), physic = false)
-    // {
-    //     console.group("Reading Region")
-        
-    //     // Read Region
-    //     const region = Object.values( await ipcInvoke("readRegion", filePath) );
-
-    //     // Read chunks
-    //     console.group("Getting chunks")
-    //     let chunks = []
-    //     for (let x = position.x; x < size.x+position.x; x++)
-    //     {
-    //         for (let y = position.y; y < size.y+position.y; y++)
-    //         {
-    //             console.log(x, y)
-    //             chunks.push(region.find(r=>r.xPos==x&&r.zPos==y))
-    //         }
-    //     }
-    //     console.groupEnd()
-
-    //     // Palette
-    //     let totalPalette = []
-    //     for(const c of chunks)
-    //     {
-    //         for(const s of c.sections)
-    //         {
-    //             for(const p of s.block_states.palette)
-    //             {
-    //                 if(totalPalette.findIndex(pal => lodash.isEqual(pal, p)) >= 0){continue}
-    //                 totalPalette.push(p)
-    //             }
-    //         }
-    //     }
-    //     let loadedModelPalette = []
-    //     for(let p of totalPalette)
-    //     {
-    //         loadedModelPalette.push(await Block.from(p.Name, p.Properties, modpackJar))
-    //     }
-
-    //     // Build
-    //     let chunksContent = new Map()
-
-    //     for (let levelIndex = 0; levelIndex < chunks.length; levelIndex++)
-    //     {
-    //         const level = chunks[levelIndex];
-    //         console.groupCollapsed("Chunk #"+levelIndex, level)
-
-    //         let chunkGroup = new THREE.Group();
-    //         window.scene.add(chunkGroup)
-    //         chunkGroup.position.set(level.xPos*16, level.yPos*16, level.zPos*16)
-
-    //         // Helper
-    //         let helper = new THREE.Mesh(new THREE.BoxGeometry(16, level.sections.length*16, 16), new THREE.MeshBasicMaterial({wireframe: true, color: 0xA00000}))
-    //         // chunkGroup.add(helper)
-    //         helper.position.set(7.5, level.sections.length*8-0.5, 7.5)
-    //         const aabb = new THREE.Box3(new THREE.Vector3(level.xPos*16, level.yPos*16, level.zPos*16), new THREE.Vector3(level.xPos*16+16, level.yPos*16 + level.sections.length*16, level.zPos*16+16));
-            
-    //         // Get Palette Indexes
-    //         let paletteIndexes = []
-    //         for(const s of level.sections)
-    //         {
-    //             if(!s?.block_states?.data || !s?.block_states?.palette) { continue }
-    //             if(s.block_states.palette.length==1&&(s.block_states.palette[0].Name == "air"||s.block_states.palette[0].Name == "minecraft:air")) { continue }
-
-    //             // Model Palette
-    //             let paletteRedirection = []
-    //             for(let p of s.block_states.palette)
-    //             {
-    //                 paletteRedirection.push(totalPalette.findIndex(pal => lodash.isEqual(pal, p)))
-    //             }
-
-    //             const paletteLen = Math.max(1, (s.block_states && s.block_states.palette || []).length);
-    //             const bitsPerBlock = Math.max(4, Math.ceil(Math.log2(paletteLen)));
-    //             const mask = (1n << BigInt(bitsPerBlock)) - 1n;
-
-    //             const candLH = s.block_states.data.map(d =>
-    //             {
-    //                 const low = BigInt.asUintN(32, BigInt(d[0]));
-    //                 const high = BigInt.asUintN(32, BigInt(d[1]));
-    //                 return (high << 32n) | low;
-    //             });
-    //             const candHL = s.block_states.data.map(d =>
-    //             {
-    //                 const low = BigInt.asUintN(32, BigInt(d[0]));
-    //                 const high = BigInt.asUintN(32, BigInt(d[1]));
-    //                 return (low << 32n) | high;
-    //             });
-
-    //             const entriesPerLong = Math.floor(64 / bitsPerBlock);
-    //             const requiredLongsAligned = Math.ceil(4096 / entriesPerLong);
-    //             const requiredLongsStraddle = Math.ceil((4096 * bitsPerBlock) / 64);
-
-    //             let longs = null;
-    //             let mode = null;
-
-    //             function sanityAligned(candidateLongs)
-    //             {
-    //                 if (candidateLongs.length < requiredLongsAligned) return false;
-    //                 // sample first 64 indices to check indices fall in palette range
-    //                 for (let i = 0; i < Math.min(64, 4096); i++)
-    //                 {
-    //                     const longIndex = Math.floor(i / entriesPerLong);
-    //                     const within = i % entriesPerLong;
-    //                     const offset = within * bitsPerBlock;
-    //                     const val = Number((candidateLongs[longIndex] >> BigInt(offset)) & mask);
-    //                     if (!Number.isFinite(val) || val < 0 || val >= paletteLen) return false;
-    //                 }
-    //                 return true;
-    //             }
-
-    //             function sanityStraddle(candidateLongs)
-    //             {
-    //                 if (candidateLongs.length < requiredLongsStraddle) return false;
-    //                 // do a short sequential decode for first 256 indices and verify palette bounds
-    //                 let state = 0;
-    //                 let data = candidateLongs[0];
-    //                 let dataLength = 64n;
-    //                 for (let j = 0; j < Math.min(256, 4096); j++) {
-    //                     const bits = bitsPerBlock;
-    //                     if (dataLength < bits) {
-    //                         state += 1;
-    //                         if (state >= candidateLongs.length) return false;
-    //                         const newData = candidateLongs[state];
-    //                         // For straddling behavior, append the new long above the existing bits
-    //                         data = (newData << dataLength) | data;
-    //                         dataLength += 64n;
-    //                     }
-    //                     const paletteId = Number(data & mask);
-    //                     if (!Number.isFinite(paletteId) || paletteId < 0 || paletteId >= paletteLen) return false;
-    //                     data >>= BigInt(bits);
-    //                     dataLength -= BigInt(bits);
-    //                 }
-    //                 return true;
-    //             }
-
-    //             if (sanityAligned(candLH))
-    //             {
-    //                 longs = candLH;
-    //                 mode = "aligned";
-    //             }
-    //             else if (sanityAligned(candHL))
-    //             {
-    //                 longs = candHL;
-    //                 mode = "aligned";
-    //             }
-    //             else if (sanityStraddle(candLH))
-    //             {
-    //                 longs = candLH;
-    //                 mode = "straddle";
-    //             }
-    //             else if (sanityStraddle(candHL))
-    //             {
-    //                 longs = candHL;
-    //                 mode = "straddle";
-    //             }
-    //             else
-    //             {
-    //                 if (candLH.length >= requiredLongsAligned)
-    //                 {
-    //                     longs = candLH;
-    //                     mode = "aligned";
-    //                     console.warn("block_states: pair-order and mode ambiguous — defaulting to [low,high]/aligned. You should verify results.");
-    //                 }
-    //                 else { throw new Error(`block_states.data seems invalid or truncated. Need at least ${Math.max(requiredLongsAligned, requiredLongsStraddle)} longs (aligned=${requiredLongsAligned}, straddle=${requiredLongsStraddle}) but got ${candLH.length}.`); }
-    //             }
-
-    //             if(mode === "aligned")
-    //             {
-    //                 if (longs.length < requiredLongsAligned)
-    //                 {
-    //                     throw new Error(`block_states.data too short for aligned mode: need ${requiredLongsAligned}, got ${longs.length}`);
-    //                 }
-    //                 for (let idx = 0; idx < 4096; idx++)
-    //                 {
-    //                     const longIndex = Math.floor(idx / entriesPerLong);
-    //                     const within = idx % entriesPerLong;
-    //                     const offset = within * bitsPerBlock;
-    //                     const paletteIndex = Number((longs[longIndex] >> BigInt(offset)) & mask);
-
-    //                     if(paletteIndex >= paletteLen)
-    //                     {
-    //                         // console.warn(`${paletteIndex} out of range.`)
-    //                         paletteIndexes.push(null)
-    //                         continue;
-    //                     }
-    //                     else if(paletteIndex > paletteRedirection)
-    //                     {
-    //                         console.warn(`${paletteIndex} is not included in the palette redirector...`)
-    //                         paletteIndexes.push(null)
-    //                         continue;
-    //                     }
-    //                     if(!loadedModelPalette[ paletteRedirection[paletteIndex] ]){paletteIndexes.push(null); continue}
-
-    //                     paletteIndexes.push(paletteRedirection[paletteIndex]);
-    //                 }
-    //             }
-    //             else
-    //             {
-    //                 if (longs.length < requiredLongsStraddle) {
-    //                     throw new Error(`block_states.data too short for straddle mode: need ${requiredLongsStraddle}, got ${longs.length}`);
-    //                 }
-    //                 longs.push(0n, 0n);
-
-    //                 let state = 0;
-    //                 let data = longs[0];
-    //                 let dataLength = 64n;
-    //                 for (let j = 0; j < 4096; j++)
-    //                 {
-    //                     if (dataLength < bitsPerBlock)
-    //                     {
-    //                         state += 1;
-    //                         const newData = longs[state];
-    //                         data = (newData << dataLength) | data;
-    //                         dataLength += 64n;
-    //                     }
-    //                     const paletteIndex = Number(data & mask);
-
-    //                     if(paletteIndex >= paletteLen)
-    //                     {
-    //                         console.warn(`${paletteIndex} out of range.`)
-    //                         paletteIndexes.push(null)
-    //                         continue;
-    //                     }
-    //                     else if(paletteIndex > paletteRedirection)
-    //                     {
-    //                         console.warn(`${paletteIndex} is not included in the palette redirector...`)
-    //                         paletteIndexes.push(null)
-    //                         continue;
-    //                     }
-    //                     if(!loadedModelPalette[ paletteRedirection[paletteIndex] ]){paletteIndexes.push(null); continue}
-
-    //                     paletteIndexes.push(paletteRedirection[paletteIndex]);
-
-    //                     data >>= BigInt(bitsPerBlock);
-    //                     dataLength -= BigInt(bitsPerBlock);
-    //                 }
-    //             }
-    //         }
-
-    //         // Placing Blocks
-    //         let sections = []
-    //         // let blocks = []
-    //         const blocks = new Array(level.sections.length * 4096);
-
-    //         for (let sectionIndex = 0; sectionIndex < level.sections.length; sectionIndex++)
-    //         {
-    //             const s = level.sections[sectionIndex]
-
-    //             let sectionGroup = new THREE.Group();
-    //             chunkGroup.add(sectionGroup)
-    //             sectionGroup.position.set(0, (s.Y+4)*16, 0)
-
-    //             const baseX = level.xPos * 16;
-    //             const baseY = level.yPos * 16;
-    //             const baseZ = level.zPos * 16;
-
-    //             // Helper & AABB
-    //             let helper = new THREE.Mesh(new THREE.BoxGeometry(16, 16, 16), new THREE.MeshBasicMaterial({wireframe: true, color: 0xA0A000}))
-    //             // sectionGroup.add(helper)
-    //             helper.position.set(7.5, 7.5, 7.5)
-    //             const aabb = new THREE.Box3(new THREE.Vector3(baseX, baseY + (s.Y + 4) * 16, baseZ), new THREE.Vector3(baseX + 16, baseY + (s.Y + 4) * 16 + 16, baseZ + 16));
-
-    //             sections.push({group: sectionGroup, aabb})
-
-
-    //             if(!s?.block_states?.data || !s?.block_states?.palette || s.block_states.palette.length==1&&(s.block_states.palette[0].Name == "air"||s.block_states.palette[0].Name == "minecraft:air"))
-    //             {
-    //                 // blocks = blocks.concat(new Array(4096).map(() => null))
-    //                 continue
-    //             }
-
-    //             for(let idx = sectionIndex*4096; idx < sectionIndex*4096+4096; idx++)
-    //             {
-    //                 const paletteIndex = paletteIndexes[idx]
-    //                 if(paletteIndex==null || !loadedModelPalette[ paletteIndex ])
-    //                 {
-    //                     blocks.push(null)
-    //                     continue
-    //                 }
-
-    //                 const y = idx >> 8;
-    //                 const z = (idx >> 4) & 15;
-    //                 const x = idx & 15;
-
-    //                 let b = loadedModelPalette[ paletteIndex ].clone()
-    //                 b.position = {x: baseX + x, y: baseY + y, z: baseZ + z}
-
-    //                 blocks[idx] = b
-    //                 // blocks.push(b)
-    //                 b.add(sectionGroup)
-    //             }
-    //         }
-
-    //         chunksContent.set(`${level.xPos},${level.zPos}`, {level, aabb, group: chunkGroup, blocks, sections, collider: null})
-    //         console.groupEnd()
-    //     }
-
-    //     // Culling
-    //     chunksContent.forEach((chunk, k) =>
-    //     {
-    //         // Culling
-    //         for(let b of chunk.blocks)
-    //         {
-    //             if(!b){continue}
-    //             const px = getBlockFromPos(b.position.x+1, b.position.y, b.position.z)
-    //             const nx = getBlockFromPos(b.position.x-1, b.position.y, b.position.z)
-    //             const py = getBlockFromPos(b.position.x, b.position.y+1, b.position.z)
-    //             const ny = getBlockFromPos(b.position.x, b.position.y-1, b.position.z)
-    //             const pz = getBlockFromPos(b.position.x, b.position.y, b.position.z+1)
-    //             const nz = getBlockFromPos(b.position.x, b.position.y, b.position.z-1)
-
-    //             b.updateSide
-    //             ([
-    //                 px ? !px.coveredFaces[1] : px!=0,
-    //                 nx ? !nx.coveredFaces[0] : nx!=0,
-    //                 py ? !py.coveredFaces[3] : py!=0,
-    //                 ny ? !ny.coveredFaces[2] : ny!=0,
-    //                 pz ? !pz.coveredFaces[5] : pz!=0,
-    //                 nz ? !nz.coveredFaces[4] : nz!=0,
-    //             ])
-    //         }
-
-    //         // Physic
-    //         if(physic)
-    //         {
-    //             const geoms = [];
-    //             for (let i = 0; i < chunk.blocks.length; i++)
-    //             {
-    //                 const b = chunk.blocks[i];
-    //                 if (!b || !b.graphic?.geometry?.index || !b.physicGeometry?.index && !b.physicGeometry?.attributes?.position) {continue}
-
-    //                 const vs = b.visibleSides;
-    //                 let anyVisible = false;
-    //                 for (let j = 0; vs && j < vs.length; j++) { if (vs[j]) { anyVisible = true; break } }
-    //                 if (!anyVisible) {continue}
-
-    //                 const g = b.physicGeometry.clone();
-    //                 const pos = g.attributes.position.array;
-    //                 const tx = b.position.x, ty = b.position.y, tz = b.position.z;
-    //                 for (let k = 0; k < pos.length; k += 3)
-    //                 {
-    //                     pos[k] += tx; pos[k+1] += ty; pos[k+2] += tz;
-    //                 }
-    //                 g.attributes.position.needsUpdate = true;
-
-    //                 geoms.push(g);
-    //             }
-
-
-    //             if(geoms.length > 0)
-    //             {
-    //                 // const chunkColliderGeom = BufferGeometryUtils.mergeGeometries(geoms, false);
-    //                 const chunkColliderGeom = BufferGeometryUtils.mergeVertices(BufferGeometryUtils.mergeGeometries(geoms, false))
-
-    //                 const chunkCollider = RAPIER.ColliderDesc.trimesh(chunkColliderGeom.attributes.position.array, chunkColliderGeom.index.array);
-    //                 window.world.createCollider(chunkCollider)
-                    
-    //                 chunksContent.set(k, Object.assign(chunk, {collider: chunkCollider}))
-    //             }
-    //         }
-
-
-    //         // Render Otpimization
-    //         window.addRenderListener((clock, frustum) =>
-    //         {
-    //             chunk.group.visible = frustum.intersectsBox(chunk.aabb)
-    //             if(!chunk.group.visible){return}
-    //             for(let s of chunk.sections)
-    //             {
-    //                 s.group.visible = frustum.intersectsBox(s.aabb)
-    //             }
-    //         })
-    //     })
-
-    //     for(const chunk of chunksContent.values?chunksContent.values():chunksContent) { for(const b of chunk.blocks.filter(b=>b?.graphic?.geometry?.index)){b.graphic.visible = false} }
-
-    //     console.log("%cWorld parsed", "color: green")
-    //     console.groupEnd();
-    // }
-    // getBlockFromPos(x, y, z)
-    // {
-    //     let chunk = this.chunks.get(`${Math.floor(x/16)},${Math.floor(z/16)}`)
-    //     if(!chunk){ return 0}
-    //     return chunk.blocks[ ((y - chunk.level.yPos*16) << 8) | ((z - chunk.level.zPos*16) << 4) | ( x - chunk.level.xPos*16) ]
-    // }
     // async oldloadChunk(x, z)
     // {
     //     const existing = this.chunks.get(`${x},${z}`)

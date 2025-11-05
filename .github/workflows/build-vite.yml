@@ -18,6 +18,9 @@ jobs:
           - os: windows-latest
             platform: win
             arch: x64
+          - os: windows-latest
+            platform: win
+            arch: arm64
           - os: macos-latest
             platform: mac
             arch: universal

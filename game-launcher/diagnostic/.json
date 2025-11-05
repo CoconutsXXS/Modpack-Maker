@@ -1,0 +1,390 @@
+{
+  "BlockStates": [
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      1048576
+    ],
+    [
+      8448,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      1082466
+    ],
+    [
+      9777,
+      1211138048
+    ],
+    [
+      8659208,
+      0
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      59136,
+      0
+    ],
+    [
+      58720256,
+      242221056
+    ],
+    [
+      60614400,
+      7576807
+    ],
+    [
+      59193,
+      -831283993
+    ],
+    [
+      60614457,
+      -831283993
+    ],
+    [
+      60614457,
+      -831513369
+    ],
+    [
+      60614401,
+      -831283993
+    ],
+    [
+      58779449,
+      -831283993
+    ],
+    [
+      60614457,
+      -831283993
+    ],
+    [
+      0,
+      1278183
+    ],
+    [
+      271368,
+      1073741824
+    ],
+    [
+      8650752,
+      0
+    ],
+    [
+      0,
+      1082499
+    ],
+    [
+      271921,
+      102794272
+    ],
+    [
+      51675952,
+      1108344832
+    ],
+    [
+      50602248,
+      33990
+    ],
+    [
+      0,
+      1113790632
+    ],
+    [
+      8,
+      1108378656
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      7
+    ],
+    [
+      58720313,
+      -831520768
+    ],
+    [
+      60614400,
+      231
+    ],
+    [
+      0,
+      242457600
+    ],
+    [
+      59193,
+      -831283993
+    ],
+    [
+      60614457,
+      -831520768
+    ],
+    [
+      9728,
+      231
+    ],
+    [
+      51912968,
+      0
+    ],
+    [
+      8658952,
+      1108384036
+    ],
+    [
+      8660529,
+      1211312161
+    ],
+    [
+      51405361,
+      -1945074655
+    ],
+    [
+      53003784,
+      1108383942
+    ],
+    [
+      50602289,
+      -1939663741
+    ],
+    [
+      10012209,
+      -1975314234
+    ],
+    [
+      51955249,
+      -1945074655
+    ],
+    [
+      8659208,
+      1073775650
+    ],
+    [
+      0,
+      1108378657
+    ],
+    [
+      264,
+      1108378656
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      1792,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      7
+    ],
+    [
+      0,
+      7340032
+    ],
+    [
+      1792,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      84156680,
+      1108378822
+    ],
+    [
+      51955249,
+      -1939662646
+    ],
+    [
+      51954737,
+      -1939662656
+    ],
+    [
+      51955249,
+      -1939662650
+    ],
+    [
+      51955249,
+      -1939662717
+    ],
+    [
+      51955249,
+      -1941759802
+    ],
+    [
+      51955249,
+      -1939662650
+    ]
+  ],
+  "Palette": [
+    {
+      "Name": "minecraft:dirt"
+    },
+    {
+      "Properties": {
+        "snowy": "false"
+      },
+      "Name": "minecraft:grass_block"
+    },
+    {
+      "Properties": {
+        "axis": "y"
+      },
+      "Name": "minecraft:oak_log"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "1",
+        "persistent": "false"
+      },
+      "Name": "minecraft:oak_leaves"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "2",
+        "persistent": "false"
+      },
+      "Name": "minecraft:oak_leaves"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "3",
+        "persistent": "false"
+      },
+      "Name": "minecraft:oak_leaves"
+    },
+    {
+      "Name": "minecraft:air"
+    },
+    {
+      "Name": "minecraft:stone"
+    },
+    {
+      "Name": "minecraft:dandelion"
+    },
+    {
+      "Name": "minecraft:poppy"
+    },
+    {
+      "Name": "minecraft:grass"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "4",
+        "persistent": "false"
+      },
+      "Name": "minecraft:oak_leaves"
+    },
+    {
+      "Properties": {
+        "axis": "y"
+      },
+      "Name": "minecraft:birch_log"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "3",
+        "persistent": "false"
+      },
+      "Name": "minecraft:birch_leaves"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "2",
+        "persistent": "false"
+      },
+      "Name": "minecraft:birch_leaves"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "4",
+        "persistent": "false"
+      },
+      "Name": "minecraft:birch_leaves"
+    },
+    {
+      "Properties": {
+        "waterlogged": "false",
+        "distance": "1",
+        "persistent": "false"
+      },
+      "Name": "minecraft:birch_leaves"
+    }
+  ]
+}

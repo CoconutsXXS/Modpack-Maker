@@ -217,6 +217,48 @@ contextBridge.exposeInMainWorld('addPackListener', async (name, callback) =>
     return;
 })
 
+// Region
+contextBridge.exposeInMainWorld('readRegion', async (path) =>
+{
+    const r = await ipcRenderer.invoke('readRegion', path);
+
+    return (x, z) => {return ipcRenderer.invoke(r+'-region-chunk', x, z);}
+    // if(!i){return null}
+
+    // const chunks = [];
+    // let index = 0;
+    // while (true)
+    // {
+    //     const chunk = await ipcRenderer.invoke(i+'-region-buffer-chunk', index);
+    //     if (chunk.byteLength === 0) break;
+    //     chunks.push(new Uint8Array(chunk));
+    //     console.log(chunk)
+    //     index++;
+    // }
+
+    // const totalLength = chunks.reduce((acc, cur) => acc + cur.length, 0);
+    // const fullBuffer = new Uint8Array(totalLength);
+    // let offset = 0;
+    // for (const chunk of chunks)
+    // {
+    //     fullBuffer.set(chunk, offset);
+    //     offset += chunk.length;
+    // }
+
+    // try
+    // {
+    //     console.log("fullBuffer", fullBuffer)
+    //     const decoded = new TextDecoder().decode(fullBuffer);
+    //     console.log("decoded", decoded)
+    //     if(!decoded){return null;}
+    //     const json = JSON.parse(decoded);
+    //     console.log("json", json)
+    //     if(!json){return null}
+    //     return json;
+    // }
+    // catch(err) { console.error(err) }
+})
+
 
 contextBridge.exposeInMainWorld('setWindowPropertie', (k, v) => {ipcRenderer.send('windowPropertie', k, v)})
 

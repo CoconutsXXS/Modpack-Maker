@@ -51,6 +51,7 @@ app.whenReady().then(async () =>
 
         win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
     }
+    
     return
 
     if(isSilent()){return;}
@@ -277,7 +278,6 @@ ipcMain.on('getInstance', (event, name) =>
 
     const buffer = new TextEncoder().encode(JSON.stringify(i)).buffer.slice(0);
     const chunkSize = 1.8*1024**2;
-    let d = new Date();
     
     try{ipcMain.removeHandler(name+'-request-buffer-chunk')}catch{}
     ipcMain.handle(name+'-request-buffer-chunk', (event, chunkIndex) =>
@@ -522,7 +522,37 @@ ipcMain.handle('retrieveFileByPath', (event, name, path, version) => { return co
 ipcMain.handle('extractFileByKeys', (event, jarPath, keys) => { return contentModifier.extractFileByKeys(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), keys) })
 ipcMain.handle('extractFileByPath', (event, jarPath, p) => { return contentModifier.extractFileByPath(path.join(app.getPath('appData'), 'Modpack Maker', jarPath), p) })
 
+let regionTransfertIndex = 0;
+ipcMain.handle('readRegion', async (event, path) =>
+{
+    regionTransfertIndex++;
+    const r = Object.values(await contentModifier.readRegion(path))
+
+    try{ipcMain.removeHandler(regionTransfertIndex+'-region-chunk')}catch{}
+    ipcMain.handle(regionTransfertIndex+'-region-chunk', (event, x, z) =>
+    {
+        return r.find(c=>c.xPos==x&&c.zPos==z)
+    });
+
+    return regionTransfertIndex;
+    if(!r){return null}
+    const buffer = new TextEncoder().encode(JSON.stringify(r)).buffer.slice(0);
+    const chunkSize = 1.9*1024**2;
+    
+    try{ipcMain.removeHandler(regionTransfertIndex+'-region-buffer-chunk')}catch{}
+    ipcMain.handle(regionTransfertIndex+'-region-buffer-chunk', (event, chunkIndex) =>
+    {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, buffer.byteLength);
+        return buffer.slice(start, end);
+    });
+
+    return regionTransfertIndex
+})
+
 ipcMain.handle('writeJarPropertie', (event, jarPath, properties) => { if(!jarPath.startsWith(path.join(app.getPath('appData'), 'Modpack Maker'))){jarPath=path.join(app.getPath('appData'), 'Modpack Maker', jarPath)} return contentModifier.writeJarPropertie(jarPath, properties) })
+ipcMain.handle('readNbt', (e, p, r) => {return contentModifier.readNbt(p, r)})
+ipcMain.handle('readDat', (e, p, r) => {return contentModifier.readDat(p, r)})
 
 // Data
 const reader = require('./jar-reader.js');

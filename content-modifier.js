@@ -4,20 +4,22 @@ const { unzip, ZipEntry } = require('unzipit');
 const zlib = require('zlib');
 const nbt = require('prismarine-nbt');
 const toml = require('toml');
-const minecraftData = require('minecraft-data')
 const jarReader = require('./jar-reader');
 const similarity = require('similarity');
 const javaParser = require("./java-parser");
 const JSZip = require("jszip");
 const mcFunction = require("@spyglassmc/mcfunction");
-const { WorldReader, RegionReader, RegionWriter } = require('@xmcl/world')
 const lodash = require("lodash")
 const path = require("path")
 const {sep} = require("path")
 var chokidar = require('chokidar');
 const decompiler = require("./decompiler")
+const pako = require("pako")
+const xmclNbt = require('@xmcl/nbt')
+
 
 const config = require('./config');
+const parseMCA = require('./mca-parser');
 
 function toNBT(value)
 {
@@ -640,9 +642,9 @@ module.exports =
     {
         let r = {};
 
-        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        if(!version && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
         { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
-        else { console.error("Cannot resolve",name,"version..."); return }
+        else if(!version) { console.error("Cannot resolve",name,"version..."); return }
 
         // List every Jar including Minecraft
         let sub = [];
@@ -686,9 +688,9 @@ module.exports =
 
     retrieveModFileById: async (name, id = "minecraft:worldgen/placed_feature/basalt_blobs", version) =>
     {
-        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        if(!version && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
         { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
-        else { console.error("Cannot resolve",name,"version..."); return }
+        else if(!version) { console.error("Cannot resolve",name,"version..."); return }
 
         // List every Jar including Minecraft
         let sub = [];
@@ -737,9 +739,9 @@ module.exports =
     },
     retrieveModFileByPath: async (name, truePath = "", version) =>
     {
-        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        if(!version && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
         { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
-        else { console.error("Cannot resolve",name,"version..."); return }
+        else if(!version) { console.error("Cannot resolve",name,"version..."); return }
 
         // List every Jar including Minecraft
         let sub = [];
@@ -784,9 +786,9 @@ module.exports =
     },
     retrieveModFileByKeys: async (name, keys = [], version) =>
     {
-        if((version==undefined||version==null) && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
+        if(!version && fs.existsSync(path.join(config.directories.instances, name, ".instance-data.json")))
         { version = (await JSON.parse(await fsPromise.readFile(path.join(config.directories.instances, name, ".instance-data.json")))).version.number }
-        else { console.error("Cannot resolve",name,"version..."); return }
+        else if(!version) { console.error("Cannot resolve",name,"version..."); return }
 
         // List every Jar including Minecraft
         let sub = [];
@@ -907,6 +909,19 @@ module.exports =
 
         const content = await main.generateAsync({type:"arraybuffer"});
         fs.writeFileSync(jarPath, Buffer.from(content))
+    },
+
+    readRegion: async (p) =>
+    {
+        return await parseMCA(p)
+    },
+    readNbt: async (p, raw = false) =>
+    {
+        return await nbt[raw?"parseAs":"parseUncompressed"](fs.readFileSync(p), 'big')
+    },
+    readDat: async (p, raw = false) =>
+    {
+        return xmclNbt.deserialize(fs.readFileSync(p), { compressed: "gzip" })
     },
 
     readZipEntry: readZipEntry,
