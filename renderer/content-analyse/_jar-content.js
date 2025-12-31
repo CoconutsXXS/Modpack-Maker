@@ -1,30 +1,60 @@
 import * as msgpack from "@msgpack/msgpack";
+import getClassData from "./class-data";
+import searchEntities from "./entity-search";
+import JavaTree from "./java-tree";
 
-export class ModpackJar
+export default class JarContent
 {
     static get = async function(name, version = null)
     {
-        let result = new ModpackJar();
+        let result = new JarContent();
         result.name = name;
-        result.data = msgpack.decode(await getCombined(name, version))
+        result.combined = msgpack.decode(await getCombined(name, version))
 
+        recursive(result.combined.data, 'data')
+        recursive(result.combined.assets, 'assets')
+        function recursive(o, prop, keys = [])
+        {
+            for(const [k, v] of Object.entries(o))
+            {
+                const path = [...keys, k]
+                if(typeof(v) == 'object' && !!v) { recursive(v, prop, path); continue }
+                if(!path[path.length-1]){continue}
+
+                const modId = path.shift()
+                if(!modId || modId.length==0){continue}
+
+                path[path.length-1] = k.slice(0, k.lastIndexOf('.'))
+
+                result[prop][modId+':'+path.join('/')] = null
+            }
+        }
+
+        await searchEntities(result)
+        
         return result
     }
 
     getFile = async function(keys, multipleResolver = (files) => { return files[0] })
     {
-        if(!getProp(this.data, keys))
+        if(!getProp(this.combined, keys))
         {
             let files = await ipcInvoke("retrieveFileByKeys", this.name, keys);
             if(files.length==0){return null;}
-            let value = multipleResolver(files);
-            setProp(this.data, keys, value)
+            let file = files.length > 1 ? multipleResolver(files) : files[0];
 
-            return value;
+            if(keys[keys.length-1].endsWith('.class'))
+            {
+                file.value = await JavaTree.from(file.value.text)
+            }
+
+            setProp(this.combined, keys, file)
+
+            return file;
         }
         else
         {
-            return getProp(this.data, keys)
+            return getProp(this.combined, keys)
         }
     }
     resolveAsset = async function(ref, prefixKeys = [])
@@ -50,7 +80,7 @@ export class ModpackJar
 
             keys = ['assets', "minecraft"].concat(cleaned);
         }
-
+        
         let targetObject = await this.getFile(keys);
         if(targetObject) { return targetObject.value }
         else
@@ -89,7 +119,9 @@ export class ModpackJar
     }
 
     name
+    combined = {}
     data = {}
+    assets = {}
 }
 
 // Object Utilies

@@ -1,20 +1,40 @@
 import { initializeScene } from "./renderer"
-import { ModpackJar } from './jar-data'
-import { parseModel, parseNbt, parseMca, Block, World, BlockModel } from "./model-loader"
-import { setupPlayer } from "./controller"
+import JarContent from '../renderer/content-analyse/jar-content'
+import World from "./world/world"
+import { Player } from "./player/controller"
 
 import * as THREE from "three";
+import Portal from "./portal/portal";
+import WorldPortal from "./portal/world-portal";
+import GUI from "./player/gui";
+import Extension from "./extension";
+import Item from "./world/item";
+import Block from "./world/block";
 
 async function main()
 {
     await initializeScene()
 
-    window.jar = await ModpackJar.get("Apocalypse");
+    window.jar = await JarContent.get("test");
+
+    // console.log(await window.jar.get("assets/minecraft/textures/item/howl_pottery_sherd_n.png"))
+
+    // Load Extension
+    window.jar = await Extension.load('modpack-maker', window.jar);
+
     console.log(window.jar)
 
+    const testItem = await Item.from('minecraft:oak_stairs', window.jar)
+    console.log(testItem)
+    console.log(testItem.block)
+    console.log(await Block.from(testItem.block, {}, window.jar))
+    // return
 
-    window.scene.add( new THREE.AmbientLight(0xffffff, 1) )
-    const light = new THREE.DirectionalLight(0xffffff, 2);
+
+    // Hub Scene
+    // Light
+    window.scene.add( new THREE.AmbientLight(0xffffff, Math.pow(12/15, 1.5)*2) )
+    const light = new THREE.DirectionalLight(0xffffff, Math.pow(1, 1.5)*2);
     light.castShadow = true;
     light.shadow.camera.near = 1;
     light.shadow.camera.far = 100;
@@ -34,11 +54,188 @@ async function main()
         light.position.set(window.mainCamera.position.x + 30, window.mainCamera.position.y + 50, window.mainCamera.position.z + 30);
     })
 
+    const structures = Object.keys(window.jar.indexer).filter(a=>a.split("/")[2] == 'structures')
 
-    let launchWorld = window.launchWorld = new World(window.jar, '/Users/coconuts/Library/Application Support/Modpack Maker/instances/test/minecraft', window.addRenderListener)
+    let launchWorld = window.mcWorld = new World(window.jar, '/Users/coconuts/Library/Application Support/Modpack Maker/instances/test/minecraft', window.addRenderListener)
     window.scene.add(launchWorld.group)
-    await launchWorld.importStructure("minecraft:structures/ancient_city/city/entrance/entrance_connector", 32, 64, 32)
 
+    // structures[Math.floor(Math.random() * structures.length)]
+    await launchWorld.importStructure('minecraft:structures/ancient_city/city/entrance/entrance_connector', 0, 0, 0);
+
+    // Player
+    window.player = new Player(8, 4, 9)
+    window.canvas.requestPointerLock();
+
+    // const blocks = Object.keys(window.jar.assets).filter(a=>a.split(":")[1].startsWith('blockstates'))
+    // for (let i = 0; i < 9; i++)
+    // {
+    //     const id = blocks[Math.floor(Math.random() * blocks.length)];
+    //     window.player.gui.setSlot(i, id.split(':')[0]+':'+id.split(':')[1].slice(id.split(':')[1].indexOf('/')+1))
+    // }
+
+
+    // Portal
+    const worldPortal = new WorldPortal(window.jar, 'New World 1_20_1', 8, 2, 8, 2, 3)
+    worldPortal.loadWorld(16)
+
+    const l = await worldPortal.world.loadLevel()
+    for (let i = 0; i < 9; i++)
+    {
+        const id = l.Player.Inventory.find(s=>s.Slot==i)?.id;
+        // await window.player.gui.setSlot(i, id)
+    }
+
+    // await window.player.gui.setSlot(6, 'modpack-maker:launcher-terminal')
+
+    // return
+
+    const i = await launch("test",
+        {
+            log: (t, c) =>
+            {
+            },
+            close: c =>
+            {
+            },
+            processLaunch: () =>
+            {
+            },
+            network: (i, c) =>
+            {
+            },
+            windowOpen: async (w, i) =>
+            {
+                // Stream
+                const stream = await navigator.mediaDevices.getUserMedia
+                ({
+                    audio: false,
+                    video:
+                    {
+                        mandatory:
+                        {
+                            chromeMediaSource: 'desktop',
+                            chromeMediaSourceId: w.id
+                        },
+                        maxWidth: 1920*2,
+                        maxHeight: 1080*2,
+                        maxFrameRate: 120,
+                        minWidth: 1920/5,
+                        minHeight: 1080/5,
+                    }
+                });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.muted = true;
+                video.onloadedmetadata = () =>
+                {
+                    video.play()
+                    worldPortal.portal.project(video, worldPortal.world.group.children)
+                }
+            },
+        },
+        {type: "singleplayer", identifier: "New World 1_20_1"},
+        window.innerWidth,
+        window.innerHeight
+    )
+
+    return
+
+    // // Portal
+    // if(false)
+    // {
+    //     let mcWorld = window.mcWorld = new World(window.jar, '/Users/coconuts/Library/Application Support/Modpack Maker/instances/test/minecraft', window.addRenderListener, null, false)
+    //     mcWorld.world = 'New World 1_20_1'
+    //     mcWorld.group.position.setY(-3000)
+    //     window.scene.add(mcWorld.group)
+
+    //     const level = await window.mcWorld.loadLevel()
+
+    //     const sky = new THREE.Mesh(new THREE.BoxGeometry(1000, 1000, 1000), new THREE.MeshBasicMaterial({side: THREE.BackSide, color: 0x000000}))
+    //     sky.position.set(level.Player.Pos[0]-.5, level.Player.Pos[1]+1.62 -3000 -.5, level.Player.Pos[2] -.5)
+    //     window.scene.add(sky)
+
+    //     const p = new Portal(2, 3, 8, 2, 8, new THREE.Vector3(level.Player.Pos[0]-.5, level.Player.Pos[1]+1.62 -3000 -.5, level.Player.Pos[2] -.5), new THREE.Vector3(THREE.MathUtils.degToRad(-level.Player.Rotation[1]), THREE.MathUtils.degToRad(-level.Player.Rotation[0]-180), 0), sky, window.scene)
+    //     mcWorld.camera = p.camera
+    //     p.fov = 70
+    //     p.shiftPosition.setY(1.5-1.62)
+
+    //     setTimeout(loadNearby, 1000)
+    //     async function loadNearby(renderDistance = 14)
+    //     {
+    //         const startPoint = {x: Math.floor(p.camera.position.x/16), z: Math.floor(p.camera.position.z/16)}
+    //         const toLoad = []
+    //         for (let x = Math.floor(p.camera.position.x/16)-renderDistance; x < Math.floor(p.camera.position.x/16)+renderDistance; x++)
+    //         {
+    //             for (let z = Math.floor(p.camera.position.z/16)-renderDistance; z < Math.floor(p.camera.position.z/16)+renderDistance; z++)
+    //             {
+    //                 toLoad.push({x,z})
+    //             }
+    //         }
+
+    //         for(let l of toLoad.sort((a, b) => (Math.abs(startPoint.x-a.x)+Math.abs(startPoint.z-a.z)) - (Math.abs(startPoint.x-b.x)+Math.abs(startPoint.z-b.z))))
+    //         {
+    //             await mcWorld.loadChunk(l.x, l.z)
+    //         }
+    //     }
+
+    //     // Launch
+    //     if(false)
+    //     {
+    //         const i = await launch("test",
+    //             {
+    //                 log: (t, c) =>
+    //                 {
+    //                 },
+    //                 close: c =>
+    //                 {
+    //                 },
+    //                 processLaunch: () =>
+    //                 {
+    //                 },
+    //                 network: (i, c) =>
+    //                 {
+    //                 },
+    //                 windowOpen: async (w, i) =>
+    //                 {
+    //                     // Stream
+    //                     const stream = await navigator.mediaDevices.getUserMedia
+    //                     ({
+    //                         audio: false,
+    //                         video:
+    //                         {
+    //                             mandatory:
+    //                             {
+    //                                 chromeMediaSource: 'desktop',
+    //                                 chromeMediaSourceId: w.id
+    //                             },
+
+    //                             maxWidth: 1920*2,
+    //                             maxHeight: 1080*2,
+
+    //                             maxFrameRate: 120,
+
+    //                             minWidth: 1920/5,
+    //                             minHeight: 1080/5,
+    //                         }
+    //                     });
+
+    //                     const video = document.createElement('video');
+    //                     document.body.appendChild(video)
+    //                     video.srcObject = stream;
+    //                     video.muted = true;
+    //                     video.onloadedmetadata = () =>
+    //                     {
+    //                         video.play()
+    //                         p.project(video, mcWorld.group.children)
+    //                     }
+    //                 },
+    //             },
+    //             {type: "singleplayer", identifier: "New World 1_20_1"},
+    //             window.innerWidth,
+    //             window.innerHeight
+    //         )
+    //     }
+    // }
 
     // Portal    
     const renderTarget = new THREE.WebGLRenderTarget(512, 512,
@@ -56,17 +253,6 @@ async function main()
     const copyCam = new THREE.PerspectiveCamera();
     copyCam.fov = window.mainCamera.fov;
     copyCam.aspect = window.mainCamera.aspect;
-
-    // World
-    let mcWorld = window.mcWorld = new World(window.jar, '/Users/coconuts/Library/Application Support/Modpack Maker/instances/test/minecraft', window.addRenderListener, copyCam, false)
-    mcWorld.world = 'New World 1_20_1'
-    mcWorld.group.position.setY(-2000)
-    window.scene.add(mcWorld.group)
-
-    const level = await window.mcWorld.loadLevel()
-    window.mainCamera.position.set(level.Player.Pos[0], level.Player.Pos[1]+1.7, level.Player.Pos[2])
-    window.mainCamera.rotation.set(THREE.MathUtils.degToRad(level.Player.Rotation[1]), THREE.MathUtils.degToRad(level.Player.Rotation[0]), 0, 'YXZ'); 
-
 
     // Material
     const portalMat = new THREE.MeshBasicMaterial
@@ -144,7 +330,7 @@ async function main()
         return angle;
     }
 
-    setupPlayer(40, 70, 40)
+    // setupPlayer(40, 70, 40)
 
     window.addRenderListener((clock, frustum) =>
     {
@@ -189,31 +375,12 @@ async function main()
 
     // Load
     setTimeout(loadNearby, 3000)
-    async function loadNearby(renderDistance = 8)
-    {
-        const startPoint = {x: Math.floor(copyCam.position.x/16), z: Math.floor(copyCam.position.z/16)}
-        console.log(JSON.parse(JSON.stringify(copyCam.position)))
-        const toLoad = []
-        for (let x = Math.floor(copyCam.position.x/16)-renderDistance; x < Math.floor(copyCam.position.x/16)+renderDistance; x++)
-        {
-            for (let z = Math.floor(copyCam.position.z/16)-renderDistance; z < Math.floor(copyCam.position.z/16)+renderDistance; z++)
-            {
-                toLoad.push({x,z})
-            }
-        }
-
-        for(let l of toLoad.sort((a, b) => (Math.abs(startPoint.x-a.x)+Math.abs(startPoint.z-a.z)) - (Math.abs(startPoint.x-b.x)+Math.abs(startPoint.z-b.z))))
-        {
-            console.log(l.x, l.z)
-            await mcWorld.loadChunk(l.x, l.z)
-        }
-    }
 
 
     // Tests
 
     // {
-    //     let bm = await BlockModel.from("minecraft:dirt", {}, window.jar);
+    //     let bm = await Block.from("minecraft:dirt", {}, window.jar);
     //     console.log(bm)
 
     //     const mesh = bm.instanceMesh(8);
@@ -228,14 +395,14 @@ async function main()
 
     //     const masks = new Float32Array
     //     ([
-    //         BlockModel.computeInstanceMask([1,1,1,1,1,1]),
-    //         BlockModel.computeInstanceMask([0,1,1,1,1,1]),
-    //         BlockModel.computeInstanceMask([1,0,1,1,1,1]),
-    //         BlockModel.computeInstanceMask([1,1,0,1,1,1]),
-    //         BlockModel.computeInstanceMask([1,1,1,0,1,1]),
-    //         BlockModel.computeInstanceMask([1,1,1,1,0,1]),
-    //         BlockModel.computeInstanceMask([1,1,1,1,1,0]),
-    //         BlockModel.computeInstanceMask([0,0,0,0,0,0]),
+    //         Block.computeInstanceMask([1,1,1,1,1,1]),
+    //         Block.computeInstanceMask([0,1,1,1,1,1]),
+    //         Block.computeInstanceMask([1,0,1,1,1,1]),
+    //         Block.computeInstanceMask([1,1,0,1,1,1]),
+    //         Block.computeInstanceMask([1,1,1,0,1,1]),
+    //         Block.computeInstanceMask([1,1,1,1,0,1]),
+    //         Block.computeInstanceMask([1,1,1,1,1,0]),
+    //         Block.computeInstanceMask([0,0,0,0,0,0]),
     //     ]);
 
     //     mesh.geometry.setAttribute('instanceMask', new THREE.InstancedBufferAttribute(masks, 1, false));

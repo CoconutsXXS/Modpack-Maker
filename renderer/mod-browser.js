@@ -1,4 +1,6 @@
 // import similarity from 'cdn/similarity'
+const codes = []
+const cache = []
 function levenshtein(value, other, insensitive)
 {
   var length
@@ -132,8 +134,34 @@ async function searchMod(text = '')
                 case 'neoforge': {flavorIndex=6;break;}
                 case 'quilt': {flavorIndex=5;break;}
             }
-            let curseforge = await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&gameFlavors[0]=${flavorIndex}${window.instance.sinytra?'%2C4':''}&classId=6`)).json()
-            if(!curseforge.data){curseforge.data=[];}
+            // https://www.curseforge.com/minecraft/search?page=1&pageSize=20&sortBy=relevancy&class=mc-mods&search=a&_rsc=1h9x8
+
+            // JSON Old API
+            // let curseforge = await (await fetch(`https://www.curseforge.com/minecraft/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}${document.getElementById("filter-version-browsing").checked?`&gameVersion=${window.instance.version.number}`:""}&gameFlavors[0]=${flavorIndex}${window.instance.sinytra?'%2C4':''}&classId=6`)).json()
+            // if(!curseforge.data){curseforge.data=[];}
+
+            // New API
+            // https://www.curseforge.com/minecraft/search?page=1&pageSize=20&sortBy=relevancy&class=mc-mods&search=Aether&_rsc=1h9x8
+            const htmlRes = await fetch ( `https://www.curseforge.com/minecraft/search?page=1&pageSize=40&sortBy=relevancy&class=mc-mods&search=${text}${document.getElementById("filter-version-browsing").checked?`&version=${window.instance.version.number}`:""}&gameVersionTypeId=${flavorIndex}${window.instance.sinytra?'%2C4':''}`, { headers: { "Accept": "text/html" } } )
+            const pageRes = new DOMParser().parseFromString(await htmlRes.text() , "text/html")
+
+            let curseforge = {data: []}
+            for(const el of pageRes.querySelectorAll("div.project-card"))
+            {
+                curseforge.data.push
+                ({
+                    slug: el.querySelector("a").href.slice(el.querySelector("a").href.lastIndexOf('/')+1),
+                    name: el.querySelector(".name > span").innerText,
+                    avatarUrl: el.querySelector(".art > #row-image").src,
+                    summary: el.querySelector(".description").innerText,
+                    gameVersion: el.querySelector(".detail-game-version").innerText,
+                    isClientCompatible: null,
+                })
+            }
+
+
+            console.log(curseforge)
+
             for(let d of curseforge.data)
             {
                 async function loadImages()
@@ -185,7 +213,7 @@ async function searchMod(text = '')
             }
             if(window.instance.sinytra&&window.instance.loader.name=='forge')
             {
-                for(let d of (await (await fetch(`https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&gameVersion=${window.instance.version.number}&gameFlavors[0]=4&classId=6`)).json()).data)
+                for(let d of (await (await fetch(`https://www.curseforge.com/minecraft/search?gameId=432&index=0&pageSize=40&sortField=1&filterText=${text}&gameVersion=${window.instance.version.number}&gameFlavors[0]=4&classId=6`)).json()).data)
                 {
                     if(curseforge.data.find(data=>data.slug==d.slug)!=undefined){continue}
                     async function loadImages()

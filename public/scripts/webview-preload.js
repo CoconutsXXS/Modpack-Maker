@@ -8,6 +8,14 @@ contextBridge.exposeInMainWorld('electron',
     fetchTxt: async (url) => { return await ipcRenderer.invoke("fetch-text", url) }
 });
 
+try {
+  // this registers any renderer-side hooks (the package name may change in future releases)
+  require('@ghostery/adblocker-electron-preload');
+} catch (err) {
+  // not fatal, but print so you know if the preload failed to load
+  console.warn('Adblocker preload failed to load:', err && err.message);
+}
+
 // Prevent window change
 // history.pushState = function(state, title, url)
 // {

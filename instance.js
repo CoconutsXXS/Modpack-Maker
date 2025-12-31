@@ -316,7 +316,7 @@ class Instance
             windowOpen: function(window, windowSource, process){},
             processLaunch: function(process){},
             network: function(m){}
-        }, port = 1337, world = null)
+        }, port = 1337, world = null, width, height)
     {
         if(!fs.existsSync(this.path)){fs.mkdirSync(this.path, {recursive: true});}
 
@@ -328,7 +328,8 @@ class Instance
                 max: Number(this.memory.max.slice(0, this.memory.max.length-1))
             },
             world,
-            listeners
+            listeners,
+            width, height
         )
     }
 
@@ -1797,7 +1798,7 @@ async function launchMinecraft(p, version, loader, memory, world, listeners =
         windowOpen: function(window, windowSource, process){},
         processLaunch: function(process){},
         network: function(m){}
-    })
+    }, width, height)
 {
     if(!fs.existsSync(p)){fs.mkdirSync(p, {recursive: true});}
 
@@ -2120,7 +2121,9 @@ async function launchMinecraft(p, version, loader, memory, world, listeners =
             maxMemory: memory.max*1024,
             
             extraMCArgs: world?[world.type=="singleplayer"?"--quickPlaySingleplayer":"--quickPlayMultiplayer", world.identifier, `${world.type=="singleplayer"?"--quickPlaySingleplayer":"--quickPlayMultiplayer"} ${world.identifier}`]:[],
-            prechecks: []
+            prechecks: [],
+
+            resolution: {width: width, height: height, fullscreen: false}
         })
 
         let pid = process?.pid;
@@ -2250,9 +2253,9 @@ async function launchMinecraft(p, version, loader, memory, world, listeners =
             forge: loader.name=='forge'||loader.name=='neoforge'?path.join(p, 'versions', `${loader.name}-${version.number}-${loader.version}`, `${loader.name}-${version.number}-${loader.version}.jar`):null,
             quickPlay: world!=undefined?world:null,
             javaPath: javaPath?javaPath:'java',
-            overrides: {detached: true}
+            overrides: {detached: true},
+            window: {width: width, height: height, fullscreen: false}
         }
-        console.log(options)
 
         // Asset Move
         launcher.on('debug', (e, ...args) =>

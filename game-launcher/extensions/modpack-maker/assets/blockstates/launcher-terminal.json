@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "":
+    {
+      "model": "modpack-maker:block/launcher-terminal"
+    },
+    "facing=east":
+    {
+      "model": "modpack-maker:block/launcher-terminal",
+      "y": 270
+    },
+    "facing=north":
+    {
+      "model": "modpack-maker:block/launcher-terminal",
+      "y": 180
+    },
+    "facing=south":
+    {
+      "model": "modpack-maker:block/launcher-terminal",
+      "y": 90
+    },
+    "facing=west":
+    {
+      "model": "modpack-maker:block/launcher-terminal",
+      "y": 0
+    }
+  }
+}

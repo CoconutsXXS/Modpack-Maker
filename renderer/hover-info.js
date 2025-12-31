@@ -32,6 +32,7 @@ window.loadHoverInfo = () =>
     }
 }
 window.addEventListener('DOMContentLoaded', window.loadHoverInfo)
+window.loadHoverInfo()
 
 document.addEventListener('mousemove', (ev) =>
 {

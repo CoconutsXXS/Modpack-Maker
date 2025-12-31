@@ -13,7 +13,10 @@ module.exports =
         saves: path.join(app.getPath('appData'), 'Modpack Maker', 'saves'),
         browserRequests: path.join(app.getPath('appData'), 'Modpack Maker', '.browser-requests.json'),
         extension: path.join(app.getPath('appData'), 'Modpack Maker', 'extension'),
-        jre: path.join(app.getPath('appData'), 'Modpack Maker', 'JRE')
+        jre: path.join(app.getPath('appData'), 'Modpack Maker', 'JRE'),
+        unobfuscated: path.join(app.getPath('appData'), 'Modpack Maker', 'unobfuscated'),
+        combinedInstances: path.join(app.getPath('appData'), 'Modpack Maker', 'combined-instances'),
+        decompiledInstances: path.join(app.getPath('appData'), 'Modpack Maker', 'decompiled-instances'),
     },
     javaAgent:path.join(app.getAppPath(), 'agent', 'agent.jar')
 }

@@ -4,6 +4,10 @@ import commonjs from '@rollup/plugin-commonjs'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 
+import NodeGlobalsPolyfillPlugin from '@esbuild-plugins/node-globals-polyfill';
+import NodeModulesPolyfillPlugin from '@esbuild-plugins/node-modules-polyfill';
+import rollupNodePolyFill from 'rollup-plugin-polyfill-node';
+
 export default defineConfig({
   root: '.',
   base: './',
@@ -23,16 +27,40 @@ export default defineConfig({
         load: resolve(__dirname, 'load.html'),
         "game-launcher": resolve(__dirname, 'game-launcher', 'main.html')
       },
-      external: ['plist', 'plist-parse', 'pend', 'fd-slicer']
+      external: ['plist', 'plist-parse', 'pend', 'fd-slicer'],
+      plugins: [
+        rollupNodePolyFill()
+      ]
     },
-    target: 'esnext'
+    target: 'esnext',
+    commonjsOptions: {
+      transformMixedEsModules: true // helps with some CJS/ESM interop
+    }
   },
   resolve: {
     alias: {
-      three: resolve('./node_modules/three')
+      three: resolve('./node_modules/three'),
+      buffer: 'buffer',
+      process: 'process/browser',
+      util: 'util',
+      assert: 'assert',
     }
   },
   optimizeDeps: {
-    include: ['three']
+    include: [
+      // force pre-bundling for libraries that might use Node features
+      'three',
+      'antlr4ts',
+      'java-ast'
+    ],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      },
+      plugins: [
+        NodeGlobalsPolyfillPlugin({ process: true, buffer: true }),
+        NodeModulesPolyfillPlugin()
+      ]
+    }
   }
 })

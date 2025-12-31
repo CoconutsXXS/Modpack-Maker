@@ -16,6 +16,7 @@
     <script src="./renderer/tab.js" type="module"></script>
     <script src="./renderer/tab-setup.js" type="module"></script>
     <script src="./renderer/panels.js" type="module"></script>
+    <script src="./renderer/resizable.js" type="module"></script>
     <script src="./renderer/background-events.js" type="module"></script>
     <script src="./renderer/horizontal-scroll.js" type="module"></script>
     <script src="./renderer/loading.js" type="module"></script>
@@ -107,10 +108,10 @@
                 <p>Open a web page:</p>
                 <div><button>Mods</button><button>Resourcepacks</button><button>Shaders</button><button>Youtube</button></div>
             </div>
-            <webview preload="./scripts/webview-preload.js"></webview>
+            <webview partition="persist:webview" preload="./scripts/webview-preload.js"></webview>
         </div>
         <div id="youtube-window">
-             <webview id="youtube-integration" style="display: none;" enableblinkfeatures="CSSVariables" preload="./scripts/webview-preload.js"></webview>
+             <webview partition="persist:webview" id="youtube-integration" style="display: none;" enableblinkfeatures="CSSVariables" preload="./scripts/webview-preload.js"></webview>
              <div id="youtube-search">
                 <input type="text" placeholder='Search for a mod, a type of mod, a resourcepack style, etc... (ex: "Apocalypse", "RPG", "Cartoon")'>
                 <div>
@@ -210,9 +211,19 @@
             </div>
         </div>
         <div id="content-editor">
-            <div anchor-top class="tab"><button>Explorer</button><button>Content Table</button><button>Apply Manager</button></div>
+            <div anchor-top class="tab">
+                <select id="content-listing-selection" name="Content">
+                    <option value="allContent">All Content</option>
+                    <option value="contentElements">Content by Mods/Resourcepacks</option>
+                    <option value="assets">Assets</option>
+                    <option value="data">Data</option>
+                    <option value="sourceCode">Source Code</option>
+                </select>
+                <button>Applier</button>
+            </div>
+            
             <div>
-                <div id="content-element-selector">
+                <!-- <div id="content-element-selector">
                     <button>Load Modpack Content Table</button>
                     <table>
                         <caption></caption>
@@ -224,16 +235,23 @@
                         <tbody>
                         </tbody>
                     </table>  
-                </div>
-                <div id="mod-content-editor">
-                    <button>Apply Changes</button>
-                    <!-- Mod Selection -->
-                    <div class="content-explorer-section">
-                        <div><img><h3>Content</h3></div>
+                </div> -->
+
+                <div id="content-explorer">
+                    <div id="pack-selector">
+                        <button>Built-In</button>
+                        <h4>Resourcepacks:</h4>
+                        <h4>Built-In Packs:</h4>
                     </div>
+                    <div id="content-explorer-selector"></div>
+                </div>
+
+                <div id="mod-content-explorer">
+                    <button>Apply Changes</button>
                     <button class="unexpend">&lt;</button>
                 </div>
-                <div id="apply-editor">
+
+                <!-- <div id="apply-editor">
                     <div>
                         <div>
                             <p>path/to/file.nbt</p>
@@ -246,7 +264,28 @@
                         <button>Revert All</button>
                     </div>
                     <button>Back</button>
+                </div> -->
+
+                <div id="apply-editor">
+                    <div>
+                        <div>
+                            <img height="32">
+                            <h4>Content Name</h4>
+                        </div>
+                        <div>
+                            <div>
+                                <p>assets/textures/blocks/block.png</p>
+                                <button soft-hover-info="Confirm"></button>
+                                <button soft-hover-info="Revert"></button>
+                            </div>
+                        </div>
+                        <div>
+                            <button>Apply All</button>
+                            <button>Reverse All</button>
+                        </div>
+                    </div>
                 </div>
+
                 <div id="launch-required">
                     <div>
                         <p>Minecraft is not installed yet. Please launch your modpack once and try again.</p>
@@ -255,9 +294,33 @@
                 </div>
 
                 <div id="editor-container">
+                    <div id="file-metadata">
+                        <div>
+                            <div>
+                                <button style="--icon: url('../resources/export.png')" hover-info="Export"></button>
+                                <!-- <button hover-info="Save"></button> -->
+                                <button style="--icon: url('../resources/import.png')" hover-info="Import"></button>
+                                <input type="file">
+                            </div>
+                            <div>
+                                <button style="--icon: url('../resources/view.png')" hover-info="View Original"></button>
+                                <button style="--icon: url('../resources/previous.png')" hover-info="Restore to Original"></button>
+                            </div>
+                            <div>
+                                <button style="--icon: url('../resources/camera.png')" hover-info="Change View"></button>
+                                <button style="--icon: url('../resources/next.png')" hover-info="Open in Game"></button>
+                            </div>
+                            <div>
+                                <button style="--icon: url('../resources/export.png')" hover-info="Export to Game"></button>
+                                <button style="--icon: url('../resources/import.png')" hover-info="Import from Game"></button>
+                            </div>
+                        </div>
+                        <select id="file-origin-selector" name="origin"></select>
+                        <h4><span></span><span></span></h4>
+                    </div>
                     <div id="multiple-source"><div></div></div>
                     <div id="code-editor">
-                        <div class="exit-options"><button class="three">Open as 3D Model</button><button class="save">Save</button><button class="exit">Exit</button></div>
+                        <div class="exit-options"><button class="three">Open as 3D Model</button></div>
                     </div>
                     <div id="nbt-editor">
                         <div><button>Edit in Minecraft</button><button>Open in 3D View</button></div>
@@ -282,13 +345,6 @@
                         </table>
                     </div>
                     <div id="image-editor">
-                        <div>
-                            <button class="download">Download</button>
-                            <button class="replace">Replace</button>
-                            <button class="save">Save</button>
-                            <input type="file">
-                        </div>
-
                         <canvas id="content-image-canvas"></canvas>
 
                         <div>
@@ -299,14 +355,14 @@
                             <button hover-info="Lock Transparency"></button>
                             <button hover-info="Lock Opacity"></button>
                             <button hover-info="Hue"></button>
-                            <input hover-info="Size" type="range" value="1" step="1" min="1" max="5">
+                            <input hover-info="Size" type="range" value="1" step="1" min="1" max="64">
                         </div>
                     </div>
                     <div id="three-editor">
-                        <div>
+                        <!-- <div>
                             <button></button><button></button><button></button>
                             <select placeholder="files dependencies" name="files dependencies"></select>
-                        </div>
+                        </div> -->
                         
                         <canvas id="three-file-canvas"></canvas>
                     </div>
@@ -437,7 +493,7 @@
             </div>
 
             <div id="bottom-webview-container">
-                <webview id="bottom-webview" preload="./scripts/webview-preload.js"></webview>
+                <webview partition="persist:webview" id="bottom-webview" preload="./scripts/webview-preload.js"></webview>
             </div>
         </div>
         <div class="resize-hand"></div>

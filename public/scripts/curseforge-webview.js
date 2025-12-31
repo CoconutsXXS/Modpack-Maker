@@ -122,7 +122,7 @@ function modify()
         }
         if(!document.getElementById('button-download-version-select') && document.querySelector("aside > div > div:nth-child(3) > div"))
         {
-            let c = document.querySelector("aside > div > div:nth-child(3) > div").cloneNode(true);
+            let c = document.querySelector("aside > div > div:nth-child(3) > div.project-actions").cloneNode(true);
             c.querySelector(".split-button").firstChild.querySelector('span').innerText = 'Select Versions';
             c.querySelector(".split-button").firstChild.querySelector('svg').remove();
             c.querySelector(".split-button").firstChild.style.backgroundColor = '#333333';
@@ -134,7 +134,7 @@ function modify()
         }
         if(!document.getElementById('button-quick-test') && document.querySelector("aside > div > div:nth-child(3) > div"))
         {
-            let c = document.querySelector("aside > div > div:nth-child(3) > div").cloneNode(true);
+            let c = document.querySelector("aside > div > div:nth-child(3) > div.project-actions").cloneNode(true);
             c.querySelector(".split-button").firstChild.querySelector('span').innerText = 'Quick Test';
             c.querySelector(".split-button").firstChild.querySelector('svg').remove();
             c.querySelector(".split-button").firstChild.style.backgroundColor = '#32a912';

@@ -1,8 +1,6 @@
-const { app, BrowserWindow, ipcMain, screen, session, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, session, dialog, shell, webContents } = require('electron');
 
 const path = require('node:path')
-const { ElectronBlocker } = require('@ghostery/adblocker-electron');
-const crossFetch = require('cross-fetch');
 const fs = require('fs')
 const fsPromise = require('fs/promises')
 const {unzip} = require('unzipit');
@@ -15,44 +13,56 @@ const Download = require('./download');
 const Saves = require('./saves.js');
 const contentModifier = require("./content-modifier.js")
 
+const InstanceContent = require('./jar-content.js');
+const { parseBuffer, rawNbtToBuffer } = require("./jar-content-parser.js")
+
 process.setMaxListeners(0)
 app.setMaxListeners(0)
 require('events').EventEmitter.defaultMaxListeners = 0
 
-ElectronBlocker.fromPrebuiltFull(crossFetch).then(b=>b.enableBlockingInSession(session.defaultSession))
+const { ElectronBlocker } = require('@ghostery/adblocker-electron');
+const fetch = require('cross-fetch');
 
 // Extension Host
 const isSilent = require("./browser-request.js");
 
+
 app.whenReady().then(async () =>
 {
-    {
-        const win = new BrowserWindow
-        ({
-            width: screen.getAllDisplays()[0].bounds.width,
-            height: screen.getAllDisplays()[0].bounds.height,
-            webPreferences:
-            {
-                preload: path.join(__dirname, 'preload.js'),
-                webviewTag: true,
-                contextIsolation: true
-            },
-            roundedCorners: false,
-            backgroundColor: '#00000000',
-            darkTheme: true,
-            hasShadow: false,
-            closable: true,
-            minimizable: true,
-            maximizable: true,
-            autoHideMenuBar: true,
-            frame: false,
-            transparent: true,
-        });
+    // {
+    //     const win = new BrowserWindow
+    //     ({
+    //         width: screen.getAllDisplays()[0].bounds.width,
+    //         height: screen.getAllDisplays()[0].bounds.height,
+    //         webPreferences:
+    //         {
+    //             preload: path.join(__dirname, 'preload.js'),
+    //             webviewTag: true,
+    //             contextIsolation: true
+    //         },
+    //         roundedCorners: false,
+    //         backgroundColor: '#00000000',
+    //         darkTheme: true,
+    //         hasShadow: false,
+    //         closable: true,
+    //         minimizable: true,
+    //         maximizable: true,
+    //         autoHideMenuBar: true,
+    //         // frame: false,
+    //         // transparent: true,
+    //     });
 
-        win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
-    }
+    //     win.loadFile(path.join(__dirname, 'dist', 'game-launcher', 'main.html'));
+    // }
     
-    return
+    // return
+
+    // BLOCKER
+    const blocker = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch);
+
+    const webviewSession = session.fromPartition("persist:webview");
+    blocker.enableBlockingInSession(webviewSession);
+
 
     if(isSilent()){return;}
 
@@ -107,6 +117,7 @@ async function mainWindow()
         finishedLoading = true
     })()
 
+    
     const win = new BrowserWindow
     ({
         width: screen.getAllDisplays()[0].bounds.width-64,
@@ -122,7 +133,7 @@ async function mainWindow()
             nodeIntegration: false,
             webgl: true,
             nodeIntegrationInSubFrames: true,
-            webSecurity: false,
+            // webSecurity: false,
             
         },
 
@@ -352,7 +363,7 @@ ipcMain.handle('downloadBuffer', async (event, buffer, filename) =>
     fs.writeFileSync(path.join(p.filePaths[0], filename), buffer);
 
     shell.showItemInFolder(path.join(p.filePaths[0], filename))
-    shell.openPath(p)
+    shell.openPath(p.filePaths[0])
 })
 
 ipcMain.handle('importInstance', async (event, link, metadata) =>
@@ -382,7 +393,7 @@ ipcMain.handle('importInstanceFromFile', async (event) =>
 })
 
 let instanceIndex = 0;
-ipcMain.handle('launch', (event, name, world = null) =>
+ipcMain.handle('launch', (event, name, world = null, width, height) =>
 {
     let i = instanceIndex; instanceIndex++;
     let instance = Instance.getInstance(name);
@@ -417,7 +428,7 @@ ipcMain.handle('launch', (event, name, world = null) =>
             },
             network: (m) => event.sender.isDestroyed()?null:event.sender.send(i+'network', m)
         }
-    , 1337+i, world)
+    , 1337+i, world, width, height)
     return i
 })
 
@@ -480,8 +491,78 @@ ipcMain.handle('savedList', (event) =>
 {
     return JSON.parse(JSON.stringify(Saves.saved));
 })
-ipcMain.handle('addSaved', (event, ...args) => { Saves.addSaved(args[0]) })
+ipcMain.handle('addSaved', (event, ...args) => { Saves.addSaved(args[0][0]) })
 ipcMain.handle('deleteSaved', (event, ...args) => { Saves.deleteSaved(args[0]) })
+
+
+// Jar Content
+const jarContents = []
+ipcMain.handle("loadInstanceContent", async (event, name, version, decompiled = false) =>
+{
+    const existing = jarContents.find(j=>j.name == name)
+    if(existing && existing?.version == version && !existing?.decompiledPath == !decompiled) { return; }
+
+    const result = await InstanceContent.from(name, version, decompiled);
+
+    if(existing) { jarContents[jarContents.findIndex(j=>j.name == name)] = result }
+    else { jarContents.push(result) }
+
+    // Send
+    const serialized = msgpack.encode( result );
+    const totalSize = serialized.byteLength;
+    event.sender.send('shared-buffer-start', { totalSize });
+    
+    const chunkSize = 1024 * 1024;
+    for (let i = 0; i < totalSize; i += chunkSize)
+    {
+        const end = Math.min(i + chunkSize, totalSize);
+        const chunk = serialized.slice(i, end);
+
+        event.sender.send('shared-buffer-chunk', { chunk, offset: i });
+    }
+
+    event.sender.send('shared-buffer-end');
+})
+ipcMain.handle("fileFromInstance", async (event, name, location) =>
+{
+    const jar = jarContents.find(j=>j.name == name)
+    if(!jar) { return }
+
+    const callId = crypto.randomUUID();
+    const responseChannel = `instanceFileSelection:${callId}`;
+
+    const result = await jar.get(location, files =>
+    {
+        event.sender.send(`instanceFileSelection-${name}-${location}`, { callId, files });
+
+        return new Promise(resolve =>
+        {
+            ipcMain.once(responseChannel, (e, file) =>
+            {
+                resolve(file);
+            });
+        });
+    });
+
+    return JSON.parse(JSON.stringify(result))
+})
+ipcMain.handle("writeInstanceContent", async (event, name, origin, files) =>
+{
+    const jar = jarContents.find(j=>j.name == name)
+    if(!jar) { return }
+
+    await jar.write(origin, files)
+})
+ipcMain.handle("parseFile", async (event, location, decompiledPath = null, extension = null) =>
+{
+    const buffer = fs.readFileSync(location);
+    return {buffer, value: await parseBuffer(buffer, location, decompiledPath, extension)}
+})
+ipcMain.handle("parseBuffer", async (event, buffer, location, decompiledPath = null, extension = null) =>
+{
+    return await parseBuffer(Buffer.from(buffer), location, decompiledPath, extension)
+})
+ipcMain.handle('rawNbtToBuffer', (e, raw) => rawNbtToBuffer(raw))
 
 
 // Content Edition
@@ -552,14 +633,26 @@ ipcMain.handle('readRegion', async (event, path) =>
 
 ipcMain.handle('writeJarPropertie', (event, jarPath, properties) => { if(!jarPath.startsWith(path.join(app.getPath('appData'), 'Modpack Maker'))){jarPath=path.join(app.getPath('appData'), 'Modpack Maker', jarPath)} return contentModifier.writeJarPropertie(jarPath, properties) })
 ipcMain.handle('readNbt', (e, p, r) => {return contentModifier.readNbt(p, r)})
+ipcMain.handle('writeNbt', (e, d, p) => { return contentModifier.writeNbt(d, p)})
 ipcMain.handle('readDat', (e, p, r) => {return contentModifier.readDat(p, r)})
 
 // Data
 const reader = require('./jar-reader.js');
 const { setTimeout } = require('node:timers/promises');
+const { decompileInstance } = require('./decompiler.js');
+const { version } = require('node:os');
+
+ipcMain.handle('appDir', async () => { return __dirname })
+ipcMain.handle('appData', async () => { return app.getPath('appData') })
+
+ipcMain.handle('readFile', async (event, p) => { return fs.readFileSync(p); })
+ipcMain.handle('readDirectory', (event, p) => { return fs.readdirSync(p, {recursive:true}).filter(r=>fs.lstatSync(path.join(p, r))?.isFile()); })
+// ipcMain.handle('parseFile', async (event, p) => { return contentModifier.readFile(p); })
+
+
 ipcMain.handle('jarData', async (event, p, dataPath) => { return await reader.jar(p, dataPath) })
-ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p), {recursive:true}).filter(r=>fs.statSync(path.join(app.getPath('appData'), p, r)).isFile()); })
-ipcMain.handle('readFile', async (event, p) => { return await reader.autoData(path.join(app.getPath('appData'), p)); })
+ipcMain.handle('readFolder', (event, p) => { return fs.readdirSync(path.join(app.getPath('appData'), p), {recursive:true}).filter(r=>fs.lstatSync(path.join(app.getPath('appData'), p, r)).isFile()); })
+ipcMain.handle('autoReadFile', async (event, p, fromAppData = false) => { return await reader.autoData( fromAppData ? path.join(app.getPath('appData'), p) : p ); })
 ipcMain.handle('readRawFile', (event, p) => { return fs.readFileSync(path.join(app.getPath('appData'), p)); })
 ipcMain.handle('writeFile', (event, p, d) => { return reader.saveData(path.join(app.getPath('appData'), p), d); })
 ipcMain.handle('writeBuffer', (event, p, b) => {p=path.join(app.getPath('appData'), p); if(!fs.existsSync(p.substring(0, p.lastIndexOf(path.sep)))){fs.mkdirSync(p.substring(0, p.lastIndexOf(path.sep)), {recursive: true})} fs.writeFileSync(p, Buffer.from(b)) })

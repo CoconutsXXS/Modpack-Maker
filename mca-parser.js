@@ -35,6 +35,7 @@ module.exports = async function parseMCA(filePath, raw = false)
         try
         {
             let parsed = await nbt[raw?"parseAs":"parseUncompressed"](decompressed, 'big')
+            // console.log(nbt.parseUncompressed(decompressed, 'big'))
             if(!raw){parsed=nbt.simplify(parsed)}
 
             for (let i = 0; i < parsed.sections.length; i++)
@@ -54,7 +55,7 @@ module.exports = async function parseMCA(filePath, raw = false)
         }
         catch (err)
         {
-            console.warn(`Failed to parse chunk ${i}:`, err.message);
+            // console.warn(`Failed to parse chunk ${i}:`, err.message);
         }
     }
 

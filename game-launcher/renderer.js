@@ -7,19 +7,29 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 await RAPIER.init()
 
-window.canvas = document.querySelector("canvas")
+// window.canvas = document.querySelector("canvas")
 window.debug = {}
 
-export async function initializeScene()
+export async function initializeScene(canvas = null, global = true, windowSize = true, useStats = false)
 {
     console.groupCollapsed("Initializing Scene")
+
+    if(!canvas)
+    {
+        console.log("No canvas prevised, using global canvas")
+        canvas = window.canvas;
+        if(!canvas)
+        {
+            console.warn("No global canvas, crating one")
+            canvas = window.canvas = document.querySelector("canvas")
+        }
+    }
     
     // WebGL Check
     function isWebGLAvailable()
     {
         try
         {
-            const canvas = document.createElement('canvas');
             return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')));
         }
         catch(e) { return false; }
@@ -34,47 +44,64 @@ export async function initializeScene()
     console.log("Using %c"+(canvas.getContext('webgl2')?"WebGL 2":"WebGL"), "font-weight: bold")
 
     // Renderer
-    window.renderer = new THREE.WebGLRenderer
+    const renderer = new THREE.WebGLRenderer
     ({
         alpha: true,
-        canvas: window.canvas, 
+        canvas: canvas, 
         powerPreference: "high-performance",
-        premultipliedAlpha: false,
-        depth: false,
-        stencil: false,
+        depth: true,
         antialias: true,
-        preserveDrawingBuffer: false
     });
-    window.renderer.autoClear = false;
-    window.renderer.shadowMap.enabled = true;
-    window.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.autoClear = false;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.LinearToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    // renderer.useLegacyLights = true
 
-    console.log("Renderer:", window.renderer)
+    console.log("Renderer:", renderer)
 
     // Main Elements
-    window.scene = new THREE.Scene();
-    window.mainCamera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.1, 1000 );
+    const scene = new THREE.Scene();
+    const mainCamera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
-    console.log("Scene:", window.scene)
-    console.log("Main Camera:", window.mainCamera)
+    console.log("Scene:", scene)
+    console.log("Main Camera:", mainCamera)
 
     // Post Processing
-    window.composer = new POSTPROCESSING.EffectComposer(window.renderer)
-    window.composer.addPass(new POSTPROCESSING.RenderPass(window.scene, window.mainCamera));
+    const composer = new POSTPROCESSING.EffectComposer(renderer, { frameBufferType: THREE.UnsignedByteType })
+    composer.addPass(new POSTPROCESSING.RenderPass(scene, mainCamera));
 
-    let effectPass = new POSTPROCESSING.EffectPass(window.mainCamera,
-        new POSTPROCESSING.SSAOEffect(window.mainCamera),
-        new POSTPROCESSING.FXAAEffect(),
-        new POSTPROCESSING.BloomEffect({intensity: 1})
+    let effectPass = new POSTPROCESSING.EffectPass(mainCamera,
+        // new POSTPROCESSING.SSAOEffect(mainCamera),
+        // new POSTPROCESSING.FXAAEffect(),
+        // new POSTPROCESSING.BloomEffect
+        // ({
+        //     intensity: 1,
+        //     luminanceThreshold: 0.9,
+        //     luminanceSmoothing: 0.25,
+        //     mipmapBlur: true
+        // }),
+        // new POSTPROCESSING.HueSaturationEffect
+        // ({
+        //     hue: 0.0,
+        //     saturation: 0
+        // }),
+        // new POSTPROCESSING.BrightnessContrastEffect
+        // ({
+        //     brightness: 0.0,
+        //     contrast: 0
+        // })
     )
     effectPass.renderToScreen = true
-    window.composer.addPass(effectPass)
+    composer.addPass(effectPass)
 
-    console.log("Composer:", window.composer)
+    console.log("Composer:", composer)
 
     // Window Resize
     let resizeListeners = []
-    window.addResizeListener = function(l)
+    const addResizeListener = function(l)
     {
         let index = resizeListeners.length;
         resizeListeners.push(l)
@@ -83,49 +110,59 @@ export async function initializeScene()
 
     const resizeElement = () =>
     {
-        const width = Math.max(1, window.innerWidth || 800);
-        const height = Math.max(1, window.innerHeight || 600);
+        const width = windowSize ? Math.max(1, window.innerWidth || 800) : canvas.getBoundingClientRect().width;
+        const height = windowSize ? Math.max(1, window.innerHeight || 600) : canvas.getBoundingClientRect().height;
 
-        window.canvas.width = width;
-        window.canvas.height = height;
+        if(windowSize)
+        {
+            canvas.width = width;
+            canvas.height = height;
+        }
 
-        window.renderer.setSize(width, height);
-        window.renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
-        window.composer.setSize(width, height)
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.max(1, (windowSize ? width/height : window.devicePixelRatio) || 1));
+        composer.setSize(width, height)
 
-        window.mainCamera.aspect = width / height;
-        window.mainCamera.updateProjectionMatrix();
+        mainCamera.aspect = width / height;
+        mainCamera.updateProjectionMatrix();
 
         for(let l of resizeListeners) { l(width, height) }
     }
-    window.addEventListener("resize", resizeElement);
+    if(windowSize) { window.addEventListener("resize", resizeElement); }
+    else { new ResizeObserver(resizeElement).observe(canvas) }
     resizeElement();
 
     console.log("Resize event ready")
 
     // Physic
-    window.pausedPhysic = false;
-    window.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    window.eventQueue = new RAPIER.EventQueue(true);
+    const pausedPhysic = false;
+    const world = new RAPIER.World({ x: 0, y: -32, z: 0 });
+    world.timestep = 1/20
+    const eventQueue = new RAPIER.EventQueue(true);
 
-    console.log("Physic World:", window.world)
+    console.log("Physic World:", world)
 
     // Render
-    window.disabledRendering = false;
+    let disabledRendering = false;
     const clock = new THREE.Clock();
 
     const mbStats = new Stats()
-    mbStats.showPanel(2)
-    document.body.appendChild(mbStats.dom)
-    mbStats.dom.style.top = "56px"
-
     const fpsStats = new Stats()
-    fpsStats.showPanel(0)
-    document.body.appendChild(fpsStats.dom)
-    fpsStats.dom.style.top = "112px"
+    if(useStats)
+    {
+        
+        mbStats.showPanel(2)
+        document.body.appendChild(mbStats.dom)
+        mbStats.dom.style.top = "56px"
+
+        
+        fpsStats.showPanel(0)
+        document.body.appendChild(fpsStats.dom)
+        fpsStats.dom.style.top = "112px"
+    }
 
     let renderListeners = []
-    window.addRenderListener = function(l, before = false)
+    const addRenderListener = function(l, before = false)
     {
         let index = renderListeners.length;
         renderListeners.push({f: l, before})
@@ -135,81 +172,132 @@ export async function initializeScene()
     const frustum = new THREE.Frustum();
     const projectionScreenMatrix = new THREE.Matrix4();
 
-    window.renderer.setAnimationLoop(() =>
+    renderer.setAnimationLoop(() =>
     {
-        mbStats.begin()
-        fpsStats.begin()
+        if(useStats)
+        {
+            mbStats.begin()
+            fpsStats.begin()
+        }
 
         // Physic
-        if(!window.pausedPhysic)
+        if(!pausedPhysic)
         {
-            window.world.timestep = clock.getDelta()*1.5
-            window.world.step();
+            // world.timestep = clock.getDelta()*1.5
+            // world.step();
         }
 
         for(let l of renderListeners) { if(l.before) { l.f(clock, frustum) } }
 
         // Render
-        if(!window.disabledRendering)
+        if(!disabledRendering)
         {
-            if(window.composer) { window.composer.render(clock.getDelta()) }
-            else { window.renderer.render( window.scene, window.mainCamera ) }
+            if(composer) { composer.render(clock.getDelta()) }
+            else { renderer.render( scene, mainCamera ) }
         }
 
         // Frustrum 
-        window.mainCamera.updateMatrixWorld();
-        window.mainCamera.matrixWorldInverse.copy(window.mainCamera.matrixWorld).invert();
-        projectionScreenMatrix.multiplyMatrices(window.mainCamera.projectionMatrix, window.mainCamera.matrixWorldInverse);
+        mainCamera.updateMatrixWorld();
+        mainCamera.matrixWorldInverse.copy(mainCamera.matrixWorld).invert();
+        projectionScreenMatrix.multiplyMatrices(mainCamera.projectionMatrix, mainCamera.matrixWorldInverse);
         frustum.setFromProjectionMatrix(projectionScreenMatrix);
         
         for(let l of renderListeners) { if(!l.before) { l.f(clock, frustum) } }
 
-        fpsStats.end()
-        mbStats.end()
+        if(useStats)
+        {
+            mbStats.end()
+            fpsStats.end()
+        }
     });
 
     console.log("Render loop ready")
 
     // Pointer Tracker
-    window.pointer = new THREE.Vector2();
+    const pointer = new THREE.Vector2();
     document.addEventListener("pointermove", (event) =>
     {
-        window.pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-        window.pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+        pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+        pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
     })
 
     console.log("Pointer track ready")
 
     // Mouse
-    window.mouseLeftPressed = false
-    window.mouseRightPressed = false
-    document.addEventListener("mousedown", (ev) =>
+    if(!window.mouseLeftPressed || !window.mouseRightPressed)
     {
-        if(ev.button == 0){window.mouseLeftPressed = true}
-        if(ev.button == 2){window.mouseRightPressed = true}
-    })
-    document.addEventListener("mouseup", (ev) =>
+        window.mouseLeftPressed = false
+        window.mouseRightPressed = false
+        document.addEventListener("mousedown", (ev) =>
+        {
+            if(ev.button == 0){window.mouseLeftPressed = true}
+            if(ev.button == 2){window.mouseRightPressed = true}
+        })
+        document.addEventListener("mouseup", (ev) =>
+        {
+            if(ev.button == 0){window.mouseLeftPressed = false}
+            if(ev.button == 2){window.mouseRightPressed = false}
+        })
+    }
+
+    if(!window.shiftKey || !window.ctrlKey)
     {
-        if(ev.button == 0){window.mouseLeftPressed = false}
-        if(ev.button == 2){window.mouseRightPressed = false}
-    })
-    window.shiftKey = false;
-    window.ctrlKey = false;
-    document.addEventListener("keydown", (ev) =>
-    {
-        if(ev.shiftKey){window.shiftKey = true}
-        if(ev.ctrlKey){window.ctrlKey = true}
-    })
-    document.addEventListener("keyup", (ev) =>
-    {
-        if(!ev.shiftKey){window.shiftKey = false}
-        if(!ev.ctrlKey){window.ctrlKey = false}
-    })
+        window.shiftKey = false;
+        window.ctrlKey = false;
+        document.addEventListener("keydown", (ev) =>
+        {
+            if(ev.shiftKey){window.shiftKey = true}
+            if(ev.ctrlKey){window.ctrlKey = true}
+        })
+        document.addEventListener("keyup", (ev) =>
+        {
+            if(!ev.shiftKey){window.shiftKey = false}
+            if(!ev.ctrlKey){window.ctrlKey = false}
+        })
+    }
 
     console.log("Input listeners ready")
 
+    if(global)
+    {
+        window.canvas = canvas
+        window.scene = scene
+        window.renderer = renderer
+        window.mainCamera = mainCamera
+        window.composer = composer
+        window.world = world
+        window.eventQueue = eventQueue
+        window.pausedPhysic = pausedPhysic
+
+        window.addRenderListener = addRenderListener
+        window.disabledRendering = disabledRendering
+        window.addResizeListener = addResizeListener
+
+        window.pointer = pointer
+    }
+
     console.groupEnd()
     console.log("%cScene Initialized", "color: green")
+    
+    if(!global)
+    {
+        return {
+            canvas,
+            scene,
+            renderer,
+            mainCamera,
+            composer,
+            world,
+            eventQueue,
+            pausedPhysic,
+
+            addRenderListener,
+            setDisabledRendering: (v) => {disabledRendering=v},
+            addResizeListener,
+
+            pointer,
+        }
+    }
 }
 
 window.debug.isFreeCamera = false;
@@ -223,37 +311,37 @@ window.debug.freeCamera = function(raycatsEvent = null)
 
     console.log("Free Camera Mode %cEnabled", "color: green")
 
-    let ogRenderingState = window.disabledRendering
-    window.disabledRendering = true;
+    let ogRenderingState = disabledRendering
+    disabledRendering = true;
     let freeCamera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
 
     const controls = new OrbitControls( freeCamera, canvas );
     controls.update();
-    controls.target = window.mainCamera.position
+    // controls.target = mainCamera.position
 
     let axisHelper = new THREE.AxesHelper(1024);
-    window.scene.add(axisHelper)
+    scene.add(axisHelper)
     let grid = new THREE.GridHelper(1024, 1024/16);
     grid.position.setY(-0.1)
-    window.scene.add(grid)
-    let cameraHelper = new THREE.CameraHelper(window.mainCamera)
-    window.scene.add(cameraHelper)
+    scene.add(grid)
+    let cameraHelper = new THREE.CameraHelper(mainCamera)
+    scene.add(cameraHelper)
 
     freeCamera.position.setZ(-10)
 
     const raycaster = new THREE.Raycaster();
 
-    let removeRendererListener = window.addRenderListener((clock) =>
+    let removeRendererListener = addRenderListener((clock) =>
     {
         controls.update(clock.getDelta());
         cameraHelper.update()
-        window.renderer.render(window.scene, freeCamera);
+        renderer.render(scene, freeCamera);
 
         // Raycast
-        raycatsEvent && raycaster.setFromCamera( window.pointer, freeCamera );
-        raycatsEvent && raycatsEvent(raycaster.intersectObjects( window.scene.children.filter(c=>c.visible&&c.geometry) )[0])
+        raycatsEvent && raycaster.setFromCamera( pointer, freeCamera );
+        raycatsEvent && raycatsEvent(raycaster.intersectObjects( scene.children.filter(c=>c.visible&&c.geometry) )[0])
     })
-    let removeResizeListener = window.addResizeListener((w, h) =>
+    let removeResizeListener = addResizeListener((w, h) =>
     {
         freeCamera.aspect = w / h;
         freeCamera.updateProjectionMatrix();
@@ -270,7 +358,7 @@ window.debug.freeCamera = function(raycatsEvent = null)
         grid.removeFromParent()
         cameraHelper.removeFromParent()
 
-        window.disabledRendering = ogRenderingState;
+        disabledRendering = ogRenderingState;
 
         delete window.debug.disableFreeCamera;
     }
@@ -283,11 +371,11 @@ window.debug.enabledPhysicView = function()
       new THREE.LineBasicMaterial({ vertexColors: true })
     );
     debugMesh.frustumCulled = false;
-    window.scene.add(debugMesh);
+    scene.add(debugMesh);
 
-    let removeRendererListener = window.addRenderListener((clock) =>
+    let removeRendererListener = addRenderListener((clock) =>
     {
-        const debugRenderer = window.world.debugRender()
+        const debugRenderer = world.debugRender()
 
         debugMesh.geometry.setAttribute('position', new THREE.BufferAttribute(debugRenderer.vertices, 3));
         debugMesh.geometry.setAttribute('color', new THREE.BufferAttribute(debugRenderer.colors, 4));

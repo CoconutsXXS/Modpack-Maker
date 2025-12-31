@@ -520,16 +520,11 @@ async function loadVideo(videoId)
 
                 break;
             }
-            case 'isSaved':
-            {
-                console.log(event)
-				let savedList = await ipcInvoke("readFile", path.join("saves", 'saved.json'));
-
-                await webview.executeJavaScript(`window.changeIsSaved(${(savedList.find(s => s.url == event.args[0])!=undefined)?"true":"false"})`)
-                break;
-            }
             case 'open-mod':
             {
+                console.log("open mod", event.args[0])
+                console.log(document.getElementById('center-panel').childNodes[1].childNodes)
+                console.log(Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web'))
                 window.web[event.args[0].hostname=='www.curseforge.com'?'loadCurseforge':'loadModrinth'](document.getElementById('web-window').querySelector('webview'), event.args[0])
                 Array.from(document.getElementById('center-panel').childNodes[1].childNodes).find(e=>e.innerText=='Web').click();
                 break;
@@ -658,6 +653,7 @@ async function loadVideo(videoId)
             case 'chapters':
             {
                 chapters = event.args[0]
+                break;
             }
             case 'new':
             {
@@ -670,15 +666,27 @@ async function loadVideo(videoId)
                     // chapters = [];
                     // description = '';
                 }
+                break;
             }
             case 'save':
             {
                 console.log(event.args[0])
                 await ipcInvoke('addSaved', [event.args[0]]);
+                break;
             }
             case 'unsave':
             {
                 await ipcInvoke('deleteSaved', [event.args[0]]);
+                break;
+            }
+            case 'isSaved':
+            {
+                const decoder = new TextDecoder()
+				const savedList = JSON.parse(decoder.decode(await ipcInvoke("autoReadFile", "Modpack Maker" + sep() + "saves" + sep() + 'saved.json', true)));
+                const result = savedList.find(s => s.url == event.args[0])!=undefined;
+                await webview.executeJavaScript(`window.isSaved(${result?'true':'false'})`, true)
+                return result
+                break;
             }
         }
     });

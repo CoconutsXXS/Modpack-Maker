@@ -97,12 +97,14 @@ async function readZipEntry(path, value)
     else if(path.endsWith(".nbt"))
     {
         let buffer = Buffer.from(await value.arrayBuffer());
+
+        // fs.writeFileSync('/Users/coconuts/Desktop/Projets/Modpack-Maker/game-launcher/nbt-structure-preset.json', JSON.stringify((await nbt.parse(buffer, 'big')).parsed, null, 4))
+
         return {parsed: await jarReader.parseNbt(buffer), accurate: (await nbt.parse(buffer)).parsed, buffer};
     }
     else if(path.endsWith(".class"))
     {
-        let buffer = Buffer.from(await value.arrayBuffer());
-        return {raw: await decompiler.decompileClass(buffer), buffer}
+        return {text: (await decompiler.decompileClass(await value.arrayBuffer())).file}
         try
         {
             return {data: javaParser.parse(await value.arrayBuffer()), buffer: Buffer.from(await value.arrayBuffer())};
@@ -130,6 +132,48 @@ async function readZipEntry(path, value)
         }
     }
     else if(!path.endsWith("/") && value.arrayBuffer){value = Buffer.from(await value.arrayBuffer());}
+
+    return value;
+}
+const decoder = new TextDecoder()
+async function readFile(path)
+{
+    if(!fs.existsSync(path)){return null;}
+
+    if(path.endsWith(".json") || path.endsWith(".mcmeta") || path.endsWith(".mcfunction") || path.endsWith(".MF") || path.endsWith('.properties') || path.endsWith('.txt'))
+    {
+        return fs.readFileSync(path, 'utf-8')
+    }
+    
+    const value = fs.readFileSync(path)
+    if(path.endsWith(".nbt"))
+    {
+        let buffer = Buffer.from(value.buffer);
+
+        // fs.writeFileSync('/Users/coconuts/Desktop/Projets/Modpack-Maker/game-launcher/nbt-structure-preset.json', JSON.stringify((await nbt.parse(buffer, 'big')).parsed, null, 4))
+
+        return {parsed: await jarReader.parseNbt(buffer), accurate: (await nbt.parse(buffer)).parsed, buffer};
+    }
+    else if(path.endsWith(".class"))
+    {
+        return {text: (await decompiler.decompileClass(value.buffer)).file}
+    }
+    else if(path.endsWith(".png"))
+    {
+        let buffer = Buffer.from(value.buffer);
+        return {
+            buffer,
+            url: buffer.toString('base64')
+        }
+    }
+    else if(path.endsWith(".toml"))
+    {
+        return {
+            raw: value,
+            parsed: toml.parse(value.replaceAll(/^([ \t]*)([A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)+)([ \t]*)=/gm, (match, indent, key, space) => `${indent}"${key}"${space}=`))
+        }
+    }
+    else if(!path.endsWith("/") && value.arrayBuffer){value = Buffer.from(value.buffer);}
 
     return value;
 }
@@ -662,6 +706,11 @@ module.exports =
 
         for(let p of sub)
         {
+            if(p == minecraftVersion(name, version))
+            {
+                p = await decompiler.decompileMinecraft( version )
+            }
+
             let jar = await getJar(p);
             // Ignore disableds
             // if(!jar || jar == null)
@@ -672,17 +721,67 @@ module.exports =
             if(!jar || jar == null){jar = await getJar(p.replaceAll(/(["\s'$`\\])/g,'\\$1'))}
             if(!jar || jar == null){console.warn("Invalid/Disabled .jar/.zip path:", p); continue;}
 
+            // Native Minecraft Jar
             if(p == minecraftVersion(name, version))
             {
-                for(let [p, v] of Object.entries(jar))
-                {
-                    if(p.endsWith(".class") && !p.includes("/")) { jar[p] = null; delete jar[p]; }
-                }
+                await decompiler.decompileMinecraft( version )
+                // (async () =>
+                // {
+                //     let decompiledClass
+
+                //     await new Promise(async resolve =>
+                //     {
+                //         const list = Object.entries(jar).filter(([p])=>p.endsWith(".class") && !p.includes("/"));
+
+                //         let processing = 0;
+                //         let count = 0;
+                //         const total = list.length
+
+                //         for(let [p, v] of list)
+                //         {
+                //             while(processing >= 512)
+                //             {
+                //                 await new Promise(resolve => setTimeout(resolve, 10))
+                //             }
+
+                //             console.log("Processing")
+
+                //             processing++;
+                //             // jar[p] = null; delete jar[p];
+                //             jar[p].arrayBuffer().then(buffer =>
+                //             {
+                //                 decompiler.decompileClass( Buffer.from(buffer)).then(data =>
+                //                 {
+                //                     const decompiled = data.file.slice(data.file.lastIndexOf(' */')+3)
+                //                     if(!decompiled){ processing--; count++; return}
+
+                //                     decompiledClass += decompiled;
+
+                //                     if(decompiled.includes('EntityModel') || decompiled.includes('BlockEntityRenderer') || decompiled.includes('net.minecraft.client.render.entity.model') || decompiled.includes('net.minecraft.client.render.block.entity'))
+                //                     {
+                //                         console.log(data, decompiled)
+                //                     }
+
+                //                     count++;
+                //                     processing--;
+                //                     if(count == total)
+                //                     { resolve() }
+
+                //                     console.log("Processed", count/total * 100)
+                //                 })
+                //             })
+                //         }
+                //     })
+
+                //     console.log(decompiledClass)
+                // })()
             }
+
 
             let content = await expandPaths(jar, async (path, value) => { return parseFiles?readZipEntry(path, value):null; });
             r = lodash.merge(r, content)
         }
+
         return r;
     },
 
@@ -792,7 +891,7 @@ module.exports =
 
         // List every Jar including Minecraft
         let sub = [];
-        sub.push(minecraftVersion(name, version))
+        sub.push( path.join(config.directories.unobfuscated, version+'.jar') )
         for(let p of fs.readdirSync(path.join(config.directories.instances, name, "minecraft/mods")))
         {
             if(p == ".DS_Store"){continue;}
@@ -924,6 +1023,13 @@ module.exports =
         return xmclNbt.deserialize(fs.readFileSync(p), { compressed: "gzip" })
     },
 
+    writeNbt: async (d, p) =>
+    {
+        fs.writeFileSync(p, nbt.writeUncompressed(d, 'big'))
+    },
+
     readZipEntry: readZipEntry,
-    toBuffer: toBuffer
+    toBuffer: toBuffer,
+
+    readFile: readFile
 }

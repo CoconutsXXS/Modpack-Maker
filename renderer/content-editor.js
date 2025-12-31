@@ -1,361 +1,31 @@
 import {EditorView, basicSetup} from 'codemirror'
-import {json} from '@codemirror/lang-json'
-import {java} from '@codemirror/lang-java'
-import {oneDark} from '@codemirror/theme-one-dark'
+import {Decoration} from "@codemirror/view";
+import {EditorState, StateEffect, StateField} from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { indentMore, indentLess } from "@codemirror/commands";
+import {oneDark} from '@codemirror/theme-one-dark'
 import { StreamLanguage, indentUnit } from "@codemirror/language";
+import {json} from '@codemirror/lang-json'
+import {java} from '@codemirror/lang-java'
 import {toml} from "@codemirror/legacy-modes/mode/toml"
-
-import { parse, stringify } from "comment-json";
 import Frame from "canvas-to-buffer";
 
+import JarContent from "./content-analyse/jar-content";
+import JavaTree from "./content-analyse/java-tree"
+import { filter } from 'lodash';
+import { initializeScene } from '../game-launcher/renderer';
+
 import * as THREE from "three"
+import World from '../game-launcher/world/world';
+import { Player } from '../game-launcher/player/controller';
+import RAPIER from '@dimforge/rapier3d-compat';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import * as POSTPROCESSING from "postprocessing"
 
-import { mergeGroupOptimizedChunked } from "./mesh-optimizer"
-// import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect, SSAOEffect, SSREffect } from 'realism-effects'
-
-import * as msgpack from "@msgpack/msgpack";
-import * as lodash from "lodash"
-
-import { Buffer } from 'buffer';
-window.Buffer = Buffer;
-
-
-async function parseMinecraftModelToThree(modelJson, opts = {})
-{
-    // modelJson = lodash.clone(modelJson);
-    const {
-        texturePathResolver = (ref) =>
-        {
-            if (!ref) return null;
-            if (ref.endsWith('.png') || ref.startsWith('http')) return ref;
-            // const cleaned = ref.replace(/^#/, '');
-            const cleaned = ref;
-            const parts = cleaned.split(':');
-            const mod = parts.length === 2 ? parts[0] : 'minecraft';
-            const path = parts.length === 2 ? parts[1] : cleaned;
-            return `/assets/${mod}/${path}.png`;
-        },
-        loader = new THREE.TextureLoader(),
-        scale = 1 / 16,
-        center = true,
-        defaultTextureSize = 64
-    } = opts;
-
-    const faceVertexIndicesMap = {
-        west: [0, 1, 2, 3],
-        east: [4, 5, 6, 7],
-        down: [0, 3, 4, 7],
-        up: [2, 1, 6, 5],
-        north: [7, 6, 1, 0],
-        south: [3, 2, 5, 4],
-    };
-
-    function buildRotationMatrix(angle, scaleVal, axis)
-    {
-        const a = Math.cos(angle) * scaleVal;
-        const b = Math.sin(angle) * scaleVal;
-        const m = new THREE.Matrix3();
-        if (axis === 'x')
-        {
-            m.set(
-                1, 0, 0,
-                0, a, -b,
-                0, b, a
-            );
-        }
-        else if (axis === 'y')
-        {
-            m.set(
-                a, 0, b,
-                0, 1, 0,
-                -b, 0, a
-            );
-        }
-        else
-        {
-            m.set(
-                a, -b, 0,
-                b, a, 0,
-                0, 0, 1
-            );
-        }
-        return m;
-    }
-
-    function rotateFaceVertexIndices(vertexIndices, angle)
-    {
-        const a = vertexIndices[0], b = vertexIndices[1], c = vertexIndices[2], d = vertexIndices[3];
-        const norm = ((angle % 360) + 360) % 360;
-        switch (norm)
-        {
-            case 0: return [a, b, c, d];
-            case 90: return [b, c, d, a];
-            case 180: return [c, d, a, b];
-            case 270: return [d, a, b, c];
-            default: return [a, b, c, d];
-        }
-    }
-
-    function getDefaultUVs(faceType, from, to)
-    {
-        const x1 = from[0], y1 = from[1], z1 = from[2];
-        const x2 = to[0], y2 = to[1], z2 = to[2];
-        switch (faceType)
-        {
-            case 'west': return [z1, 16 - y2, z2, 16 - y1];
-            case 'east': return [16 - z2, 16 - y2, 16 - z1, 16 - y1];
-            case 'down': return [x1, 16 - z2, x2, 16 - z1];
-            case 'up': return [x1, z1, x2, z2];
-            case 'north': return [16 - x2, 16 - y2, 16 - x1, 16 - y1];
-            case 'south': return [x1, 16 - y2, x2, 16 - y1];
-            default: return [0, 0, 16, 16];
-        }
-    }
-
-    function normalizedUVs(uvsArr)
-    {
-        const out = [];
-        for (let i = 0; i < 4; i++)
-        {
-            const coord = uvsArr[i];
-            if (i % 2 === 1)
-            {
-                out.push((16 - coord) / 16);
-            }
-            else
-            {
-                out.push(coord / 16);
-            }
-        }
-        return out;
-    }
-
-    function getCubeCornerVertices(from, to)
-    {
-        const x1 = from[0], y1 = from[1], z1 = from[2];
-        const x2 = to[0], y2 = to[1], z2 = to[2];
-        return [
-            new THREE.Vector3(x1, y1, z1),
-            new THREE.Vector3(x1, y2, z1),
-            new THREE.Vector3(x1, y2, z2),
-            new THREE.Vector3(x1, y1, z2),
-            new THREE.Vector3(x2, y1, z2),
-            new THREE.Vector3(x2, y2, z2),
-            new THREE.Vector3(x2, y2, z1),
-            new THREE.Vector3(x2, y1, z1),
-        ];
-    }
-
-    function rotateCubeCornerVertices(vertices, rotation)
-    {
-        const angle = (rotation.angle / 180) * Math.PI;
-        const scaleVal = rotation.rescale === true
-            ? Math.SQRT2 / Math.sqrt(Math.cos(angle || Math.PI / 4) ** 2 * 2)
-            : 1;
-        const rotationMatrix = buildRotationMatrix(angle, scaleVal, rotation.axis);
-        const origin = new THREE.Vector3().fromArray(rotation.origin);
-        return vertices.map((vertex) =>
-        {
-            return vertex.clone().sub(origin).applyMatrix3(rotationMatrix).add(origin);
-        });
-    }
-
-    function loadTextureAsync(url)
-    {
-        if (!url) return Promise.resolve(null);
-        return new Promise((resolve) =>
-        {
-            loader.load(
-                url,
-                (tex) =>
-                {
-                    let width = tex.width | tex.source.data.width;
-                    let height = tex.height | tex.source.data.height;
-
-                    if(height > width)
-                    {
-                        let ogHeight = height;
-                        let ogData = tex.source.data;
-
-                        let canvas = document.createElement("canvas")
-                        canvas.width = canvas.height = width
-
-                        let ctx = canvas.getContext("2d")
-                        ctx.drawImage(ogData, 0, 0)
-
-                        canvas.style.position = 'fixed'
-                        canvas.style.top = '0'
-                        canvas.style.left = '0'
-
-                        // document.body.appendChild(canvas)
-                        
-                        tex = new THREE.Texture(canvas)
-
-                        let currentHeight = 0;
-                        setInterval(() =>
-                        {
-                            currentHeight += width;
-                            if(currentHeight >= ogHeight){currentHeight=0}
-                            ctx.drawImage(ogData, 0, -currentHeight)
-
-                            tex.needsUpdate = true
-                        }, 50)
-                    }
-
-                    tex.magFilter = THREE.NearestFilter;
-                    tex.minFilter = THREE.NearestFilter;
-                    tex.generateMipmaps = false;
-                    tex.wrapS = THREE.RepeatWrapping;
-                    tex.wrapT = THREE.RepeatWrapping;
-
-                    resolve(tex);
-                },
-                undefined,
-                () => resolve(null)
-            );
-        });
-    }
-
-    const texturesMap = modelJson.textures || {};
-    const textureVarToPath = {};
-    const resolvedPathsSet = new Set();
-    for (const key in texturesMap)
-    {
-        const raw = texturesMap[key];
-        const cleaned = raw ? raw.replace(/^#/, '') : raw;
-        const resolved = await texturePathResolver(raw);
-        textureVarToPath['#' + key] = resolved;
-        if (resolved) resolvedPathsSet.add(resolved);
-    }
-
-    const resolvedPaths = Array.from(resolvedPathsSet);
-    const textureCache = {};
-    await Promise.all(resolvedPaths.map(async (p) =>
-    {
-        const tex = await loadTextureAsync(p);
-        textureCache[p] = tex;
-    }));
-
-    const materialCache = {};
-    for (const p of resolvedPaths)
-    {
-        const tex = textureCache[p] || null;
-        const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: false, side: THREE.FrontSide, alphaTest: .5, shadowSide: THREE.FrontSide, clipShadows: true, clipIntersection: true });
-        mat.needsUpdate = true;
-        if(mat.map) { mat.map.needsUpdate = true}
-        materialCache[p] = mat;
-    }
-
-    const materialGroups = {};
-    for (const p of resolvedPaths)
-    {
-        materialGroups[p] = { vertices: [], uvs: [], indices: [] };
-    }
-    const missingGroup = { vertices: [], uvs: [], indices: [] };
-    const textureVarToGroupMap = {};
-    for (const key in textureVarToPath)
-    {
-        const p = textureVarToPath[key];
-        textureVarToGroupMap[key] = materialGroups[p] || missingGroup;
-    }
-
-    const elements = modelJson.elements || [];
-    for (const elem of elements)
-    {
-        let cornerVertices = getCubeCornerVertices(elem.from, elem.to);
-        if (elem.rotation != null)
-        {
-            cornerVertices = rotateCubeCornerVertices(cornerVertices, elem.rotation);
-        }
-        for (const v of cornerVertices)
-        {
-            v.sub(new THREE.Vector3(8, 0, 8));
-        }
-        const faces = elem.faces || {};
-        for (const faceType in faces)
-        {
-            const face = faces[faceType];
-            if (face === undefined) continue;
-            const group = textureVarToGroupMap[face.texture] || missingGroup;
-            const i = group.vertices.length / 3;
-            group.indices.push(i, i + 2, i + 1);
-            group.indices.push(i, i + 3, i + 2);
-            const baseIndices = faceVertexIndicesMap[faceType];
-            const rotatedIndices = rotateFaceVertexIndices(baseIndices, face.rotation ?? 0);
-            for (const idx of rotatedIndices)
-            {
-                const v = cornerVertices[idx];
-                group.vertices.push(v.x * scale, v.y * scale, v.z * scale);
-            }
-            const faceUVs = (face.uv != null && face.uv.length === 4) ? face.uv.slice() : getDefaultUVs(faceType, elem.from, elem.to);
-            const [nu1, nv1, nu2, nv2] = normalizedUVs(faceUVs);
-            const u1 = nu1, v1 = nv1, u2 = nu2, v2 = nv2;
-            group.uvs.push(u1, v2);
-            group.uvs.push(u1, v1);
-            group.uvs.push(u2, v1);
-            group.uvs.push(u2, v2);
-        }
-    }
-
-    const parentGroup = new THREE.Group();
-    if (center)
-    {
-        parentGroup.position.set(0, 0, 0);
-    }
-
-    const materialEntries = Object.entries(materialGroups).sort();
-    for (const [path, group] of materialEntries)
-    {
-        if (group.vertices.length === 0) continue;
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(group.vertices, 3));
-        geom.setAttribute('uv', new THREE.Float32BufferAttribute(group.uvs, 2));
-        geom.setIndex(new THREE.Uint16BufferAttribute(group.indices, 1));
-        const mat = materialCache[path] || new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.FrontSide });
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        parentGroup.add(mesh);
-    }
-
-    if (missingGroup.vertices.length > 0)
-    {
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(missingGroup.vertices, 3));
-        geom.setAttribute('uv', new THREE.Float32BufferAttribute(missingGroup.uvs, 2));
-        geom.setIndex(new THREE.Uint16BufferAttribute(missingGroup.indices, 1));
-        const mat = new THREE.MeshStandardMaterial({ color: 0xff00ff, side: THREE.FrontSide });
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        parentGroup.add(mesh);
-    }
-
-    // Normals
-    parentGroup.traverse((child) =>
-    {
-        if(child.geometry)
-        {
-            child.geometry.computeVertexNormals()
-        }
-    })
-
-    return parentGroup;
-}
-
-
-// Elements
-let section = document.querySelector(".content-explorer-section").cloneNode(true); document.querySelector(".content-explorer-section").remove();
-let modEditor = document.getElementById("mod-content-editor"); modEditor.style.display = "none";
+// Editor UI
+let section = document.createElement("div"); section.className = "content-explorer-section"
 
 let editors =
 {
-    applyEditor: document.getElementById("apply-editor"),
     codeEditor: document.getElementById("code-editor"),
     nbtEditor: document.getElementById("nbt-editor"),
     imgEditor: document.getElementById("image-editor"),
@@ -363,905 +33,30 @@ let editors =
     noEditor: document.getElementById("no-editor"),
     sourceSelection: document.getElementById("multiple-source")
 }
-editors.applyEditor.style.display = "none"
 editors.codeEditor.style.display = "none"
 editors.nbtEditor.style.display = "none"; editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none";
 editors.noEditor.style.display = "none"
 editors.imgEditor.style.display = "none"
 editors.threeEditor.style.display = "none"
-
-// Jar Decompiler/Interpreter
-window.jarData =
-{
-    combined: {},
-    modified: [],
-    idList: []
-}
-
-window.addInstanceListener((i) => {jarAnalyseSetup(i)});
-async function jarAnalyseSetup(i)
-{
-    if(!(await ipcInvoke("isMinecraftInstalled", window.instance.name, window.instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
-    document.getElementById("launch-required").style.display = "none";
-    document.getElementById("launch-required").querySelector("button").onclick = ()=>{jarAnalyseSetup(i)}
-
-    // Full Combinaison
-    window.jarData.combined = msgpack.decode(await getCombined(i.name, i.version.number));
-    window.jarData.modified = [];
-    window.jarData.idList = [];
-
-    // Apply
-    window.jarData.openApplier = async function()
-    {
-        for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
-        modEditor.style.display = "none";
-        editors.applyEditor.style.display = "block";
-
-        editors.applyEditor.querySelector(":scope > div:first-of-type").innerHTML = '';
-        for(let [i, m] of window.jarData.modified.entries())
-        {
-            let e = document.createElement("div");
-            e.appendChild(document.createElement("p"))
-            e.appendChild(document.createElement("button"))
-            e.appendChild(document.createElement("button"))
-
-            // Text
-            let keyPath = "";
-            for(let p of m.keys){keyPath+=p+"/";} keyPath = keyPath.slice(0, keyPath.length-1);
-            e.querySelector("p").innerText = keyPath;
-
-            // Buttons
-            e.querySelector("button:first-of-type").innerText = "apply";
-            e.querySelector("button:first-of-type").onclick = async () =>
-            {
-                await ipcInvoke("writeJarPropertie", m.origin, [m]);
-                window.instance.jarModifications.push(m)
-                window.jarData.modified.splice(i, 1)
-                e.remove();
-            }
-
-            e.querySelector("button:last-of-type").innerText = "revert";
-            e.querySelector("button:last-of-type").onclick = async () =>
-            {
-                window.jarData.modified.splice(i, 1)
-                e.remove();
-            }
-
-            editors.applyEditor.querySelector(":scope > div:first-of-type").appendChild(e)
-        }
-
-        editors.applyEditor.querySelector(":scope > div:last-of-type > button:first-of-type").onclick = async () =>
-        {
-            let groups = [];
-            for(let [i, m] of window.jarData.modified.entries)
-            {
-                if(groups.find(g=>g[0]?.origin==m.origin))
-                { groups[groups.findIndex(g=>g[0]?.origin==m.origin)].push(m); }
-                else { groups.push([m]) }
-
-                window.instance.jarModifications.push(m)
-                window.jarData.modified.splice(i, 1)
-            }
-            for(let g of groups) { window.instance.jarModifications.push(m); await ipcInvoke("writeJarPropertie", g[0].origin, g); }
-
-            for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:first-of-type")) { b.remove(); }
-        }
-        editors.applyEditor.querySelector(":scope > div:last-of-type > button:last-of-type").onclick = async () =>
-        {
-            for(let b of editors.applyEditor.querySelectorAll(":scope > div:first-of-type > div > button:last-of-type")) { b.remove(); }
-        }
-
-
-        editors.applyEditor.querySelector(":scope > button:last-of-type").onclick = () =>
-        {
-            editors.applyEditor.style.display = "none"
-            editors.applyEditor.querySelector(":scope > div:first-of-type").innerHTML = '';
-            document.querySelector('#content-editor > .tab > button:first-of-type').click();
-        }
-    }
-    modEditor.querySelector(":scope > button").onclick = () => { document.querySelector('#content-editor > .tab > button:last-of-type').click() };
-
-    window.jarData.openExplorer = async function(path = "")
-    {
-        if(!(await ipcInvoke("isMinecraftInstalled", window.instance.name, window.instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
-        document.getElementById("launch-required").style.display = "none";
-
-        let pathKeys = path;
-        if(typeof path == "string") { pathKeys = path.split("/"); }
-
-        document.querySelector("#content-element-selector").style.display = "none";
-
-        explorer(window.jarData.combined, async (keys) =>
-        {
-            editors.sourceSelection.firstChild.innerHTML = '';
-            editors.sourceSelection.style.display = "none";
-            for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
-
-            keys = lodash.clone(keys);
-
-            let selectedFile = null;
-            let files = await ipcInvoke("retrieveFileByKeys", i.name, keys, i.version.number);
-
-            if(files.length == 0)
-            {
-                editors.sourceSelection.style.display = "block";
-                let p = document.createElement("p");
-                p.innerText = `${keys[keys.length-1]} not found...`;
-                return;
-            }
-
-            selectedFile = files.length>1?await new Promise((resolve) =>
-            {
-                editors.sourceSelection.style.display = "block";
-                let p = document.createElement("p");
-                p.innerText = `${keys[keys.length-1]} is modified by multiple sources:`;
-                editors.sourceSelection.firstChild.appendChild(p);
-                for(let [i, f] of files.entries())
-                {
-                    let b = document.createElement("button");
-                    b.innerText = f.jarFile.slice(f.jarFile.lastIndexOf("/"))
-                    b.onclick = () =>
-                    {
-                        editors.sourceSelection.firstChild.innerHTML = '';
-                        editors.sourceSelection.style.display = "none";
-                        resolve(files[i])
-                    }
-                    editors.sourceSelection.firstChild.appendChild(b);
-                }
-            }):files[0];
-            if(getProp(window.jarData.combined, keys)) { selectedFile.value = getProp(window.jarData.combined, keys); }
-
-            setProp(window.jarData.combined, keys, selectedFile.value);
-            fileEditor(lodash.clone(selectedFile.value), keys[keys.length-1], (value) =>
-            {
-                if(lodash.isEqual(selectedFile.value, value)){return}
-                
-                setProp(window.jarData.combined, keys, value);
-                if(window.jarData.modified.find(m => m.keys==keys))
-                {
-                    window.jarData.modified[window.jarData.modified.findIndex(m => m.keys==keys)] = {origin: selectedFile.jarFile, keys, value}
-                }
-                else
-                {
-                    window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
-                }
-            }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, async () =>
-            {
-                let files = await ipcInvoke("retrieveFileByKeys", i.name, keys, i.version.number);
-                return files[files.length-1].value;
-            }, async (keys) =>
-            {
-                let value = null;
-                if(!getProp(window.jarData.combined, keys))
-                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
-                else { value = getProp(window.jarData.combined, keys) }
-
-                return value;
-            }, async (keys) =>
-            {
-                let value = null;
-                if(!getProp(window.jarData.combined, keys))
-                { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
-                else { value = getProp(window.jarData.combined, keys) }
-
-                return value;
-            })
-        }, {name: ""}, [], 0, [...pathKeys])
-
-        document.querySelector('#content-editor > .tab > button:first-of-type').click()
-    }
-
-    let loadedTable = false;
-    window.jarData.loadTable = async function loadTable(force = false)
-    {
-        if(loadedTable && !force){return}
-        loadedTable=true;
-
-        document.querySelector("#content-element-selector > button").style.display = "none";
-        document.querySelector("#content-element-selector > table").style.display = "block";
-
-        // Clean
-        while(document.querySelector("#content-element-selector thead > tr").children.length > 1){document.querySelector("#content-element-selector thead > tr").lastChild.remove()}
-        document.querySelector("#content-element-selector tbody").innerHTML = ''
-        
-        let modsMetadata = [];
-        let elementGroupMetadata = [];
-
-        let dataCopy = lodash.clone(window.jarData.combined.data); Object.assign(dataCopy, window.jarData.combined.assets)
-        let combinedEntrie = Object.entries(dataCopy).filter(([e,v]) => lodash.isObject(v) && e != ".mcassetsroot");
-        for(let [e, v] of combinedEntrie)
-        {
-            if(window.jarData.combined.data[e])
-            {
-                v = lodash.clone(window.jarData.combined.data[e])
-                Object.assign(v, window.jarData.combined.assets[e])
-            }
-            else
-            {
-                v = window.jarData.combined.assets[e];
-            }
-
-            let el = document.createElement("th");
-            el.scope = "col"; el.innerHTML = e;
-            document.querySelector("#content-element-selector thead > tr").appendChild(el);
-            let tableIndex = Array.from(document.querySelector("#content-element-selector thead > tr").childNodes).filter(e=>e.nodeName=="TH").findIndex(e=>e==el)
-
-            let count = 0;
-            async function recursiveSearch(p, preKeys = [])
-            {
-                for(let [key, v] of Object.entries(p))
-                {
-                    await new Promise(resolve => setTimeout(resolve, 0));
-
-                    let keys = [...preKeys];
-                    keys.push(key);
-
-                    if(key.includes("."))
-                    {
-                        if(keys.length <= 1){continue;}
-                        keys[keys.length-1] = keys[keys.length-1].replace(/\.[^/.]+$/, "");
-                        let path = "";
-                        for(let k of keys){path+=k+"/"}
-                        path = path.slice(0, path.length-1)
-
-                        window.jarData.idList.push(`${e}:${path}`);
-
-                        // Metadata
-                        let shortFilename = path.slice(path.lastIndexOf("/"));
-                        let shortPath = path.slice(0, path.indexOf("/"))
-
-                        count++;
-                        if(elementGroupMetadata.find(g=>g.path==shortPath))
-                        {
-                            elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].count++;
-                            elementGroupMetadata[elementGroupMetadata.findIndex(g=>g.path==shortPath)].elements.push({p: shortPath, f: shortFilename});
-                        }
-                        else
-                        {
-                            elementGroupMetadata.push
-                            ({
-                                path: shortPath,
-                                count: 1,
-                                elements: [{p: shortPath, f: shortFilename}]
-                            })
-                        }
-
-                        // Display
-                        let parent = Array.from(document.querySelectorAll("#content-element-selector tbody > tr")).find(tr => tr.querySelector(":scope > th").innerText == shortPath);
-                        if(!parent)
-                        {
-                            parent = document.createElement("tr");
-                            document.querySelector("#content-element-selector tbody").appendChild(parent);
-                            let titleEl = document.createElement("th");
-                            titleEl.scope = "row"; titleEl.innerText = shortPath;
-                            parent.appendChild(titleEl);
-                        }
-                        // else if (parent.childElementCount > 100){continue;}
-
-                        while(!parent.childNodes.item(tableIndex) || !parent.childNodes.item(combinedEntrie.length))
-                        {
-                            let el = document.createElement("th");
-                            el.scope = "row";
-                            parent.appendChild(el);
-                        }
-
-                        if(!isNaN(Number(parent.childNodes.item(tableIndex).innerText))) { parent.childNodes.item(tableIndex).innerText = (Number(parent.childNodes.item(tableIndex).innerText)+1); }
-                        else { parent.childNodes.item(tableIndex).innerText = "1"; }
-
-                        // Open
-                        parent.childNodes.item(tableIndex).onclick = () =>
-                        {
-                            let isAsset = getProp(window.jarData.combined, ["assets", e, ...shortPath.split("/")])!=undefined;
-                            window.jarData.openExplorer((isAsset?"assets":"data")+"/"+e+"/"+shortPath)
-                        }
-                    }
-                    else if(lodash.isObject(v))
-                    {
-                        recursiveSearch(v, keys);
-                    }
-                }
-            }
-            await recursiveSearch(v);
-
-            modsMetadata.push
-            ({
-                id: e,
-                count
-            })
-        }
-
-        // SORTING
-        {
-            // Columns
-            for (let i = 0; i < document.querySelectorAll("#content-element-selector thead > tr > th").length; i++)
-            {
-                let c = 0;
-                for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
-                {
-                    c += Number(child.childNodes[i].innerText)
-                }
-
-                for(let child of document.querySelectorAll("#content-element-selector tbody > tr"))
-                {
-                    child.childNodes[i].setAttribute("total", c)
-                }
-                document.querySelectorAll("#content-element-selector thead > tr > th")[i].setAttribute("total", c)
-            }
-
-            for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
-            {
-                [...document.querySelectorAll("#content-element-selector tbody > tr").item(i).childNodes]
-                .sort((a, b) =>
-                {
-                    if(a.nodeType != 1){return -1;}
-                    if(b.nodeType != 1){return 1;}
-                    return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
-                })
-                .forEach(node => document.querySelectorAll("#content-element-selector tbody > tr").item(i).appendChild(node));
-            }
-
-            [...document.querySelector("#content-element-selector thead > tr").childNodes]
-            .sort((a, b) =>
-            {
-                if(a.nodeType != 1){return -1;}
-                if(b.nodeType != 1){return 1;}
-                return Number(b.getAttribute("total"))-Number(a.getAttribute("total"));
-            })
-            .forEach(node => document.querySelector("#content-element-selector thead > tr").appendChild(node));
-
-            // Rows
-            for (let i = 0; i < document.querySelectorAll("#content-element-selector tbody > tr").length; i++)
-            {
-                let c = 0;
-                for(let child of document.querySelectorAll("#content-element-selector tbody > tr")[i].querySelectorAll(":scope > th"))
-                {
-                    if(isNaN(Number(child.innerText))){continue}
-                    c += Number(child.innerText)
-                }
-
-                document.querySelectorAll("#content-element-selector tbody > tr")[i].setAttribute("total", c)
-            }
-
-            [...document.querySelector("#content-element-selector tbody").childNodes]
-            .sort((a, b) =>
-            {
-                if(a.nodeType != 1){return -1;}
-                if(b.nodeType != 1){return 1;}
-
-                let ca=0;
-                for(let child of a.querySelectorAll(":scope > th"))
-                {
-                    if(isNaN(Number(child.innerText))){continue}
-                    ca += Number(child.innerText)
-                }
-
-                let cb=0;
-                for(let child of b.querySelectorAll(":scope > th"))
-                {
-                    if(isNaN(Number(child.innerText))){continue}
-                    cb += Number(child.innerText)
-                }
-
-                return cb-ca;
-            })
-            .forEach(node => document.querySelector("#content-element-selector tbody").appendChild(node));
-        }
-
-        modsMetadata = modsMetadata.sort((a,b) => b.count - a.count)
-        elementGroupMetadata = elementGroupMetadata.sort((a,b) => b.count - a.count)
-    }
-    document.querySelector("#content-element-selector > button").onclick = window.jarData.loadTable;
-    document.querySelector("#content-element-selector > table > thead > tr > th").onclick = window.jarData.loadTable;
-}
-
-
-// Three Setup
-let loadModel;
-let loadStructure;
-window.addInstanceListener(async (i) => 
-{
-    // Setup
-    function isWebGLAvailable()
-    {
-        try {
-            const canvas = document.createElement('canvas');
-            return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')));
-        } catch (e) {
-            return false;
-        }
-    }
-    if (!isWebGLAvailable())
-    {
-        console.error("WebGL is not supported or disabled!");
-        return
-    }
-
-    const renderer = new THREE.WebGLRenderer
-    ({
-        alpha: false,
-        canvas: document.getElementById("three-file-canvas"), 
-        powerPreference: "high-performance",
-        premultipliedAlpha: false,
-        depth: false,
-        stencil: false,
-        antialias: false,
-        preserveDrawingBuffer: true
-    });
-    renderer.autoClear = false;
-
-    document.body.appendChild( renderer.domElement );
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.1, 1000 );
-
-
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.castShadow = true;
-    light.shadow.camera.near = 1;
-    light.shadow.camera.far = 50;
-    light.shadow.camera.right = 50;
-    light.shadow.camera.left = -50;
-    light.shadow.camera.top	= 50;
-    light.shadow.camera.bottom = -50;
-    light.shadow.mapSize.width = 1024;
-    light.shadow.mapSize.height = 1024;
-
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.BasicShadowMap;
-
-
-    light.position.set(20, 40, 20);
-    light.target.position.set(0, 0, 0);
-    scene.add(light, light.target, new THREE.AmbientLight(0xffffff, 0.5));
-
-    camera.position.z = 5;
-    
-    // Post
-    const composer = new POSTPROCESSING.EffectComposer(renderer)
-
-    if(true)
-    {
-        composer.addPass(new POSTPROCESSING.RenderPass(scene, camera));
-        // const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera)
-
-        const combinedEffects2 = new POSTPROCESSING.EffectPass(camera,
-            // new TRAAEffect(scene, camera, velocityDepthNormalPass),
-            // new HBAOEffect(composer, camera, scene, {power: 0.3, radius: 3, distance: 1}),
-            new POSTPROCESSING.SSAOEffect(camera),
-            new POSTPROCESSING.FXAAEffect(),
-            new POSTPROCESSING.BloomEffect({intensity: 1})
-        );
-        combinedEffects2.renderToScreen = true;
-        composer.addPass(combinedEffects2)
-        // composer.addPass(new MotionBlurEffect(velocityDepthNormalPass, {intensity: 1, jitter: 1}))
-    }
-    else if(false)
-    {
-        const ssrEffect = new SSREffect(scene, camera, new VelocityDepthNormalPass(scene, camera))
-        const ssrPass = new POSTPROCESSING.EffectPass(camera, ssrEffect)
-        composer.addPass(ssrPass)
-    }
-    else
-    {
-        composer.addPass(new POSTPROCESSING.RenderPass(scene, camera));
-        const velocityDepthNormalPass = new VelocityDepthNormalPass(scene, camera);
-
-        const ssgi = new SSGIEffect(scene, camera, velocityDepthNormalPass, {denoiseIterations: 0, refineSteps: 60, steps: 120, resolutionScale: 1, distance: 40, thickness: 0.01})
-
-        const motionBlur = new MotionBlurEffect(velocityDepthNormalPass);
-        const traa = new TRAAEffect(scene, camera, velocityDepthNormalPass);
-
-        const effectPass = new POSTPROCESSING.EffectPass(camera, ssgi, traa);
-        effectPass.renderToScreen = true;
-        composer.addPass(effectPass);
-    }
-
-    // Resize
-    const resizeElement = () =>
-    {
-        const width = Math.max(1, renderer.domElement.parentNode.getBoundingClientRect().width || 800);
-        const height = Math.max(1, renderer.domElement.parentNode.getBoundingClientRect().height || 600);
-
-        camera.aspect = width / height;
-
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
-        composer.setSize(width, height)
-
-        console.log(width, height)
-
-        camera.updateProjectionMatrix();
-    }
-    renderer.domElement.parentNode.onresize = resizeElement;
-    let observer = new ResizeObserver(resizeElement);
-    observer.observe(renderer.domElement.parentNode)
-
-    setInterval(() =>
-    {
-        if(renderer.domElement.parentNode.getBoundingClientRect().width!=renderer.domElement.getBoundingClientRect().width||renderer.domElement.parentNode.getBoundingClientRect().height!=renderer.domElement.getBoundingClientRect().height)
-        {resizeElement()}
-    }, 100/30)
-
-    editors.threeEditor.appendChild(renderer.domElement);
-    resizeElement();
-
-    const resolveTexture = async (ref, getFile = (k) => {}, json) =>
-    {
-        if (!ref) return null;
-        if (ref.includes('http') || ref.endsWith('.png')) return ref;
-
-        if(ref.startsWith("#"))
-        { return await resolveTexture(json["textures"][ref.replace(/^#/, '')], getFile, json); }
-
-        let cleaned = ref.replace(/^#/, '');
-        let keys = [];
-        if (cleaned.includes(':'))
-        {
-            let [mod, path] = cleaned.split(':');
-            path = path.split("/");
-            path[path.length-1] = path[path.length-1]+".png"
-
-            keys = ['assets', mod, 'textures'].concat(path);
-        }
-        else
-        {
-            cleaned = cleaned.split("/");
-            cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".png"
-
-            keys = ['assets', "minecraft", 'textures'].concat(cleaned);
-        }
-
-        let targetObject = await getFile(keys);
-        if(targetObject)
-        {
-            return "data:image/png;base64,"+targetObject.url;
-        }
-        return "data:image/png;base64,0";
-    };
-    const resolveModel = async (ref, getFile = (k) => {}) =>
-    {
-        if (!ref) return null;
-        if (ref.includes('http') || ref.endsWith('.png')) return ref;
-        let cleaned = ref.replace(/^#/, '');
-        let keys = [];
-        if (cleaned.includes(':'))
-        {
-            let [mod, path] = cleaned.split(':');
-            path = path.split("/");
-            path[path.length-1] = path[path.length-1]+".json"
-
-            keys = ['assets', mod, 'models'].concat(path);
-        }
-        else
-        {
-            cleaned = cleaned.split("/");
-            cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".json"
-
-            keys = ['assets', "minecraft", 'models'].concat(cleaned);
-        }
-
-        let targetObject = await getFile(keys);
-        if(targetObject)
-        {
-            return JSON.parse(targetObject);
-        }
-        return {};
-    };
-    
-    let lastModel = null;
-    loadModel = async (json, getFile = (k) => {}) =>
-    {
-        resizeElement();
-
-        if(lastModel){scene.remove(lastModel)}
-
-        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
-        editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").setAttribute("selected", "");
-        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '';
-
-        // Parent
-        while(json.parent != undefined)
-        {
-            let parent = json.parent;
-            let parentObj = await resolveModel(parent, getFile);
-            let nextParent = parentObj.parent;
-
-            json = lodash.merge(parentObj, json);
-
-            if(parent == nextParent) { json.parent = undefined }
-            else { json.parent = nextParent; }
-        }
-
-        let dependencies = []
-        lastModel = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {if(!ref.startsWith("#")){dependencies.push(ref)} return await resolveTexture(ref, getFile, json)}, scale: 1, center: true});
-        lastModel.position.setY(-0.5)
-        scene.add(lastModel);
-
-        editors.threeEditor.querySelector(":scope > div:first-of-type > select").value = ""
-        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '<option value="" disabled selected>Dependencies</option>'
-        for(let d of dependencies)
-        {
-            let e = document.createElement("option");
-            e.innerText = d;
-            e.value = d;
-            editors.threeEditor.querySelector(":scope > div:first-of-type > select").appendChild(e);
-        }
-
-        editors.threeEditor.querySelector(":scope > div:first-of-type > select").onchange = () =>
-        {
-            let cleaned = editors.threeEditor.querySelector(":scope > div:first-of-type > select").value.replace(/^#/, '');
-            let keys = [];
-            if (cleaned.includes(':'))
-            {
-                let [mod, path] = cleaned.split(':');
-                path = path.split("/");
-                path[path.length-1] = path[path.length-1]+".png"
-
-                keys = ['assets', mod, 'textures'].concat(path);
-            }
-            else
-            {
-                cleaned = cleaned.split("/");
-                cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".png"
-
-                keys = ['assets', "minecraft", 'textures'].concat(cleaned);
-            }
-
-            window.jarData.openExplorer(keys);
-            console.log(keys);
-        }
-    }
-
-    loadStructure = async (data, getFile = (k) => {}) => 
-    {
-        // Cleanup
-        resizeElement();
-
-        if(lastModel){scene.remove(lastModel)}
-
-        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
-        editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").setAttribute("selected", "");
-        editors.threeEditor.querySelector(":scope > div:first-of-type > select").innerHTML = '';
-
-
-        // Load
-        let palette = [];
-        for(let [i, p] of data.palette.entries())
-        {
-            function idToKeys(id, preKeys = [])
-            {
-                let cleaned = id.replace(/^#/, '');
-                let keys = [];
-                if (cleaned.includes(':'))
-                {
-                    let [mod, path] = cleaned.split(':');
-                    path = path.split("/");
-                    path[path.length-1] = path[path.length-1]+".json"
-
-                    keys = ['assets', mod, ...preKeys].concat(path);
-                }
-                else
-                {
-                    cleaned = cleaned.split("/");
-                    cleaned[cleaned.length-1] = cleaned[cleaned.length-1]+".json"
-
-                    keys = ['assets', "minecraft", ...preKeys].concat(cleaned);
-                }
-                return keys;
-            }
-
-            let files = [];
-            // Properties
-            if(p.Properties || (p.Name && !(await getFile(idToKeys(p.Name, ['models']))) && !(await getFile(idToKeys(p.Name, ['models', 'block'])))))
-            {
-                if(!p.Properties){p.Properties={}}
-                let blockPropertiesString = Object.entries(p.Properties).map(([k, v]) => `${k}=${JSON.stringify(v).slice(1, JSON.stringify(v).length-1)}`).join(',');
-
-                let variantKeys = idToKeys(p.Name, ["blockstates"]);
-                
-                let blockstateJson = JSON.parse(await getFile(variantKeys));
-
-                if(blockstateJson?.variants)
-                {
-                    let variantData = {};
-
-                    for(let [k, v] of Object.entries(blockstateJson.variants))
-                    {
-                        let valid = true;
-                        for(let part of k.split(','))
-                        {
-                            if(!blockPropertiesString.includes(part)){valid=false; break;}
-                        }
-                        if(!valid){continue}
-
-                        if(Array.isArray(v)){v=v[0]}
-                        variantData = lodash.merge(variantData, v)
-                    }
-
-                    if((Object.entries(variantData).length == 0 || !variantData.model) && !blockstateJson.multipart) { files.push({model: p.Name}); }
-                    else { files.push(variantData) }
-                }
-                if(blockstateJson?.multipart)
-                {
-                    let final = {};
-                    blockstateJson.multipart.reverse()
-                    for(let m of blockstateJson.multipart)
-                    {
-                        if(!m.when){continue;}
-                        let valid = true;
-                        for(let [k, v] of Object.entries(m.when))
-                        {
-                            if(!p.Properties[k] == v){valid = false; break;}
-                        }
-                        if(!valid){continue;}
-
-                        final = lodash.merge(final, m.apply)
-                        // files.push(m.apply)
-                    }
-                    for(let m of blockstateJson.multipart)
-                    {
-                        if(!m.model){continue}
-                        let finalCopy = lodash.clone(final);
-                        finalCopy.model = m.model;
-                        files.push(final);
-                    }
-                }
-
-                if(!blockstateJson?.variants && !blockstateJson?.multipart)
-                {
-                    console.log("NO VARIANT/MULTIPART", blockstateJson)
-                }
-            }
-            else { files.push({model: p.Name}); }
-
-            let final = new THREE.Group();
-            for(let f of files)
-            {
-                if(!f.model){ console.log(files, p); continue;}
-                let json = JSON.parse(await getFile(idToKeys(f.model, ['models'])));
-
-                if(!json){ json = JSON.parse(await getFile(idToKeys(f.model, ['models', 'block']))) }
-                if(!json){ continue; }
-
-                while(json.parent != undefined)
-                {
-                    let parent = json.parent;
-                    let parentObj = await resolveModel(parent, getFile);
-                    let nextParent = parentObj.parent;
-
-                    json = lodash.merge(parentObj, json);
-
-                    if(parent == nextParent) { json.parent = undefined }
-                    else { json.parent = nextParent; }
-                }
-                
-                let model = await parseMinecraftModelToThree(json, {texturePathResolver: async (ref) => {return await resolveTexture(ref, getFile, json)}, scale: 1/16, center: true});
-
-                for(let [i, c] of model.children.entries()){model.children[i].position.z-=0;model.children[i].position.y-=0.5;model.children[i].position.x-=0;}
-                
-                if(!f.x){f.x=0} if(!f.y){f.y=0;}
-                model.rotation.order = 'XYZ';
-                model.rotateY(THREE.MathUtils.degToRad(-f.y))
-                model.rotateX(THREE.MathUtils.degToRad(-f.x))
-
-                final.add(model);
-            }
-
-            palette.push(final);
-        }
-
-        lastModel = new THREE.Group();
-        for(let b of data.blocks)
-        {
-            if(!palette[b.state] || !palette[b.state]){continue;}
-            let m = palette[b.state].clone(true);
-            m.position.setX(b.pos[0]+0.5)
-            m.position.setY(b.pos[1]+0.5)
-            m.position.setZ(b.pos[2]+0.5)
-            lastModel.add(m);
-        }
-
-        controls.target.set(data.size[0]/2, data.size[1]/2, data.size[2]/2)
-
-        lastModel = await mergeGroupOptimizedChunked(lastModel, { tolerance: 1e-5 });
-        lastModel.castShadow = true;
-        lastModel.receiveShadow = true;
-        scene.add(lastModel)
-    }
-    
-    // Shading Select
-    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(1)").onclick = (ev) =>
-    {
-        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
-        ev.target.setAttribute("selected", "");
-        lastModel.traverse((child) =>
-        {
-            if(Array.isArray(child.material))
-            {
-                for(let m of Object.entries(child.material))
-                {
-                    let newMat = new THREE.MeshStandardMaterial({ map: m[1].map, color: 0xffffff, transparent: false, side: THREE.FrontSide, wireframe: true })
-                    child.castShadow = child.receiveShadow = true;
-                    child.material[m[0]] = newMat;
-                }
-            }
-            else if(child.material)
-            {
-                let newMat = new THREE.MeshStandardMaterial({ map: child.material.map, color: 0xffffff, transparent: false, side: THREE.FrontSide, wireframe: true })
-                child.castShadow = child.receiveShadow = true;
-                child.material = newMat;
-            }
-
-        })
-    }
-    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(2)").onclick = (ev) =>
-    {
-        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
-        ev.target.setAttribute("selected", "");
-        lastModel.traverse((child) =>
-        {
-            if(Array.isArray(child.material))
-            {
-                for(let m of Object.entries(child.material))
-                {
-                    let newMat = new THREE.MeshBasicMaterial({ map: m[1].map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5 })
-                    child.castShadow = child.receiveShadow = true;
-                    child.material[m[0]] = newMat;
-                }
-            }
-            else if(child.material)
-            {
-                let newMat = new THREE.MeshBasicMaterial({ map: child.material.map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5 })
-                child.castShadow = child.receiveShadow = true;
-                child.material = newMat;
-            }
-        })
-    }
-    editors.threeEditor.querySelector(":scope > div:first-of-type > button:nth-child(3)").onclick = (ev) =>
-    {
-        for(let b of editors.threeEditor.querySelectorAll(":scope > div:first-of-type > button")){b.removeAttribute("selected")}
-        ev.target.setAttribute("selected", "");
-        lastModel.traverse((child) =>
-        {
-            if(child.material)
-            {
-                let newMat = new THREE.MeshPhysicalMaterial({ map: child.material.map, side: THREE.FrontSide, shadowSide: THREE.FrontSide, alphaTest: .5, roughness: 0.2, specularIntensity: 1, reflectivity: 1 });
-                child.castShadow = child.receiveShadow = true;
-                child.material = newMat;
-            }
-        })
-    }
-
-    // Camera Control
-    const controls = new OrbitControls( camera, renderer.domElement );
-    camera.position.set( 0, 20, 100 );
-    controls.update();
-
-    scene.add(new THREE.AxesHelper(1))
-
-    renderer.shadowMap.type=THREE.VSMShadowMap;
-
-    const clock = new THREE.Clock();
-    // Render Loop
-    function animate()
-    {
-        // if(!editors.threeEditor.checkVisibility()){return;}
-
-        light.rotateY(clock.getDelta());
-        renderer.shadowMap.needsUpdate = true;
-
-        scene.updateMatrixWorld();
-
-        controls.update();
-
-        if(composer) { composer.render(clock.getDelta()) }
-        else { renderer.render( scene, camera ) }
-    }
-    renderer.setAnimationLoop( animate );
-});
-
-// Core Functions
-let editorTheme = EditorView.theme
+const importFileInput = document.querySelector("#editor-container > #file-metadata > div > div > input")
+const applyEditor = document.getElementById("apply-editor")
+applyEditor.style.display = "none"
+
+const fileOptButtons =
+[
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(1) > button:nth-child(1)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(1) > button:nth-child(2)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(2) > button:nth-child(1)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(2) > button:nth-child(2)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(3) > button:nth-child(1)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(3) > button:nth-child(2)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(4) > button:nth-child(1)"),
+    document.querySelector("#file-metadata > div:first-of-type > div:nth-child(4) > button:nth-child(2)"),
+]
+
+
+
+const editorTheme = EditorView.theme
 ({
     "&":
     {
@@ -1276,1056 +71,1817 @@ let editorTheme = EditorView.theme
     }
 }, {dark: true})
 
-let nbtEditorOpened = false;
-let nbtEditorIndex = -1;
 
-// Expend/Unexpend
-document.querySelector("#content-editor .unexpend").onclick = () =>
-{
-    document.querySelector("#mod-content-editor").style.display = "none";
-    document.querySelector("#content-editor .expend").style.display = "block";
-}
-document.querySelector("#content-editor .expend").onclick = () =>
-{
-    document.querySelector("#mod-content-editor").style.display = "flex";
-    document.querySelector("#content-editor .unexpend").style.display = "block";
-    document.querySelector("#content-editor .expend").style.display = "none";
-}
-
-// Core Functions
-function explorer(o, open, display, keysPath = [], iteration = 0, startingPath = [], max = 6)
-{
-    let s = null;
-    if(modEditor.querySelectorAll(".content-explorer-section")[iteration])
-    {
-        s = modEditor.querySelectorAll(".content-explorer-section")[iteration];
-        while(modEditor.querySelectorAll(".content-explorer-section")[iteration+1]){modEditor.querySelectorAll(".content-explorer-section")[iteration+1].remove();}
-        for (let index = modEditor.querySelectorAll(".content-explorer-section").length-1; index > iteration; index--)
-        {
-            for(let b of modEditor.querySelectorAll(".content-explorer-section")[index].querySelectorAll("button")){b.removeAttribute("selected")}
-        }
-        // while(modEditor.querySelectorAll(".content-explorer-section").length > max){modEditor.querySelectorAll(".content-explorer-section")[0].remove();}
-        while(s.querySelector("button")){s.querySelector("button").remove();}
-    }
-    else { s = section.cloneNode(true); modEditor.appendChild(s); }
-    if(!display.name) { s?.querySelector("h3")?.remove(); }
-    else if(s?.querySelector("h3")) { s.querySelector("h3").innerText = display.name }
-
-    if(display.icon)
-    {
-        if(!s.querySelector("img")) {s.querySelector(":scope > div").insertBefore(document.createElement("img"), s.querySelector(":scope > div").firstChild)}
-        s.querySelector("img").src = display.icon; }
-    else if(s.querySelector("img")) { s.querySelector("img").remove(); }
-
-    for(let [k, v] of Object.entries(o).sort(([ka], [kb])=>ka.localeCompare(kb)))
-    {
-        let b = document.createElement("button");
-        if(k.endsWith(".png") && v && v.url)
-        {
-            let i = document.createElement("img");
-            i.src = "data:image/png;base64,"+v.url;
-            b.appendChild(i);
-
-            let span = document.createElement("span");
-            span.innerText = k;
-            b.appendChild(span);
-        }
-        else if(k.endsWith(".png"))
-        {
-            let span = document.createElement("span");
-            span.innerText = k;
-            b.appendChild(span);
-
-            let path = lodash.clone(keysPath);
-            path.push(k);
-
-            ipcInvoke("retrieveFileByKeys", window.instance.name, path, window.instance.version.number).then(file =>
-            {
-                if(!file || file.length == 0 || !file[0].value?.url){return}
-                
-                let i = document.createElement("img");
-                i.src = "data:image/png;base64,"+file[0].value.url;
-                b.insertBefore(i, span);
-            })
-        }
-        else
-        {
-            b.innerText = k;
-        }
-        s.appendChild(b)
-
-        if(!/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k) && (v==undefined || Object.entries(v).length == 0))
-        {
-            b.disabled = true;
-        }
-
-        b.onclick = () =>
-        {
-            let path = lodash.clone(keysPath);
-            path.push(k);
-
-            for(let s of b.parentNode.querySelectorAll("button")){s.removeAttribute("selected")}
-            b.setAttribute("selected", "")
-
-            if(/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(k))
-            {
-                open(path)
-
-                let directoryPath = path;
-                directoryPath.pop();
-
-                let index = Array.from(b.parentNode.childNodes).indexOf(b)
-
-                for (let i = modEditor.querySelectorAll(".content-explorer-section").length-1; i > iteration; i--)
-                {
-                    for(let b of modEditor.querySelectorAll(".content-explorer-section")[i].querySelectorAll("button")){b.removeAttribute("selected")}
-                }
-                for (let s of modEditor.querySelectorAll(".content-explorer-section"))
-                {
-                    for(let b of Array.from(s.querySelectorAll("button")).filter(b=>/^[^\\\/:\*\?"<>\|]+(\.[a-zA-Z0-9]+)+$/.test(b.innerText) || b.querySelector("span")))
-                    {
-                        b.removeAttribute("selected")
-                    }
-                }
-
-                s.parentNode.querySelectorAll(":scope > div")[iteration].childNodes.item(index).setAttribute("selected", "")
-                // {name: path[path.length-1]}
-            }
-            else
-            {
-                explorer(v, open, {name: null}, path, iteration+1, startingPath[iteration]==k?startingPath:[]);
-            }
-        }
-
-        if(startingPath[iteration] == k){b.onclick(); startingPath = []; }
-    }
-
-    document.getElementById("mod-content-editor").scrollTo(document.getElementById("mod-content-editor").scrollHeight, 0)
-}
-
-let closeEditor = () => {};
 let Drawers = {};
-async function fileEditor(data, filename, onChange = (value)=>{}, onExit = () => {}, reload = () => {}, getFile = (k) => {}, getGlobalFile = (k) => {})
-{    
-    for(let [e, v] of Object.entries(editors)){editors[e].style.display = "none";}
-    closeEditor();
-    if(filename.endsWith(".json") || filename.endsWith(".mcmeta"))
+
+// Three Scene
+let threeSetup = null;
+const threeCanvas = document.querySelector("#editor-container #three-file-canvas")
+async function setupThree(content)
+{
+    if(threeSetup) { return }
+    const data = await initializeScene(threeCanvas, false, false)
+
+    // Light
+    data.scene.add( new THREE.AmbientLight(0xffffff, 2) )
     {
-        editors.codeEditor.style.display = "block";
-
-        let value = data;
-        // Beautiful Indent
-        value = stringify(parse(value, undefined, true), null, 4);
-
-        let editor = new EditorView
-        ({
-            doc: value,
-            extensions:
-            [
-                basicSetup,
-                json(),
-                editorTheme,
-                oneDark,
-                indentUnit.of("    "),
-                EditorView.updateListener.of(update =>
-                {
-                    if (update.docChanged)
-                    {
-                        const doc = update.state.doc;
-                        value = doc.toString()
-                    }
-                }),
-                keymap.of
-                ([
-                    { key: "Tab", run: indentMore },
-                    { key: "Shift-Tab", run: indentLess }
-                ])
-            ],
-            parent: editors.codeEditor
-        })
-                    
-        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
-        editors.codeEditor.querySelector(".exit-options > button.save").onclick = () =>
-        {
-            try
-            {
-                onChange(value)
-            }
-            catch(err)
-            {
-                console.warn(err)
-                // TODO: Error invalid json
-            }
-        }
-
-        closeEditor = () =>
-        {
-            editors.codeEditor.style.display = "none";
-            editors.threeEditor.style.display = "none";
-            editor.dom.remove();
-            onExit();
-        }
-        editors.codeEditor.querySelector(".exit-options > button.exit").onclick = closeEditor
-
-        editors.codeEditor.querySelector(".exit-options > button.three").onclick = () =>
-        {
-            if(!loadModel){return}
-            editors.codeEditor.style.display = "none";
-            editors.threeEditor.style.display = "block";
-
-            loadModel(JSON.parse(value), getGlobalFile);
-        }
+        const light = new THREE.DirectionalLight(0xffffff, Math.pow(1, 1.5)*2);
+        light.castShadow = true;
+        light.shadow.camera.near = 1;
+        light.shadow.camera.far = 100;
+        light.shadow.camera.right = 50;
+        light.shadow.camera.left = -50;
+        light.shadow.camera.top	= 50;
+        light.shadow.camera.bottom = -50;
+        light.shadow.mapSize.width = 1024;
+        light.shadow.mapSize.height = 1024;
+        light.shadow.bias = -0.02
+        light.position.set(50, 100, 50);
+        light.target = data.mainCamera
+        data.scene.add(light)
     }
-    else if(filename.endsWith(".class"))
-    {
-        editors.codeEditor.style.display = "block";
 
-        let value = data;
-        let editor = new EditorView
-        ({
-            doc: value.raw.file,
-            extensions:
-            [
-                basicSetup,
-                java(),
-                editorTheme,
-                oneDark,
-                indentUnit.of("    "),
-                EditorView.updateListener.of(update =>
-                {
-                    if (update.docChanged)
-                    {
-                        const doc = update.state.doc;
-                        value.raw.file = doc.toString()
-                    }
-                }),
-                keymap.of
-                ([
-                    { key: "Tab", run: indentMore },
-                    { key: "Shift-Tab", run: indentLess }
-                ])
-            ],
-            parent: editors.codeEditor
+    // World
+    data.mcWorld = new World(content, '/Users/coconuts/Library/Application Support/Modpack Maker/instances/test/minecraft', data.addRenderListener, data.mainCamera, true, data.world)
+    data.scene.add(data.mcWorld.group)
+
+    // Ground Collider
+    const ground = RAPIER.ColliderDesc.cuboid(1024, 32, 1024);
+    ground.translation = new RAPIER.Vector3(0, -32, 0);
+    data.world.createCollider(ground);
+
+    // Player
+    data.player = new Player(-2, 0, -2, data, content)
+    document.querySelector("#editor-container #three-editor").appendChild(data.player.gui.container)
+
+    // Camera Mode
+    data.setDisabledRendering(true)
+    let camera = new THREE.PerspectiveCamera(40, threeCanvas.getBoundingClientRect().width / threeCanvas.getBoundingClientRect().height, 0.1, 1000);
+
+    const controls = new OrbitControls( camera, threeCanvas );
+    controls.update();
+
+    let axisHelper = new THREE.AxesHelper(64);
+    data.scene.add(axisHelper)
+    let grid = new THREE.GridHelper(64, 64);
+    grid.position.setY(-0.1)
+    data.scene.add(grid)
+
+    camera.position.setZ(-10)
+
+    // const raycaster = new THREE.Raycaster();
+
+    let removeRendererListener = null
+    let removeResizeListener = null
+
+    data.enableFreeCamera = () =>
+    {
+        data.setDisabledRendering(true)
+
+        data.renderer.clear(true, true, true);
+        data.player.enabled = false;
+
+        removeRendererListener = data.addRenderListener((clock) =>
+        {
+            controls.update(clock.getDelta());
+            data.renderer.render(data.scene, camera);
+
+            // // Raycast
+            // raycatsEvent && raycaster.setFromCamera( pointer, camera );
+            // raycatsEvent && raycatsEvent(raycaster.intersectObjects( data.scene.children.filter(c=>c.visible&&c.geometry) )[0])
         })
-                    
-        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
 
-        editors.codeEditor.querySelector(".exit-options > button.three").disabled = editors.codeEditor.querySelector(".exit-options > button.save").disabled = true;
-        editors.codeEditor.querySelector(".exit-options > button.save").onclick = () =>
+        removeResizeListener = data.addResizeListener((w, h) =>
         {
-            try
-            {
-                onChange(value)
-            }
-            catch(err)
-            {
-                console.warn(err)
-                // TODO: Error invalid json
-            }
-        }
-
-        closeEditor = () =>
-        {
-        editors.codeEditor.querySelector(".exit-options > button.three").disabled = editors.codeEditor.querySelector(".exit-options > button.save").disabled = false;
-            editors.codeEditor.style.display = "none"
-            editor.dom.remove();
-            onExit();
-        }
-        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
-    }
-    else if(filename.endsWith(".toml"))
-    {
-        editors.codeEditor.style.display = "block";
-
-        let value = data;
-        let editor = new EditorView
-        ({
-            doc: value.raw,
-            extensions:
-            [
-                basicSetup,
-                StreamLanguage.define(toml),
-                editorTheme,
-                oneDark,
-                indentUnit.of("    "),
-                EditorView.updateListener.of(update =>
-                {
-                    if (update.docChanged)
-                    {
-                        const doc = update.state.doc;
-                        value.raw = doc.toString()
-                    }
-                }),
-                keymap.of
-                ([
-                    { key: "Tab", run: indentMore },
-                    { key: "Shift-Tab", run: indentLess }
-                ])
-            ],
-            parent: editors.codeEditor
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
         })
-                    
-        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
-        editors.codeEditor.querySelector(".exit-options > .save").onclick = () =>
-        {
-            try
-            {
-                onChange(value)
-            }
-            catch(err)
-            {
-                console.warn(err)
-                // TODO: Error invalid json
-            }
-        }
-
-        closeEditor = () =>
-        {
-            editors.codeEditor.style.display = "none"
-            editor.dom.remove();
-            onExit();
-        }
-        editors.codeEditor.querySelector(".exit-options > .exit").onclick = closeEditor
     }
-    else if(filename.endsWith(".mcfunction") || filename.endsWith(".MF") || filename.endsWith(".properties") || filename.endsWith(".txt"))
+    data.disableFreeCamera = () =>
     {
-        editors.codeEditor.style.display = "block";
+        removeRendererListener();
+        removeResizeListener();
 
-        let editor = new EditorView
-        ({
-            doc: data,
-            extensions:
-            [
-                basicSetup,
-                editorTheme,
-                oneDark,
-                indentUnit.of("    "),
-                EditorView.updateListener.of(update =>
+        data.setDisabledRendering(false)
+        data.player.enabled = true;
+
+        data.renderer.clear(true, true, true);
+    }
+
+    fileOptButtons[5].onclick = () =>
+    {
+        data.player.enabled ? data.enableFreeCamera() : data.disableFreeCamera()
+    }
+
+    data.enableFreeCamera()
+    threeSetup = data
+}
+
+// Nbt In-Game
+let nbtEditorIndex = -1;
+let nbtEditorOpened = false
+
+
+async function instanceEditor(name)
+{
+    const content = await JarContent.get(name, null, false)
+    console.log(content)
+
+    // Clean
+    let exitEditor = () => {}
+    function clean()
+    {
+        while(document.getElementById("content-explorer").querySelector(".content-explorer-section"))
+        {document.getElementById("content-explorer").querySelector(".content-explorer-section").remove()}
+        exitEditor();
+    }
+
+    // Build explorer
+    const parentElement = document.querySelector("#content-explorer > #content-explorer-selector")
+    let lastDirectory = []
+    function displayDirectory(directory = [], root = [], filters = [], separated = false, hierarchy = null)
+    {
+        let progressiveDir = hierarchy ? hierarchy : content.hierarchyIndexer
+        for(const d of root) { progressiveDir = progressiveDir?.[d] }
+
+        let startIndex = 0;
+        for(let i = 0; i < directory.length; i++)
+        {
+            startIndex++
+            if(lastDirectory[i] != directory[i])
+            { break; }
+        }
+
+        while(container.querySelector("button")) { container.querySelector("button").remove() }
+
+        directory = ['', ...directory]
+        for (let i = 0; i < directory.length; i++)
+        {
+            const dir = directory[i];
+            if(i>0) { progressiveDir = progressiveDir?.[dir] }
+            if(i<startIndex){continue}
+
+            // Delete if Old
+            if(i>directory.length)
+            {
+                if(parentElement.querySelectorAll(".content-explorer-section")[i])
+                { parentElement.querySelectorAll(".content-explorer-section")[i].remove() }
+                continue
+            }
+
+            // Container
+            let container = null;
+            if(parentElement.querySelectorAll(".content-explorer-section")[i])
+            {
+                // Get Container and Clean
+                container = parentElement.querySelectorAll(".content-explorer-section")[i];
+                while(container.querySelector("button")) { container.querySelector("button").remove() }
+
+                // Remove Old Children
+                while(parentElement.querySelectorAll(".content-explorer-section")[i+1]){parentElement.querySelectorAll(".content-explorer-section")[i+1].remove();}
+
+                // Select outline
+                for (let index = parentElement.querySelectorAll(".content-explorer-section").length-1; index > i; index--)
                 {
-                    if (update.docChanged)
-                    {
-                        const doc = update.state.doc;
-                        data = doc.toString()
-                    }
-                }),
-                keymap.of
-                ([
-                    { key: "Tab", run: indentMore },
-                    { key: "Shift-Tab", run: indentLess }
-                ])
-            ],
-            parent: editors.codeEditor
-        })
-                    
-        editors.codeEditor.appendChild(editors.codeEditor.querySelector(".exit-options"))
-        editors.codeEditor.querySelector(".exit-options > button:first-of-type").onclick = () => {onChange(data)}
+                    for(let b of parentElement.querySelectorAll(".content-explorer-section")[index].querySelectorAll("button")){b.removeAttribute("selected")}
+                }
+            }
+            else { container = section.cloneNode(true); parentElement.insertBefore(container, parentElement.lastChild); }
 
-        closeEditor = () =>
-        {
-            editors.codeEditor.style.display = "none"
-            editor.dom.remove();
-            onExit();
-        }
-        editors.codeEditor.querySelector(".exit-options > button:last-of-type").onclick = closeEditor
-    }
-    else if(filename.endsWith(".nbt"))
-    {
-        editors.nbtEditor.style.display = "block";
-
-        closeEditor = () => { editors.nbtEditor.style.display = "none"; onExit(); }
-
-        editors.nbtEditor.querySelectorAll("p")[1].innerText = `Dimensions x: ${data.parsed.size[0]}, y: ${data.parsed.size[1]}, z: ${data.parsed.size[2]}`
-
-        editors.nbtEditor.querySelector("caption").innerText = filename;
-        while(editors.nbtEditor.querySelector("tbody").firstChild){editors.nbtEditor.querySelector("tbody").firstChild.remove();}
-        for(let [i, p] of data.parsed.palette.entries())
-        {
-            let c = document.createElement("tr");
-            editors.nbtEditor.querySelector("tbody").appendChild(c);
-
-            c.appendChild(document.createElement("td"));
-            c.querySelector("td:last-of-type").innerText = data.parsed.blocks.filter(b=>b.state==i).length
-
-            c.appendChild(document.createElement("td"));
-            c.querySelector("td:last-of-type").innerText = p.Name
-
-            c.appendChild(document.createElement("td"));
-            c.querySelector("td:last-of-type").innerText = p.Properties?JSON.stringify(p.Properties, null, 4):"";
-            c.querySelector("td:last-of-type").style.textAlign = "start"
-        }
-
-        while(editors.nbtEditor.querySelector("ul").firstChild){editors.nbtEditor.querySelector("ul").firstChild.remove();}
-        for(let entity of data.parsed.entities)
-        {
-            let e = document.createElement("li");
-            e.innerText = entity.nbt.id;
-            editors.nbtEditor.querySelector("ul").appendChild(e);
-        }
-
-        editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
-        editors.nbtEditor.querySelectorAll("div > button")[0].innerText = nbtEditorOpened?"Load to Minecraft":"Edit in Minecraft"
-
-        editors.nbtEditor.querySelectorAll(":scope > button")[0].innerText = "Save into "+filename;
-        editors.nbtEditor.querySelectorAll(":scope > button")[0].onclick = async () => 
-        {
-            // Save
-            let data =
+            // Children
+            for(const c of Object.keys(progressiveDir).sort((a, b) => a.localeCompare(b)))
             {
-                parsed: await ipcInvoke("readFile", 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt'),
-                buffer: await ipcInvoke("readRawFile", 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt')
-            };
-            await onChange(data);
+                let origins = separated ? progressiveDir[c].origins : progressiveDir[c]
 
-            data = await reload();
+                if(c.slice(c.lastIndexOf('.')+1) == "class" && c.includes('$'))
+                { continue; }
 
-        }
-        editors.nbtEditor.querySelectorAll("div > button")[0].onclick = async () =>
-        {
-            nbtEditorIndex++;
-            if(!nbtEditorOpened)
-            {
-                nbtEditorOpened = true;
-                await ipcInvoke("addEditionWorld", window.instance.name);
-                await launch(
-                    window.instance.name,
+                const b = document.createElement("button");
+
+                let span = document.createElement("span");
+                span.innerText = c;
+                b.appendChild(span);
+
+                let img = document.createElement("img");
+                b.insertBefore(img, span);
+
+                // File: list of origins
+                if(Array.isArray(origins))
+                {
+                    if(filters.length > 0 && !origins.find(e => filters.includes(e)))
+                    { continue; }
+
+                    const filePath = separated ? progressiveDir[c].location.join('/') : root.concat(directory.slice(1).concat([c])).join('/');
+
+                    const fileSelection = (files, resolveByUI = true) =>
                     {
-                        log: (t, c) => {},
-                        close: async c =>
+                        if(filters.length == 0 || files.length == 1) { return files[0] }
+                        else if(filters.length > 0)
                         {
-                            closeEditor();
-                            nbtEditorOpened = false;
-                            editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Edit in Minecraft"
-                            editors.nbtEditor.querySelectorAll("div > button")[0].disabled = false
-                            editors.nbtEditor.querySelectorAll("p")[0].innerHTML = "";
-                            editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "none"
+                            const avalaibles = files.filter(f => filters.includes(f));
 
-                            ipcInvoke('deleteFolder', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep());
-                        },
-                        network: (i, c) => {},
-                        windowOpen: async (w, i) => {},
-                    },
-                    {type: "singleplayer", identifier: ".Structure Edition"}
+                            if(avalaibles.length == 0) { return null; }
+                            else if(avalaibles.length == 1) { return avalaibles[0]; }
+                            else if(resolveByUI)
+                            {
+                                // TODO: selection
+                            }
+
+                            return avalaibles[0]
+                        }
+                        else if(resolveByUI)
+                        {
+                            // TODO: selection
+                        }
+
+                        return files[0]
+                    }
+
+                    // Changes Color
+                    if(content.modified[filePath])
+                    {
+                        const s = fileSelection(Object.keys(content.modified[filePath]))
+                        if(s && content.modified[filePath][s])
+                        {
+                            switch(content.modified[filePath][s].type)
+                            {
+                                case "modify": { span.style.color = '#ffdb3dd1'; break; }
+                                case "add": { span.style.color = '#3bf494d1'; break; }
+                                case "remove": { span.style.color = '#bb0000d1'; break; }
+                            }
+                        }
+                    }
+
+                    // Logo
+                    img.style.scale = '.7'
+                    img.style.opacity = '.5'
+
+                    switch(c.slice(c.lastIndexOf('.')+1).toLocaleLowerCase())
+                    {
+                        case "json": { img.src = 'resources/files/json.png'; break; }
+                        case "jpm": { img.src = 'resources/files/json.png'; break; }
+                        case "jem": { img.src = 'resources/files/json.png'; break; }
+                        case "mcmeta": { img.src = 'resources/files/json.png'; break; }
+                        case "java": { img.src = 'resources/files/java.png'; break; }
+                        case "class": { img.src = 'resources/files/java.png'; break; }
+                        case "toml": { img.src = 'resources/files/toml.png'; break; }
+                        case "mf": { img.src = 'resources/files/meta.png'; break; }
+                        case "fsh": { img.src = 'resources/files/shader.png'; break; }
+                        case "vsh": { img.src = 'resources/files/shader.png'; break; }
+                        case "csh": { img.src = 'resources/files/shader.png'; break; }
+                        case "nbt": { img.src = 'resources/files/nbt.png'; break; }
+                        case "png":
+                        {
+                            img.src = 'resources/files/image.png';
+                            content.get( filePath, fileSelection).then(v =>
+                            {
+                                if(!v?.value){return}
+                                img.src = 'data:image/png;base64,'+v?.value
+                            })
+                        }
+                        default: { img.src = 'resources/file.png'; break; }
+                    }
+
+                    b.onclick = async () =>
+                    {
+                        for(const n of parentElement.querySelectorAll('button[selected]')) { n.removeAttribute('selected') }
+                        b.setAttribute("selected", "true")
+
+                        openEditor(await content.get( filePath, fileSelection), () => { span.style.color = '#ffdb3dd1' } )
+                    }
+                }
+                // Directory
+                else
+                {
+                    if(filters.length > 0)
+                    {
+                        let filtersOk = false;
+                        checkChildren(origins)
+                        function checkChildren(p)
+                        {
+                            for(const v of Object.values(p))
+                            {
+                                const isArr = Array.isArray(v);
+                                if(isArr && filters.find(f=>v.includes(f)))
+                                { filtersOk = true; return; }
+                                else if(!isArr)
+                                { checkChildren(v) }
+                            }
+                        }
+
+                        if(!filtersOk){continue}
+                    }
+
+                    img.src = 'resources/folder.png'
+                    img.style.scale = '.7'
+                    img.style.opacity = '.5'
+
+                    b.onclick = () =>
+                    {
+                        for(const n of b.parentNode.querySelectorAll('button[selected]')) { n.removeAttribute('selected') }
+                        b.setAttribute("selected", "true")
+                        displayDirectory( directory.slice(0, i).concat([c]), root, filters, separated, hierarchy)
+                    }
+                }
+
+                container.appendChild(b)
+            }
+        }
+
+        directory = directory.slice(1)
+        lastDirectory = directory;
+
+        parentElement.scrollTo({left: parentElement.scrollWidth})
+    }
+
+    // Build Editor
+    let saveEvent = ()=>{}
+    function openEditor(file, changeCallback = () => {})
+    {
+        saveEvent()
+        if(!file){return}
+        exitEditor();
+        for(let [e] of Object.entries(editors)){editors[e].style.display = "none";}
+        document.getElementById("editor-container").style.display = "block"
+        applyEditor.style.display = "none"
+
+        document.querySelector("#editor-container > #file-metadata > h4 > span:first-of-type").innerText = file.path.slice(0, file.path.lastIndexOf('/')+1)
+        document.querySelector("#editor-container > #file-metadata > h4 > span:last-of-type").innerText = file.path.slice(file.path.lastIndexOf('/')+1)
+        document.querySelector("#editor-container > #file-metadata > #file-origin-selector").innerHTML = ""
+        for(const origin of Object.keys(content.loaded[file.path]))
+        {
+            const el = document.createElement("option")
+            el.value = el.innerText = origin
+            document.querySelector("#editor-container > #file-metadata > #file-origin-selector").appendChild(el)
+        }
+        // #file-origin-selector
+        document.querySelector("#editor-container > #file-metadata > #file-origin-selector").value = file.origin
+
+        // Change Origin
+        document.querySelector("#editor-container > #file-metadata > #file-origin-selector").onchange = async () =>
+        {
+            const v = document.querySelector("#editor-container > #file-metadata > #file-origin-selector").value;
+            openEditor( await content.get( file.path, () => { return v } ) )
+        }
+
+        fileOptButtons[1].disabled = false
+
+        const extension = file.path.slice(file.path.lastIndexOf('.')+1).toLocaleLowerCase()
+
+        let changed = false;
+        const ogValue = file.value;
+        saveEvent = function()
+        {
+            if(!changed || ogValue == file.value) { return }
+            changed = false;
+
+            if(!textEncoder)
+            { var textEncoder = new TextEncoder() }
+            const oldBuffer = file.buffer
+            file.buffer = textEncoder.encode(file.value)
+
+            if(file.buffer == oldBuffer){return}
+            content.set(file.path, file.origin, file.value, file.buffer)
+
+            changeCallback()
+        }
+        let importEvent = async function(f)
+        {
+            file.buffer = await f.arrayBuffer();
+            file.value = await f.text();
+        }
+
+        for(const b of fileOptButtons) { b.style.display = 'none' }
+
+        // Java
+        if(["class", "java"].includes(extension))
+        {
+            editors.codeEditor.style.display = "block";
+            fileOptButtons[1].disabled = true
+
+            const setClickableRanges = StateEffect.define();
+            const clickableRangesField = StateField.define
+            ({
+                create: () => [],
+                update(ranges, tr)
+                {
+                    if (tr.docChanged && ranges.length)
+                    {
+                        ranges = ranges.map(r =>
+                        ({
+                            ...r,
+                            from: tr.changes.mapPos(r.from, 1),
+                            to:   tr.changes.mapPos(r.to, -1)
+                        })).filter(r => r.from < r.to);
+                    }
+                    // accept explicit updates
+                    for (const e of tr.effects) if (e.is(setClickableRanges)) ranges = e.value;
+                    return ranges;
+                },
+                provide: f => EditorView.decorations.from(f, ranges =>
+                    Decoration.set(ranges.map(r => Decoration.mark({ attributes: { "data-clickable-id": r.id }, class: "cm-clickable" }).range(r.from, r.to) ))
                 )
-                editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Minecraft launched"
-                editors.nbtEditor.querySelectorAll("div > button")[0].disabled = true
-                editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "block"
-                editors.nbtEditor.querySelectorAll("p")[0].style.opacity = '0.8';
-                editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
-            }
+            });
 
-            ipcInvoke('writeBuffer', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', data.buffer);
-            editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
-        }
+            const clickableCallbacks = new Map();
 
-        editors.nbtEditor.querySelectorAll("div > button")[1].onclick = async () =>
-        {
-            editors.nbtEditor.style.display = "none";
-            editors.threeEditor.style.display = "block";
-            loadStructure(data.parsed, getFile)
-        }
-    }
-    else if(filename.endsWith(".png"))
-    {
-        let moving = false;
-        closeEditor = () => { editors.imgEditor.style.display = "none"; onExit(); moving = false; canvas.style.scale = '1'; }
-        editors.imgEditor.style.display = "block";
-
-        // External
-        document.getElementById("image-editor").querySelector(".download").onclick = async () =>
-        {
-            await ipcInvoke("downloadBuffer", data.buffer, filename.split("/")[filename.split("/").length-1])
-        }
-
-        document.getElementById("image-editor").querySelector(".replace").onclick = async () =>
-        {
-            document.getElementById("image-editor").querySelector("input").click();
-
-            document.getElementById("image-editor").querySelector("input").onchange = async () =>
-            {
-                data.buffer = await document.getElementById("image-editor").querySelector("input").files[0].arrayBuffer();
-                console.log(data)
-                onChange(data);
-            }
-        }
-
-
-        // Image
-        let canvas = document.getElementById("image-editor").querySelector("canvas")
-        let ctx = canvas.getContext('2d');
-
-        document.getElementById("image-editor").querySelector(".save").onclick = async () =>
-        {
-            console.log(canvas, new Frame(canvas, ["png"], 1))
-            const buffer = new Frame(canvas, ["png"], 1).toBuffer();
-
-            if(!lodash.isEqual(data.buffer, buffer)){data.url = buffer.toString("base64")}
-            data.buffer = buffer;
-            onChange(data);
-        }
-
-        let img = new Image;
-        img.onload = (i) =>
-        {
-            canvas.width = img.width
-            canvas.height = img.height
-            if(canvas.width * editors.imgEditor.getBoundingClientRect().height < canvas.height * editors.imgEditor.getBoundingClientRect().width) { canvas.style.height = "calc(80% - 32px)"; canvas.style.width = "unset"; }
-            else { canvas.style.width = "calc(80% - 32px)"; canvas.style.height = "unset"; }
-            ctx.drawImage(img, 0, 0);
-
-            canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`
-        }
-        img.src = "data:image/png;base64,"+data.url;
-
-        // Image Editor
-
-        // Color Utily
-        function changeHue(rgb, degree)
-        {
-            var hsl = rgbToHSL(rgb);
-            hsl.h = degree;
-            if (hsl.h > 360) {
-                hsl.h -= 360;
-            }
-            else if (hsl.h < 0) {
-                hsl.h += 360;
-            }
-            return hslToRGB(hsl);
-        }
-        function rgbToHSL(rgb)
-        {
-            rgb = rgb.replace(/^\s*#|\s*$/g, '');
-
-            if(rgb.length == 3){
-                rgb = rgb.replace(/(.)/g, '$1$1');
-            }
-
-            var r = parseInt(rgb.substr(0, 2), 16) / 255,
-                g = parseInt(rgb.substr(2, 2), 16) / 255,
-                b = parseInt(rgb.substr(4, 2), 16) / 255,
-                cMax = Math.max(r, g, b),
-                cMin = Math.min(r, g, b),
-                delta = cMax - cMin,
-                l = (cMax + cMin) / 2,
-                h = 0,
-                s = 0;
-
-            if (delta == 0) {
-                h = 0;
-            }
-            else if (cMax == r) {
-                h = 60 * (((g - b) / delta) % 6);
-            }
-            else if (cMax == g) {
-                h = 60 * (((b - r) / delta) + 2);
-            }
-            else {
-                h = 60 * (((r - g) / delta) + 4);
-            }
-
-            if (delta == 0) {
-                s = 0;
-            }
-            else {
-                s = (delta/(1-Math.abs(2*l - 1)))
-            }
-
-            return {
-                h: h,
-                s: s,
-                l: l
-            }
-        }
-        function hslToRGB(hsl)
-        {
-            var h = hsl.h,
-                s = hsl.s,
-                l = hsl.l,
-                c = (1 - Math.abs(2*l - 1)) * s,
-                x = c * ( 1 - Math.abs((h / 60 ) % 2 - 1 )),
-                m = l - c/ 2,
-                r, g, b;
-
-            if (h < 60) {
-                r = c;
-                g = x;
-                b = 0;
-            }
-            else if (h < 120) {
-                r = x;
-                g = c;
-                b = 0;
-            }
-            else if (h < 180) {
-                r = 0;
-                g = c;
-                b = x;
-            }
-            else if (h < 240) {
-                r = 0;
-                g = x;
-                b = c;
-            }
-            else if (h < 300) {
-                r = x;
-                g = 0;
-                b = c;
-            }
-            else {
-                r = c;
-                g = 0;
-                b = x;
-            }
-
-            r = normalize_rgb_value(r, m);
-            g = normalize_rgb_value(g, m);
-            b = normalize_rgb_value(b, m);
-
-            return rgbToHex(r,g,b);
-        }
-        function normalize_rgb_value(color, m)
-        {
-            color = Math.floor((color + m) * 255);
-            if (color < 0) {
-                color = 0;
-            }
-            return color;
-        }
-        function rgbToHex(r, g, b)
-        {
-            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-        }
-        function hexToRgb(hex)
-        {
-            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : null;
-        }
-
-        // Zoom
-        document.getElementById("image-editor").onwheel = (event) =>
-        {
-            canvas.style.scale = Number((isNaN(Number(canvas.style.scale)) || Number(canvas.style.scale) == 0)?1:canvas.style.scale)*(1+event.deltaY/2500);
-            if(Number(canvas.style.scale) <= 0.1) { canvas.style.scale = "0.1" }
-        }
-        document.getElementById("image-editor").onmousedown = (event) => { if(event.button == 1){moving=true;} }
-        window.addEventListener("mouseup", (event) => { if(event.button == 1){moving=false;lastPos = null;} })
-        let lastPos = null;
-        window.addEventListener("mousemove", (event) =>
-        {
-            if(!moving){return;}
-            if(lastPos == null) { lastPos = {x: event.clientX, y: event.clientY} }
-            else
-            {
-                if(!canvas.style.translate.replaceAll("px","").split(" ")[0] || !canvas.style.translate.replaceAll("px","").split(" ")[1]){canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`}
-                canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])+(event.clientX-lastPos.x)*1.5) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)+(event.clientY-lastPos.y)*1.5) + "px";
-                lastPos = {x: event.clientX, y: event.clientY}
-            }
-        })
-
-        initializeDrawer(document.getElementById("content-image-canvas"));
-        function initializeDrawer(canvas)
-        {
-            let id = 0;
-
-            var ctx = canvas.getContext("2d");
-
-            // Tool Selection
-            const buttonContainer = document.getElementById("image-editor").querySelector("div:last-child");
-            let buttons = buttonContainer.querySelectorAll("button");
-
-            if(!Drawers[id])
-            {
-                console.log("Init drawer")
-                Drawers[id] = {};
-                Drawers[id].size = 1;
-                Drawers[id].color = buttonContainer.querySelector("input").value;
-                Drawers[id].toolId = 0;
-                Drawers[id].alphaLock = false;
-                Drawers[id].onBack = false;
-                Drawers[id].hue = false;
-            }
-            Drawers[id].canvas = canvas;
-
-            Drawers[id].selectTool = function(element)
-            {
-                var toolId = Array.from(buttons).indexOf(element);
-
-                if(toolId > 1)
+            const ctrlClick = EditorView.domEventHandlers
+            ({
+                mousedown(e, view)
                 {
-                    if(element.attributes.getNamedItem('current') != null)
-                    {
-                        element.removeAttribute("current");
-                    }
-                    else if(toolId != 2)
-                    {
-                        element.setAttribute("current", "");
-                    }
+                    if (e.button !== 0 || !(e.ctrlKey || e.metaKey)) return false;
+                    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+                    if (pos == null) return false;
 
-                    if(toolId == 5)
+                    const ranges = view.state.field(clickableRangesField);
+                    const hit = ranges.find(r => pos >= r.from && pos < r.to);
+                    if (!hit) return false;
+
+                    e.preventDefault();
+                    view.focus();
+                    const cb = clickableCallbacks.get(hit.id);
+                    if (typeof cb === "function")
                     {
-                        Drawers[id].hue = !Drawers[id].hue;
-                        if(!Drawers[id].alphaLock && Drawers[id].hue)
+                        try { cb({ view, range: hit, event: e, pos }); }
+                        catch (err) { console.error("click handler error", err); }
+                    }
+                    return true;
+                }
+            });
+            const clickableTheme = EditorView.baseTheme
+            ({
+                ".cm-clickable": { textDecoration: "underline dotted", cursor: "pointer" },
+                ".cm-clickable:hover": { textDecorationStyle: "solid" }
+            });
+
+            function setClickableParts(view, ranges = [], callbacks = {})
+            {
+                const safe = ranges.map(r => ({ id: String(r.id), from: r.from|0, to: r.to|0, meta: r.meta })).filter(r => r.from < r.to);
+                Object.entries(callbacks).forEach(([id,fn]) => { if (typeof fn === "function") clickableCallbacks.set(String(id), fn); });
+                view.dispatch({ effects: setClickableRanges.of(safe) });
+            }
+
+            let editor = new EditorView
+            ({
+                doc: file.value,
+                extensions:
+                [
+                    basicSetup,
+                    java(),
+                    editorTheme,
+                    oneDark,
+                    clickableRangesField,
+                    ctrlClick,
+                    clickableTheme,
+                    indentUnit.of("    "),
+                    EditorView.updateListener.of(update =>
+                    {
+                        if (update.docChanged)
                         {
-                            buttons[3].click();
+                            changed = true
+                            const doc = update.state.doc;
+                            file.value = doc.toString()
+                        }
+                    }),
+                    keymap.of
+                    ([
+                        { key: "Tab", run: indentMore },
+                        { key: "Shift-Tab", run: indentLess }
+                    ])
+                ],
+                parent: editors.codeEditor
+            })
+ 
+            let removed = false;
+            exitEditor = () => { editor.dom.remove(); removed = true; }
+
+            JavaTree.from(file.value).then(async tree =>
+            {
+                if(removed){return}
+
+                const parts = []
+                await tree.walk(c =>
+                {
+                    if(c.type == "import_declaration" && c.get("scoped_identifier"))
+                    {
+                        let identifier = c.get("scoped_identifier");
+                        if(!content.indexer[identifier.totalContent.replaceAll('.', '/')+'.class'])
+                        { return }
+                        parts.push({ id: identifier.totalContent, from: identifier.node.startIndex, to: identifier.node.endIndex })
+                    }
+                })
+
+                const events = {}
+                for(const p of parts)
+                {
+                    events[p.id] = async ({ view, range }) =>
+                    {
+                        // view.dispatch({ selection: { anchor: range.from } });
+                        openEditor( await content.get( p.id.replaceAll('.', '/')+'.class' ) )
+
+                        p.id.pop()
+                        displayDirectory(p.id.split('.'), [])
+                    }
+                }
+
+                setClickableParts(editor, parts, events);
+            });
+        }
+        // JSON
+        else if(["json", 'mcmeta', 'jpm', 'jem'].includes(extension))
+        {
+            editors.codeEditor.style.display = "block";
+
+            let editor = new EditorView
+            ({
+                doc: file.value,
+                extensions:
+                [
+                    basicSetup,
+                    json(),
+                    editorTheme,
+                    oneDark,
+                    indentUnit.of("    "),
+                    EditorView.updateListener.of(update =>
+                    {
+                        if (update.docChanged)
+                        {
+                            const doc = update.state.doc;
+                            file.value = doc.toString()
+                            changed = true
+                        }
+                    }),
+                    keymap.of
+                    ([
+                        { key: "Tab", run: indentMore },
+                        { key: "Shift-Tab", run: indentLess }
+                    ])
+                ],
+                parent: editors.codeEditor
+            })
+
+            exitEditor = () => { editor.dom.remove(); }
+        }
+        // TOML
+        else if(['toml'].includes(extension))
+        {
+            editors.codeEditor.style.display = "block";
+
+            let editor = new EditorView
+            ({
+                doc: file.value,
+                extensions:
+                [
+                    basicSetup,
+                    StreamLanguage.define(toml),
+                    editorTheme,
+                    oneDark,
+                    indentUnit.of("    "),
+                    EditorView.updateListener.of(update =>
+                    {
+                        if (update.docChanged)
+                        {
+                            const doc = update.state.doc;
+                            file.value = doc.toString()
+                            changed = true
+                        }
+                    }),
+                    keymap.of
+                    ([
+                        { key: "Tab", run: indentMore },
+                        { key: "Shift-Tab", run: indentLess }
+                    ])
+                ],
+                parent: editors.codeEditor
+            })
+
+            exitEditor = () => { editor.dom.remove(); }
+        }
+        // PNG
+        else if(['png'].includes(extension))
+        {
+            let moving = false;
+            editors.imgEditor.style.display = "block";
+
+            // Image
+            let canvas = document.getElementById("image-editor").querySelector("canvas")
+            let ctx = canvas.getContext('2d');
+
+            exitEditor = () => { editors.imgEditor.style.display = "none"; moving = false; canvas.style.scale = '1'; }
+
+            saveEvent = () =>
+            {
+                if(!changed) { return }
+                changed = false;
+
+                const buffer = new Frame(canvas, ["png"], 1).toBuffer();
+
+                if(file.buffer == buffer){return}
+
+                const newDataURL = bufferToDataURL(buffer)
+                if(newDataURL == file.value){return}
+
+                file.value = bufferToDataURL(buffer);
+                file.buffer = buffer
+
+                content.set(file.path, file.origin, file.value, file.buffer)
+                changeCallback()
+            }
+
+            importEvent = async function(f)
+            {
+                const buffer = await f.arrayBuffer();
+                file.buffer = buffer;
+                file.value = bufferToDataURL(buffer);
+            }
+
+            let img = new Image;
+            img.onload = (i) =>
+            {
+                canvas.width = img.width
+                canvas.height = img.height
+                if(canvas.width * editors.imgEditor.getBoundingClientRect().height < canvas.height * editors.imgEditor.getBoundingClientRect().width) { canvas.style.height = "calc(80% - 32px)"; canvas.style.width = "unset"; }
+                else { canvas.style.width = "calc(80% - 32px)"; canvas.style.height = "unset"; }
+                ctx.drawImage(img, 0, 0);
+
+                canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`
+            }
+            img.src = "data:image/png;base64,"+file.value;
+
+            // Utilies
+            function bufferToDataURL(buffer)
+            {
+                let binary = "";
+                const bytes = new Uint8Array(buffer);
+
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+
+                const base64 = btoa(binary);
+                return base64
+            }
+            function dataURLToUint8Array(dataURL)
+            {
+                const [meta, base64] = dataURL.split(',');
+                const binary = atob(base64);
+                const len = binary.length;
+                const bytes = new Uint8Array(len);
+
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+
+                return bytes;
+            }
+            function changeHue(rgb, degree)
+            {
+                var hsl = rgbToHSL(rgb);
+                hsl.h = degree;
+                if (hsl.h > 360) {
+                    hsl.h -= 360;
+                }
+                else if (hsl.h < 0) {
+                    hsl.h += 360;
+                }
+                return hslToRGB(hsl);
+            }
+            function rgbToHSL(rgb)
+            {
+                rgb = rgb.replace(/^\s*#|\s*$/g, '');
+
+                if(rgb.length == 3){
+                    rgb = rgb.replace(/(.)/g, '$1$1');
+                }
+
+                var r = parseInt(rgb.substr(0, 2), 16) / 255,
+                    g = parseInt(rgb.substr(2, 2), 16) / 255,
+                    b = parseInt(rgb.substr(4, 2), 16) / 255,
+                    cMax = Math.max(r, g, b),
+                    cMin = Math.min(r, g, b),
+                    delta = cMax - cMin,
+                    l = (cMax + cMin) / 2,
+                    h = 0,
+                    s = 0;
+
+                if (delta == 0) {
+                    h = 0;
+                }
+                else if (cMax == r) {
+                    h = 60 * (((g - b) / delta) % 6);
+                }
+                else if (cMax == g) {
+                    h = 60 * (((b - r) / delta) + 2);
+                }
+                else {
+                    h = 60 * (((r - g) / delta) + 4);
+                }
+
+                if (delta == 0) {
+                    s = 0;
+                }
+                else {
+                    s = (delta/(1-Math.abs(2*l - 1)))
+                }
+
+                return {
+                    h: h,
+                    s: s,
+                    l: l
+                }
+            }
+            function hslToRGB(hsl)
+            {
+                var h = hsl.h,
+                    s = hsl.s,
+                    l = hsl.l,
+                    c = (1 - Math.abs(2*l - 1)) * s,
+                    x = c * ( 1 - Math.abs((h / 60 ) % 2 - 1 )),
+                    m = l - c/ 2,
+                    r, g, b;
+
+                if (h < 60) {
+                    r = c;
+                    g = x;
+                    b = 0;
+                }
+                else if (h < 120) {
+                    r = x;
+                    g = c;
+                    b = 0;
+                }
+                else if (h < 180) {
+                    r = 0;
+                    g = c;
+                    b = x;
+                }
+                else if (h < 240) {
+                    r = 0;
+                    g = x;
+                    b = c;
+                }
+                else if (h < 300) {
+                    r = x;
+                    g = 0;
+                    b = c;
+                }
+                else {
+                    r = c;
+                    g = 0;
+                    b = x;
+                }
+
+                r = normalize_rgb_value(r, m);
+                g = normalize_rgb_value(g, m);
+                b = normalize_rgb_value(b, m);
+
+                return rgbToHex(r,g,b);
+            }
+            function normalize_rgb_value(color, m)
+            {
+                color = Math.floor((color + m) * 255);
+                if (color < 0) {
+                    color = 0;
+                }
+                return color;
+            }
+            function rgbToHex(r, g, b)
+            {
+                return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+            }
+            function hexToRgb(hex)
+            {
+                var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : null;
+            }                
+
+            // Zoom
+            document.getElementById("image-editor").onwheel = (event) =>
+            {
+                const f = 1+event.deltaY/2500;
+                canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])*f) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)*f) + "px";
+
+                canvas.style.scale = Number((isNaN(Number(canvas.style.scale)) || Number(canvas.style.scale) == 0)?1:canvas.style.scale)*f;
+                if(Number(canvas.style.scale) <= 0.1) { canvas.style.scale = "0.1" }
+            }
+            document.getElementById("image-editor").onmousedown = (event) => { if(event.button == 1){moving=true;} }
+
+            // Mouse
+            let lastPos = null;
+            window.addEventListener("mouseup", (event) => { if(event.button == 1){moving=false;lastPos = null;} })
+            window.addEventListener("mousemove", (event) =>
+            {
+                if(!moving){return;}
+                if(lastPos == null) { lastPos = {x: event.clientX, y: event.clientY} }
+                else
+                {
+                    if(!canvas.style.translate.replaceAll("px","").split(" ")[0] || !canvas.style.translate.replaceAll("px","").split(" ")[1]){canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`}
+                    canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])+(event.clientX-lastPos.x)*1.5) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)+(event.clientY-lastPos.y)*1.5) + "px";
+                    lastPos = {x: event.clientX, y: event.clientY}
+                }
+            })
+
+            initializeDrawer(document.getElementById("content-image-canvas"));
+            function initializeDrawer(canvas)
+            {
+                let id = 0;
+
+                var ctx = canvas.getContext("2d");
+
+                // Tool Selection
+                const buttonContainer = document.getElementById("image-editor").querySelector("div:last-child");
+                let buttons = buttonContainer.querySelectorAll("button");
+
+                if(!Drawers[id])
+                {
+                    Drawers[id] = {};
+                    Drawers[id].size = 1;
+                    Drawers[id].color = buttonContainer.querySelector("input").value;
+                    Drawers[id].toolId = 0;
+                    Drawers[id].alphaLock = false;
+                    Drawers[id].onBack = false;
+                    Drawers[id].hue = false;
+                }
+                Drawers[id].canvas = canvas;
+
+                // Tools
+                Drawers[id].selectTool = function(element)
+                {
+                    var toolId = Array.from(buttons).indexOf(element);
+
+                    if(toolId > 1)
+                    {
+                        if(element.attributes.getNamedItem('current') != null)
+                        {
+                            element.removeAttribute("current");
+                        }
+                        else if(toolId != 2)
+                        {
+                            element.setAttribute("current", "");
+                        }
+
+                        if(toolId == 5)
+                        {
+                            Drawers[id].hue = !Drawers[id].hue;
+                            if(!Drawers[id].alphaLock && Drawers[id].hue)
+                            {
+                                buttons[3].click();
+                            }
+                            return;
+                        }
+                        else if(toolId == 3)
+                        {
+                            Drawers[id].alphaLock = !Drawers[id].alphaLock;
+                            buttons[4].removeAttribute("current");
+                            Drawers[id].onBack = false;
+                        }
+                        else if (toolId == 4)
+                        {
+                            Drawers[id].onBack = !Drawers[id].onBack;
+                            buttons[3].removeAttribute("current");
+                            Drawers[id].alphaLock = false;
+                        }
+                        else if (toolId == 2)
+                        {
+                            buttonContainer.querySelector("input").click();
                         }
                         return;
                     }
-                    else if(toolId == 3)
+
+                    Drawers[id].toolId = toolId;
+
+
+                    buttons[1].removeAttribute("current");
+                    for (let index = 0; index < buttons.length; index++)
                     {
-                        Drawers[id].alphaLock = !Drawers[id].alphaLock;
-                        buttons[4].removeAttribute("current");
-                        Drawers[id].onBack = false;
+                        if(index > 0) { break; }
+                        const button = buttons[index];
+                        button.removeAttribute("current");
                     }
-                    else if (toolId == 4)
-                    {
-                        Drawers[id].onBack = !Drawers[id].onBack;
-                        buttons[3].removeAttribute("current");
-                        Drawers[id].alphaLock = false;
-                    }
-                    else if (toolId == 2)
-                    {
-                        console.log(buttonContainer.querySelector("input"))
-                        buttonContainer.querySelector("input").click();
-                    }
-                    return;
+
+                    element.setAttribute("current", "");
                 }
 
-                Drawers[id].toolId = toolId;
-
-
-                buttons[1].removeAttribute("current");
+                buttons[2].style.backgroundColor = Drawers[id].color;
+                buttonContainer.querySelector("input").onchange = (e) => {Drawers[id].color = e.target.value; buttons[2].style.backgroundColor = e.target.value};
                 for (let index = 0; index < buttons.length; index++)
                 {
-                    if(index > 0) { break; }
-                    const button = buttons[index];
-                    button.removeAttribute("current");
+                    const element = buttons[index];
+
+                    element.onclick = (e) => Drawers[id].selectTool(e.currentTarget);
                 }
 
-                element.setAttribute("current", "");
-            }
+                Drawers[id].selectTool(buttons[0]);
 
-            buttons[2].style.backgroundColor = Drawers[id].color;
-            buttonContainer.querySelector("input").onchange = (e) => {Drawers[id].color = e.target.value; buttons[2].style.backgroundColor = e.target.value};
-            for (let index = 0; index < buttons.length; index++)
-            {
-                const element = buttons[index];
-
-                element.onclick = (e) => Drawers[id].selectTool(e.currentTarget);
-            }
-
-            Drawers[id].selectTool(buttons[0]);
-
-            // Slider
-            document.getElementById("image-editor").querySelector("input[type='range']").oninput = (event) =>
-            {
-                Drawers[id].size = event.currentTarget.value;
-            };
-
-            // Draw on Canvas
-            const oldCanvas = [];
-            ctx.imageSmoothingEnabled= false;
-
-            var press = false;
-            canvas.onmousemove = (e) => {drawEvent(e)};
-            canvas.onmousedown = (e) => {if(e.button != 0){return} drawEvent(e); press = true;};
-            const drawEvent = function(event)
-            {
-                if(event.button != 0){return}
-                var rect = event.target.getBoundingClientRect();
-
-                var x = Math.round(((event.clientX - rect.left)/canvas.getBoundingClientRect().width)*canvas.width - 0.5);
-                var y = Math.round(((event.clientY - rect.top)/canvas.getBoundingClientRect().height)*canvas.height - 0.5);
-
-                if(Drawers[id].toolId == -1){ return }
-
-                switch(Number(Drawers[id].size))
+                // Slider
+                document.getElementById("image-editor").querySelector("input[type='range']").oninput = (event) =>
                 {
-                    case 1: drawPixel(x, y); break;
-                    case 2: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x, y+1); break;
-                    case 3: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1); break;
-                    case 4: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1); 
-                    drawPixel(x-2, y);drawPixel(x, y-2);drawPixel(x+2, y);drawPixel(x, y+2);break;
-                    case 5: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1);
-                    drawPixel(x-2, y);drawPixel(x-2, y-2);drawPixel(x, y-2);drawPixel(x+2, y);drawPixel(x+2, y+2);drawPixel(x-2, y+2);drawPixel(x+2, y-2);drawPixel(x, y+2); break;
-                }
+                    Drawers[id].size = event.currentTarget.value;
+                };
 
-                function drawPixel(x, y)
+                // Draw on Canvas
+                const oldCanvas = [];
+                ctx.imageSmoothingEnabled= false;
+
+                var press = false;
+                canvas.onmousemove = (e) => {drawEvent(e)};
+                canvas.onmousedown = (e) => {if(e.button != 0){return} drawEvent(e); press = true;};
+                const drawEvent = function(event)
                 {
-                    if(press)
-                    {
-                        if(Drawers[id].toolId == 0)
-                        {
-                            ctx.globalCompositeOperation = 'source-over';
-                            if(Drawers[id].alphaLock){ ctx.globalCompositeOperation = 'source-atop' }
-                            if(Drawers[id].onBack){ ctx.globalCompositeOperation = 'destination-over'; }
-                        }
-                        else if(Drawers[id].toolId == 1){ ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = 'black'; }
-
-                        ctx.fillStyle = Drawers[id].color;
-
-                        if(Drawers[id].hue)
-                        {
-                            var p = ctx.getImageData(x, y, 1, 1).data; 
-                            var hex = "#" + ("000000" + rgbToHex(p[0], p[1], p[2])).slice(-6);
-
-                            ctx.fillStyle = changeHue(hex, rgbToHSL(Drawers[id].color).h);
-                        }
-
-                        ctx.fillRect(x, y, 1, 1);
-                    }
-                }
-            };
-            canvas.onclick = (event) =>
-            {
-                if(Drawers[id].toolId == -1)
-                {
+                    if(event.button != 0){return}
                     var rect = event.target.getBoundingClientRect();
 
                     var x = Math.round(((event.clientX - rect.left)/canvas.getBoundingClientRect().width)*canvas.width - 0.5);
                     var y = Math.round(((event.clientY - rect.top)/canvas.getBoundingClientRect().height)*canvas.height - 0.5);
 
-                    var p = ctx.getImageData(x, y, 1, 1).data; 
-                    var hex = "#" + ("000000" + rgbToHex(p[0], p[1], p[2])).slice(-6);
+                    if(Drawers[id].toolId == -1){ return }
 
-                    Drawers[id].color = hex;
-                    buttons[3].value = hex;
-
-                    // buttonContainer.children.item(8).click();
-                }
-            };
-            window.onmouseup = async function(event) { press = false; oldCanvas.push(await canvas.toDataURL()); }
-
-            document.onkeydown = async () =>
-            {
-                var evtobj = window.event? event : e
-                if (evtobj.keyCode == 90 && (evtobj.shiftKey || evtobj.metaKey || evtobj.ctrlKey))
-                {
-                    ctx.globalCompositeOperation = 'source-over';
-
-                    var img = new Image;
-                    if(oldCanvas[oldCanvas.length - 2] != undefined)
+                    const r = Math.floor(Drawers[id].size / 2);
+                    for (let dx = -r; dx <= r; dx++)
                     {
-                        img.src = oldCanvas[oldCanvas.length - 2];
-                        oldCanvas.splice(oldCanvas.length - 2, 2)
+                        for (let dy = -r; dy <= r; dy++)
+                        {
+                            if(dx * dx + dy * dy <= r * r)
+                            {
+                                drawPixel(x + dx, y + dy);
+                            }
+                        }
                     }
-                    else if(oldCanvas[oldCanvas.length - 1] != undefined)
+                    // switch(Number(Drawers[id].size))
+                    // {
+                    //     case 1: drawPixel(x, y); break;
+                    //     case 2: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x, y+1); break;
+                    //     case 3: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1); break;
+                    //     case 4: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1); 
+                    //     drawPixel(x-2, y);drawPixel(x, y-2);drawPixel(x+2, y);drawPixel(x, y+2);break;
+                    //     case 5: drawPixel(x, y);drawPixel(x-1, y);drawPixel(x-1, y-1);drawPixel(x, y-1);drawPixel(x+1, y);drawPixel(x+1, y+1);drawPixel(x-1, y+1);drawPixel(x+1, y-1);drawPixel(x, y+1);
+                    //     drawPixel(x-2, y);drawPixel(x-2, y-2);drawPixel(x, y-2);drawPixel(x+2, y);drawPixel(x+2, y+2);drawPixel(x-2, y+2);drawPixel(x+2, y-2);drawPixel(x, y+2); break;
+                    // }
+
+                    changed = true;
+
+                    function drawPixel(x, y)
                     {
-                        img.src = oldCanvas[oldCanvas.length - 1];
-                        oldCanvas.splice(oldCanvas.length - 1, 1)
+                        if(press)
+                        {
+                            if(Drawers[id].toolId == 0)
+                            {
+                                ctx.globalCompositeOperation = 'source-over';
+                                if(Drawers[id].alphaLock){ ctx.globalCompositeOperation = 'source-atop' }
+                                if(Drawers[id].onBack){ ctx.globalCompositeOperation = 'destination-over'; }
+                            }
+                            else if(Drawers[id].toolId == 1){ ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = 'black'; }
+
+                            ctx.fillStyle = Drawers[id].color;
+
+                            if(Drawers[id].hue)
+                            {
+                                var p = ctx.getImageData(x, y, 1, 1).data; 
+                                var hex = "#" + ("000000" + rgbToHex(p[0], p[1], p[2])).slice(-6);
+
+                                ctx.fillStyle = changeHue(hex, rgbToHSL(Drawers[id].color).h);
+                            }
+
+                            ctx.fillRect(x, y, 1, 1);
+                        }
+                    }
+                };
+                canvas.onclick = (event) =>
+                {
+                    if(Drawers[id].toolId == -1)
+                    {
+                        var rect = event.target.getBoundingClientRect();
+
+                        var x = Math.round(((event.clientX - rect.left)/canvas.getBoundingClientRect().width)*canvas.width - 0.5);
+                        var y = Math.round(((event.clientY - rect.top)/canvas.getBoundingClientRect().height)*canvas.height - 0.5);
+
+                        var p = ctx.getImageData(x, y, 1, 1).data; 
+                        var hex = "#" + ("000000" + rgbToHex(p[0], p[1], p[2])).slice(-6);
+
+                        Drawers[id].color = hex;
+                        buttons[3].value = hex;
+
+                        // buttonContainer.children.item(8).click();
+                    }
+                };
+                window.onmouseup = async function(event) { press = false; oldCanvas.push(await canvas.toDataURL()); }
+
+                // Control Z
+                document.onkeydown = async () =>
+                {
+                    var evtobj = window.event? event : e
+                    if (evtobj.keyCode == 90 && (evtobj.shiftKey || evtobj.metaKey || evtobj.ctrlKey))
+                    {
+                        ctx.globalCompositeOperation = 'source-over';
+
+                        var img = new Image;
+                        if(oldCanvas[oldCanvas.length - 2] != undefined)
+                        {
+                            img.src = oldCanvas[oldCanvas.length - 2];
+                            oldCanvas.splice(oldCanvas.length - 2, 2)
+                        }
+                        else if(oldCanvas[oldCanvas.length - 1] != undefined)
+                        {
+                            img.src = oldCanvas[oldCanvas.length - 1];
+                            oldCanvas.splice(oldCanvas.length - 1, 1)
+                        }
+
+                        if(!img.src || img.src == "") { return }
+
+                        img.onload = () => {ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.drawImage(img, 0, 0, ctx.canvas.width, ctx.canvas.height);};
+                    }
+                };
+
+                // Reinit
+                fileOptButtons[3].onclick = () =>
+                {
+                    let img = new Image;
+                    img.onload = () => { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.drawImage(img, 0, 0, ctx.canvas.width, ctx.canvas.height);};
+                    img.src = "data:image/png;base64," + content.loaded[file.path][file.origin].value
+                }
+
+                // Preview OG
+                const ogEl = document.createElement("img")
+                ogEl.src = "data:image/png;base64," + content.loaded[file.path][file.origin].value
+                ctx.canvas.parentElement.insertBefore(ogEl, ctx.canvas);
+                function resizeCopy()
+                {
+                    ogEl.style.width = ctx.canvas.style.width
+                    ogEl.style.height = ctx.canvas.style.height
+                    ogEl.style.translate = ctx.canvas.style.translate
+                    ogEl.style.scale = ctx.canvas.style.scale
+                    ogEl.style.translate = `${Number(ogEl.style.translate.split(" ")[0].slice(0, ogEl.style.translate.split(" ")[0].length-2)) - ogEl.getBoundingClientRect().width}px ${ogEl.style.translate.split(" ")[1]}`
+                }
+                const observer = new MutationObserver(() => resizeCopy)
+                observer.observe(ctx.canvas, {attributes: true})
+
+                ogEl.style.display = 'none'
+                fileOptButtons[2].onclick = () =>
+                {
+                    ogEl.style.display = ogEl.style.display == 'none' ? 'block' : 'none'
+                    resizeCopy()
+                }
+            }
+        }
+        // NBT
+        else if(['nbt'].includes(extension))
+        {
+            document.querySelector("#editor-container #three-editor").style.display = "block"
+            document.activeElement.blur();
+
+            // 3D Editor
+            function setupViewport()
+            {
+                setupThree(content).then(async () =>
+                {
+                    // Nbt File Importation
+                    threeSetup.mcWorld.clearAll()
+                    await threeSetup.mcWorld.importStructure(file.value.simplified, 0, 0, 0);
+
+                    // Player Position
+                    threeSetup.player.body.setTranslation(new RAPIER.Vector3(-1, 1, -1))
+                    threeSetup.mainCamera.rotation.setFromVector3(new THREE.Vector3(0, Math.PI*1.25, 0))
+
+                    for (let i = 0; i < 9; i++)
+                    {
+                        const id = file.value.simplified.palette?.[i]?.Name
+                        if(!id) { continue }
+                        await threeSetup.player.gui.setSlot(i, id, threeSetup.renderer)
+                    }
+
+                    // Save
+                    saveEvent = async () =>
+                    {
+                        if(!changed) { return }
+                        changed = false;
+
+                        file.value.raw = threeSetup.mcWorld.toStructureNbt()
+                        const oldBuffer = file.buffer
+                        file.buffer = await ipcInvoke("rawNbtToBuffer", file.value.raw)
+                        if(file.buffer == oldBuffer) { return }
+                        content.set(file.path, file.origin, file.value, file.buffer)
+                        changeCallback()
+                    }
+                })
+            }
+            setupViewport()
+
+            fileOptButtons[7].style.display = fileOptButtons[8].style.display = "block"
+            fileOptButtons[5].style.display = fileOptButtons[6].style.display = "block"
+
+            // In-Game Editor
+            document.querySelector("#editor-container > #file-metadata > div > div:nth-child(2) > button:last-of-type").onclick = async () =>
+            {
+                nbtEditorIndex++;
+                if(!nbtEditorOpened)
+                {
+                    nbtEditorOpened = true;
+                    await ipcInvoke("addEditionWorld", window.instance.name);
+                    await launch(
+                        window.instance.name,
+                        {
+                            log: (t, c) => {},
+                            close: async c =>
+                            {
+                                closeEditor();
+                                
+                                nbtEditorOpened = false;
+                                fileOptButtons[7].disabled = fileOptButtons[8].disabled = true
+
+                                ipcInvoke('deleteFolder', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep());
+                            },
+                            network: (i, c) => {},
+                            windowOpen: async (w, i) => {},
+                        },
+                        {type: "singleplayer", identifier: ".Structure Edition"}
+                    )
+
+                    // document.querySelector("#editor-container > #file-metadata > div > div:nth-child(3) > button:first-of-type")
+                    fileOptButtons[7].disabled = fileOptButtons[8].disabled = false
+
+                    // editors.nbtEditor.querySelectorAll("div > button")[0].innerText = "Minecraft launched"
+                    // editors.nbtEditor.querySelectorAll("div > button")[0].disabled = true
+                    // editors.nbtEditor.querySelectorAll(":scope > button")[0].style.display = "block"
+                    // editors.nbtEditor.querySelectorAll("p")[0].style.opacity = '0.8';
+                    // editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
+                }
+
+                ipcInvoke('writeBuffer', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', await ipcInvoke("rawNbtToBuffer", threeSetup.mcWorld.toStructureNbt()));
+                // editors.nbtEditor.querySelectorAll("p")[0].innerHTML = `<br>Minecraft is opened. The current structure is <span style="color=#fff">${filename}</span>.<br>To load it put "<span onclick="navigator.clipboard.writeText('${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}')" style="cursor:pointer;text-decoration: underline">${'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)}</span>" (click to copy) as structure name in the structure block and press "LOAD" twice.<br>To save it, in the structure block set "Load Mode" to "Save" and press "SAVE".<br>(Userful command to clear: <span style:"backgroundColor: #000">/fill 0 1 0 16 16 16 air</span>)<br>You must save the structure via the structure block before saving it into the mod.<br>`
+            }
+            // Export to Game
+            fileOptButtons[7].onclick = async () =>
+            {
+                nbtEditorIndex++;
+                ipcInvoke('writeBuffer', 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt', await ipcInvoke("rawNbtToBuffer", threeSetup.mcWorld.toStructureNbt()));
+            }
+            // Import from Game
+            fileOptButtons[8].onclick = async () =>
+            {
+                // Save
+                file.buffer = await ipcInvoke("readRawFile", 'Modpack\ Maker'+sep()+'instances'+sep()+window.instance.name+sep()+'minecraft'+sep()+'saves'+sep()+'.Structure Edition'+sep()+'generated'+sep()+'minecraft'+sep()+'structures'+sep()+'structure'+(nbtEditorIndex==0?'':nbtEditorIndex)+'.nbt')
+                file.value = await ipcInvoke("parseBuffer", file.buffer, file.path, null, null)
+
+                content.set(file.path, file.origin, file.value, file.buffer)
+                changeCallback()
+
+                setupViewport()
+            }
+        }
+        // Default: Text
+        else if(file?.value)
+        {
+            editors.codeEditor.style.display = "block";
+
+            let editor = new EditorView
+            ({
+                doc: file.value,
+                extensions:
+                [
+                    basicSetup,
+                    editorTheme,
+                    oneDark,
+                    indentUnit.of("    "),
+                    EditorView.updateListener.of(update =>
+                    {
+                        if (update.docChanged)
+                        {
+                            const doc = update.state.doc;
+                            file.value = doc.toString()
+
+                            changed = true
+                        }
+                    }),
+                    keymap.of
+                    ([
+                        { key: "Tab", run: indentMore },
+                        { key: "Shift-Tab", run: indentLess }
+                    ])
+                ],
+                parent: editors.codeEditor
+            })
+
+            exitEditor = () => { editor.dom.remove(); }
+        }
+
+        // Import
+        fileOptButtons[1].onclick = () =>
+        {
+            importFileInput.click();
+            importFileInput.onchange = async () =>
+            {
+                await importEvent(importFileInput.files[0])
+                // Reload without save
+                openEditor(file)
+            }
+        }
+
+        // // Save
+        // saveFileButton.onclick = saveEvent
+
+        // Export
+        fileOptButtons[0].onclick = async () =>
+        {
+            await ipcInvoke("downloadBuffer", file.buffer, file.path.slice(file.path.lastIndexOf('/')+1))
+        }
+
+        fileOptButtons[0].style.display = fileOptButtons[1].style.display = 'block'
+        fileOptButtons[2].style.display = fileOptButtons[3].style.display = 'block'
+    }
+
+    window.contentExplorer =
+    {
+        // All
+        allContent: () =>
+        {
+            document.getElementById("content-explorer").style.display = 'flex';
+            document.querySelector("#content-explorer > #pack-selector").style.display = 'none';
+
+            // Cleanup
+            while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+            { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+            clean()
+
+            displayDirectory([], [])
+        },
+
+        // Content Elements
+        contentElements: () =>
+        {
+            document.getElementById("content-explorer").style.display = 'flex';
+            document.querySelector("#content-explorer > #pack-selector").style.display = 'block';
+            document.querySelector("#content-explorer > #pack-selector > h4:first-of-type").innerText = "Mods"
+            document.querySelector("#content-explorer > #pack-selector > h4:last-of-type").innerText = "Resourcepacks"
+            document.querySelectorAll("#content-explorer>#pack-selector > h4")[0].style.display =
+            document.querySelectorAll("#content-explorer>#pack-selector > h4")[1].style.display = 'block';
+            document.getElementById("pack-selector").style.display = 'block';
+            document.getElementById("pack-selector").style.width = '12em';
+
+            // Cleanup
+            while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+            { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+            for(const k of Object.keys(content.elements))
+            {
+                if(k.startsWith('versions/'))
+                {
+                    const b = document.createElement("button")
+                    b.innerText = "Vanilla "+k.split('/')[1]
+                    document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").firstChild)
+                    b.onclick = () => { displayDirectory([], [], [k]) }
+                }
+                else if(k.startsWith('mods/'))
+                {
+                    const b = document.createElement("button")
+                    b.style.textOverflow = 'clip'
+
+                    const filename = document.createElement("span")
+                    filename.innerText = k;
+                    filename.style.opacity = '.5'
+                    filename.style.fontSize = '.7em'
+                    filename.style.whiteSpace = 'nowrap'
+
+                    const title = document.createElement("span")
+                    const meta = window.instance.mods.find(m=>m.filename==k.slice(k.lastIndexOf('/')+1, k.lastIndexOf('.')));
+                    title.innerText = meta?.title || k.slice(k.lastIndexOf('/')+1, k.lastIndexOf('.'))
+
+                    if(meta?.icon)
+                    {
+                        b.style.display = 'flex'
+
+                        const img = document.createElement('img');
+                        img.src = meta.icon
+                        img.style.height = '2em'
+                        img.style.marginRight = '.5em'
+
+                        b.appendChild(img)
+
+                        const textParent = document.createElement('div')
+                        textParent.style.width = 'calc(100% - 2.5em)';
+                        textParent.appendChild(filename)
+                        textParent.appendChild(document.createElement('br'))
+                        textParent.appendChild(title)
+                        b.appendChild(textParent)
                     }
                     else
                     {
-                        ctx.clearRect(0, 0, 16, 16); updateModel(id); return;
+                        b.appendChild(filename)
+                        b.appendChild(document.createElement('br'))
+                        b.appendChild(title)
                     }
 
-                    img.onload = () => {ctx.clearRect(0, 0, 16, 16);ctx.drawImage(img, 0, 0, 16, 16); updateModel(id)};
+                    document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector > h4:last-of-type"))
+                    b.onclick = () => { displayDirectory([], [], [k]) }
                 }
-            };
-        }
-    }
-    else
-    {
-        closeEditor = () => { editors.noEditor.style.display = "none"; onExit(); }
-        editors.noEditor.style.display = "block";
-        document.getElementById("no-editor").querySelector("p").innerText = filename.split("/")[filename.split("/").length-1] + "\nFormat not supported... You can download it and/or replace it with another file to modify it externally.";
-        
-        document.getElementById("no-editor").querySelector("button:first-of-type").onclick = async () =>
-        {
-            await ipcInvoke("downloadBuffer", data, filename.split("/")[filename.split("/").length-1])
-        }
+                else if(k.startsWith('resourcepacks/'))
+                {
+                    const b = document.createElement("button")
+                    b.style.textOverflow = 'clip'
 
-        document.getElementById("no-editor").querySelector("button:last-of-type").onclick = async () =>
-        {
-            document.getElementById("no-editor").querySelector("input").click();
+                    const filename = document.createElement("span")
+                    filename.innerText = k;
+                    filename.style.opacity = '.5'
+                    filename.style.fontSize = '.7em'
+                    filename.style.whiteSpace = 'nowrap'
 
-            document.getElementById("no-editor").querySelector("input").onchange = async () =>
-            {
-                console.log(await document.getElementById("no-editor").querySelector("input").files[0].arrayBuffer())
-                onChange(await document.getElementById("no-editor").querySelector("input").files[0].arrayBuffer());
+                    const title = document.createElement("span")
+                    const meta = window.instance.rp.find(m=>m.filename==k.slice(k.lastIndexOf('/')+1, k.lastIndexOf('.')));
+                    title.innerText = meta?.title || k.slice(k.lastIndexOf('/')+1, k.lastIndexOf('.'))
+
+                    if(meta?.icon)
+                    {
+                        b.style.display = 'flex'
+
+                        const img = document.createElement('img');
+                        img.src = meta.icon
+                        img.style.height = '2em'
+                        img.style.marginRight = '.5em'
+
+                        b.appendChild(img)
+
+                        const textParent = document.createElement('div')
+                        textParent.style.width = 'calc(100% - 2.5em)';
+                        textParent.appendChild(filename)
+                        textParent.appendChild(document.createElement('br'))
+                        textParent.appendChild(title)
+                        b.appendChild(textParent)
+                    }
+                    else
+                    {
+                        b.appendChild(filename)
+                        b.appendChild(document.createElement('br'))
+                        b.appendChild(title)
+                    }
+
+                    document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+                    b.onclick = () => { displayDirectory([], [], [k]) }
+                }
             }
+
+            clean()
+        },
+
+        // Asset Selection
+        // assets: () =>
+        // {
+        //     document.getElementById("content-explorer").style.display = 'flex';
+        //     document.querySelector("#content-explorer > #pack-selector").style.display = 'block';
+        //     document.querySelector("#content-explorer > #pack-selector > h4:first-of-type").innerText = "Resourcepacks"
+        //     document.querySelector("#content-explorer > #pack-selector > h4:last-of-type").innerText = "Built-In Packs"
+        //     document.querySelectorAll("#content-explorer>#pack-selector > h4")[0].style.display =
+        //     document.querySelectorAll("#content-explorer>#pack-selector > h4")[1].style.display = 'block';
+        //     document.getElementById("pack-selector").style.display = 'block';
+        //     document.getElementById("pack-selector").style.width = '8em';
+
+        //     // Cleanup
+        //     while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+        //     { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+        //     // Built-in
+        //     {
+        //         const b = document.createElement("button")
+        //         b.innerText = "Built-In"
+        //         document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").firstChild)
+        //         b.onclick = () =>
+        //         { displayDirectory([], ['assets']) }
+        //     }
+        //     // Resourcepacks
+        //     for(const k of Object.keys(content.elements))
+        //     {
+        //         if(k.startsWith('resourcepacks/'))
+        //         {
+        //             const b = document.createElement("button")
+        //             b.innerText = k.slice(14)
+        //             document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector > h4:last-of-type"))
+        //             b.onclick = () => { displayDirectory([], ['assets'], [k]) }
+        //         }
+        //     }
+        //     // Packs
+        //     if(content.hierarchyIndexer.packs)
+        //     {
+        //         for(const k of Object.keys(content.hierarchyIndexer.packs))
+        //         {
+        //             if(!content.hierarchyIndexer.packs?.[k]?.assets) { continue }
+
+        //             const b = document.createElement("button")
+        //             b.innerText = k
+        //             document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+        //             b.onclick = () => { displayDirectory([], ['packs', k, 'assets']) }
+        //         }
+        //     }
+        //     // Programmer Art
+        //     if(content.hierarchyIndexer.programmer_art)
+        //     {
+        //         const b = document.createElement("button")
+        //         b.innerText = "Programmer Art"
+        //         document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+        //         b.onclick = () => { displayDirectory([], ['programmer_art', 'assets']) }
+        //     }
+
+        //     clean()
+        // },
+        assets: () =>
+        {
+            document.getElementById("content-explorer").style.display = 'flex';
+            document.querySelector("#content-explorer > #pack-selector").style.display = 'none';
+
+            // Cleanup
+            while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+            { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+            clean()
+
+            const combined = {}
+            for(const assetContainer of Object.keys(content.hierarchyIndexer.assets))
+            {
+                walk(content.hierarchyIndexer.assets[assetContainer], [])
+                function walk(parent, path = [])
+                {
+                    let subObject = getProp(combined, path);
+                    if(!subObject) { subObject = {}; if(path.length > 0) { setProp(combined, path, subObject) } }
+
+                    for(const [k, c] of Object.entries(parent))
+                    {
+                        if(Array.isArray(c))
+                        {
+                            subObject[k] = {origins: c, location: ['assets', assetContainer, ...path, k]}
+                        }
+                        else if(typeof c == "object")
+                        {
+                            walk(c, path.concat([k]))
+                        }
+                    }
+
+                    if(path.length == 0) { return }
+                    setProp(combined, path, subObject)
+                }
+            }
+
+
+            displayDirectory([], [], [], true, combined)
+        },
+
+        // Data Selection
+        // data: () =>
+        // {
+        //     document.getElementById("content-explorer").style.display = 'flex';
+        //     document.querySelector("#content-explorer > #pack-selector").style.display = 'block';
+        //     document.querySelector("#content-explorer > #pack-selector > h4:first-of-type").innerText = "Resourcepacks"
+        //     document.querySelector("#content-explorer > #pack-selector > h4:last-of-type").innerText = "Built-In Packs"
+        //     document.querySelectorAll("#content-explorer>#pack-selector > h4")[0].style.display =
+        //     document.querySelectorAll("#content-explorer>#pack-selector > h4")[1].style.display = 'block';
+        //     document.getElementById("pack-selector").style.display = 'block';
+        //     document.getElementById("pack-selector").style.width = '8em';
+
+        //     // Cleanup
+        //     while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+        //     { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+        //     // Built-in
+        //     {
+        //         const b = document.createElement("button")
+        //         b.innerText = "Built-In"
+        //         document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").firstChild)
+        //         b.onclick = () =>
+        //         { displayDirectory([], ['data']) }
+        //     }
+        //     // Packs
+        //     if(content.hierarchyIndexer.packs)
+        //     {
+        //         for(const k of Object.keys(content.hierarchyIndexer.packs))
+        //         {
+        //             if(!content.hierarchyIndexer.packs?.[k]?.data) { continue }
+
+        //             const b = document.createElement("button")
+        //             b.innerText = k
+        //             document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+        //             b.onclick = () => { displayDirectory([], ['packs', k, 'data']) }
+        //         }
+        //     }
+
+        //     clean()
+        // },
+        data: () =>
+        {
+            document.getElementById("content-explorer").style.display = 'flex';
+            document.querySelector("#content-explorer > #pack-selector").style.display = 'none';
+
+            // Cleanup
+            while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+            { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+            clean()
+
+            const combined = {}
+            for(const assetContainer of Object.keys(content.hierarchyIndexer.data))
+            {
+                walk(content.hierarchyIndexer.data[assetContainer], [])
+                function walk(parent, path = [])
+                {
+                    let subObject = getProp(combined, path);
+                    if(!subObject) { subObject = {}; if(path.length > 0) { setProp(combined, path, subObject) } }
+
+                    for(const [k, c] of Object.entries(parent))
+                    {
+                        if(Array.isArray(c))
+                        {
+                            subObject[k] = {origins: c, location: ['data', assetContainer, ...path, k]}
+                        }
+                        else if(typeof c == "object")
+                        {
+                            walk(c, path.concat([k]))
+                        }
+                    }
+
+                    if(path.length == 0) { return }
+                    setProp(combined, path, subObject)
+                }
+            }
+
+            displayDirectory([], [], [], true, combined)
+        },
+
+        // Soure code Selection
+        sourceCode: () =>
+        {
+            document.getElementById("content-explorer").style.display = 'flex';
+            document.querySelector("#content-explorer > #pack-selector").style.display = 'block';
+            document.getElementById("pack-selector").style.display = 'block';
+            document.getElementById("pack-selector").style.width = '16em';
+
+            // Cleanup
+            while(document.querySelectorAll("#content-explorer>#pack-selector > button").length > 0)
+            { document.querySelectorAll("#content-explorer>#pack-selector > button")[document.querySelectorAll("#content-explorer>#pack-selector > button").length-1].remove() }
+
+            for(const k of Object.keys(content.hierarchyIndexer))
+            {
+                if(['programmer_art', 'packs', 'assets', 'data', 'META-INF'].includes(k) || Array.isArray(content.hierarchyIndexer[k]))
+                { continue }
+
+                for(const key of Object.keys(content.hierarchyIndexer[k]))
+                {
+                    console.log(Array.isArray(content.hierarchyIndexer[k][key]))
+                    if(Array.isArray(content.hierarchyIndexer[k][key]))
+                    { continue }
+
+                    const subValues = Object.values(content.hierarchyIndexer[k][key]);
+                    if(subValues.find(v=>Array.isArray(v)))
+                    {
+                        const b = document.createElement("button")
+
+                        const prefix = document.createElement("span")
+                        prefix.innerText = k+'.';
+                        prefix.style.opacity = '.5'
+                        prefix.style.fontSize = '.7em'
+
+                        const id = document.createElement("span")
+                        id.innerText = key;
+
+                        b.appendChild(prefix)
+                        b.appendChild(id)
+
+                        document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+
+                        b.onclick = () => { displayDirectory([], [k, key]) }
+                        continue;
+                    }
+
+                    for(const id of Object.keys(content.hierarchyIndexer[k][key]))
+                    {
+                        if(Array.isArray(content.hierarchyIndexer[k][key]))
+                        { continue }
+
+                        const b = document.createElement("button")
+
+                        const prefix = document.createElement("span")
+                        prefix.innerText = k+'.';
+                        prefix.style.opacity = '.5'
+                        prefix.style.fontSize = '.7em'
+
+                        const author = document.createElement("span")
+                        author.innerText = key+'.';
+                        author.style.opacity = '.7'
+                        author.style.fontSize = '.9em'
+
+                        const idEl = document.createElement("span")
+                        idEl.innerText = id;
+
+                        b.appendChild(prefix)
+                        b.appendChild(author)
+                        b.appendChild(idEl)
+
+                        document.querySelector("#content-explorer > #pack-selector").insertBefore(b, document.querySelector("#content-explorer > #pack-selector").lastChild)
+                        b.onclick = () => { displayDirectory([], [k, key, id]) }
+                    }
+                }
+            }
+
+            document.querySelectorAll("#content-explorer>#pack-selector > h4")[0].style.display =
+            document.querySelectorAll("#content-explorer>#pack-selector > h4")[1].style.display = 'none';
+
+            clean()
         }
     }
+
+    // Tabs
+    document.querySelector("#content-editor > .tab > #content-listing-selection").onmousedown = (ev) =>
+    {
+        if(document.querySelector("#content-editor > .tab > #content-listing-selection").getAttribute("current") != "true")
+        {
+            document.querySelector("#content-editor > .tab > button").setAttribute("current", "false")
+            document.querySelector("#content-editor > .tab > #content-listing-selection").setAttribute("current", "true")
+            window.contentExplorer[document.querySelector("#content-editor > .tab > #content-listing-selection").value]()
+            applyEditor.style.display = "none"
+            ev.preventDefault()
+        }
+    }
+    document.querySelector("#content-editor > .tab > #content-listing-selection").onchange = (ev) =>
+    {
+        applyEditor.style.display = "none"
+
+        document.querySelector("#content-editor > .tab > button").setAttribute("current", "false")
+        document.querySelector("#content-editor > .tab > #content-listing-selection").setAttribute("current", "true")
+
+        if(window.contentExplorer?.[document.querySelector("#content-editor > .tab > #content-listing-selection").value])
+        { window.contentExplorer[document.querySelector("#content-editor > .tab > #content-listing-selection").value]() }
+    }
+
+    document.querySelector("#content-editor > .tab > button").onclick = () =>
+    {
+        document.getElementById("editor-container").style.display = "none"
+        document.getElementById("content-explorer").style.display = "none"
+
+        document.querySelector("#content-editor > .tab > button").setAttribute("current", "true")
+        document.querySelector("#content-editor > .tab > #content-listing-selection").setAttribute("current", "false")
+
+        openApplier()
+    }
+
+    // Apply Editor
+    function openApplier()
+    {
+        applyEditor.style.display = "block"
+        applyEditor.innerHTML = '';
+
+        for(const element of Object.keys(content.elements))
+        {
+            const confirmed = []
+
+            const el = document.createElement("div")
+
+            const header = document.createElement("div"); el.appendChild(header);
+            const icon = document.createElement("img")
+            header.appendChild(icon)
+            const title = document.createElement("h4");
+            title.innerText = element
+            header.appendChild(title)
+
+            const contentEl = document.createElement("div"); el.appendChild(contentEl);
+
+            const actions = document.createElement("div"); el.appendChild(actions);
+            const applyAll = document.createElement("button");
+            applyAll.innerText = "Apply"
+            actions.appendChild(applyAll)
+            const confirmAll = document.createElement("button");
+            confirmAll.innerText = "Confirm All"
+            actions.appendChild(confirmAll)
+            const reverseAll = document.createElement("button");
+            reverseAll.innerText = "Reverse All"
+            actions.appendChild(reverseAll)
+
+            const entries = Object.entries(content.modified).filter(([, v]) => v[element]);
+            if(entries.length == 0) { continue }
+
+            for(const [k] of entries)
+            {
+                const el = document.createElement("div")
+                el.appendChild(document.createElement("p"))
+                el.appendChild(document.createElement("button"))
+                el.appendChild(document.createElement("button"))
+
+                el.querySelector('p').innerText = k
+                el.querySelector("button:first-of-type").setAttribute('soft-hover-info', 'Confirm')
+                el.querySelector("button:last-of-type").setAttribute('soft-hover-info', 'Revert')
+
+                // Confirm
+                let isConfirmed = false
+                el.ondblclick = el.querySelector("button:first-of-type").onclick = () =>
+                {
+                    if(!isConfirmed)
+                    {
+                        isConfirmed = true;
+                        confirmed.push
+                        ({
+                            location: k,
+                            buffer: content.modified[k][element].buffer,
+                            type: content.modified[k][element].type
+                        })
+                        el.setAttribute('selected', '')
+                    }
+                    else
+                    {
+                        isConfirmed = false;
+                        const index = confirmed.findIndex(c=>c.origin==element&&c.location==k)
+                        if(index >= 0) { confirmed.splice(index) }
+                        el.removeAttribute('selected')
+                    }
+                }
+                // Revert
+                el.querySelector("button:last-of-type").onclick = () =>
+                {
+                    content.modified[k][element] = undefined
+                    delete content.modified[k][element]
+                    content.loaded[k][element] = undefined
+                    delete content.loaded[k][element]
+                    el.remove()
+                }
+
+                contentEl.appendChild(el)
+            }
+
+            // Apply All
+            applyAll.onclick = () =>
+            {
+                content.write(element, confirmed)
+            }
+
+            // Confirm All
+            confirmAll.onclick = () =>
+            {
+                for(const el of contentEl.querySelectorAll("button:not([selected])"))
+                {
+                    el.onclick()
+                }
+            }
+
+            // Reverse All
+            reverseAll.onclick = () =>
+            {
+                for(const [k] of entries)
+                {
+                    const index = confirmed.findIndex(c=>c.origin==element&&c.location==k)
+                    if(index >= 0) { confirmed.splice(index) }
+                }
+                contentEl.innerHTML = ''
+            }
+
+            applyEditor.appendChild(el)
+        }
+
+        window.loadHoverInfo()
+    }
+
+    // Init Setup
+    window.contentExplorer.allContent();
+    applyEditor.style.display = "none"
 }
 
-window.openModContent = async function(path)
+document.querySelector("#content-editor > .tab > #content-listing-selection").setAttribute("current", "true")
+// Resize Setup
+// window.setResizable(document.querySelector("#content-explorer > #pack-selector"), ['right'],
+// [
+//     {
+//         toWidth: 72,
+//         callback: (width) =>
+//         {
+//             for(const b of document.querySelector("#content-explorer > #pack-selector").querySelectorAll("button"))
+//             {
+//                 if(!b.querySelector("div")) { continue; }
+
+//                 b.querySelector("div").style.display = 'none'
+//             }
+//             for(const d of document.querySelector("#content-explorer > #pack-selector").querySelectorAll("h4"))
+//             { d.style.display = "none" }
+//         }
+//     },
+//     {
+//         fromWidth: 72,
+//         callback: (width) =>
+//         {
+//             for(const b of document.querySelector("#content-explorer > #pack-selector").querySelectorAll("button"))
+//             {
+//                 if(!b.querySelector("div")) { continue; }
+//                 b.querySelector("div").style.display = 'block'
+//             }
+//             for(const d of document.querySelector("#content-explorer > #pack-selector").querySelectorAll("h4"))
+//             { d.style.display = "block" }
+//         }
+//     }
+// ])
+window.setResizable(document.querySelector("#content-explorer > #content-explorer-selector"), ["right"])
+
+// instanceEditor(window.instance.name)
+window.addInstanceListener(() =>
 {
-    if(!(await ipcInvoke("isMinecraftInstalled", instance.name, instance.version.number))){ document.getElementById("launch-required").style.display = "block"; return}
-    document.getElementById("launch-required").style.display = "none";
-
-    closeEditor();
-    let fullPath = "instances/"+window.instance.name +"/minecraft/"+path+".jar";
-    let data = await ipcInvoke("getJar", fullPath, true)
-
-    document.querySelector('#content-editor > .tab > button:first-of-type').click();
-
-    // Icon
-    let icon = null;
-    let modData = await ipcInvoke("extractFileByPath", fullPath, "META-INF/mods.toml");
-    if(modData?.parsed?.mods)
-    {
-        for(let m of modData.parsed.mods)
-        {
-            if(m.logoFile)
-            {
-                let logoData = await ipcInvoke("extractFileByPath", fullPath, m.logoFile);
-                if(logoData) { icon = "data:image/png;base64,"+logoData.url; }
-            }
-        }
-    }
-
-    explorer(data, async (keys) =>
-    {
-        editors.sourceSelection.firstChild.innerHTML = '';
-        editors.sourceSelection.style.display = "none";
-
-        keys = lodash.clone(keys);
-        let selectedFile = null;
-
-        if(!getProp(window.jarData.combined, keys))
-        {
-            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number);
-
-            if(files.length == 0)
-            {
-                editors.sourceSelection.style.display = "block";
-                let p = document.createElement("p");
-                p.innerText = `${keys[keys.length-1]} not found...`;
-                return;
-            }
-
-            selectedFile = files.find(f=>f.jarFile.endsWith(fullPath));
-
-            if(!selectedFile)
-            {
-                editors.sourceSelection.style.display = "block";
-                let p = document.createElement("p");
-                p.innerText = `${keys[keys.length-1]} is not modified by ${path.slice(path.lastIndexOf("/"))}...`;
-                return;
-            }
-        }
-        else
-        {
-            selectedFile = {value: getProp(window.jarData.combined, keys), keys: keys, jarFile: fullPath};
-        }
+    instanceEditor(window.instance.name)
+})
 
 
-        setProp(window.jarData.combined, keys, selectedFile.value);
-        fileEditor(lodash.clone(selectedFile.value), keys[keys.length-1], (value) =>
-        {
-            if(lodash.isEqual(selectedFile.value, value)){return}
-
-            setProp(window.jarData.combined, keys, value);
-            if(window.jarData.modified.find(m => m.keys==keys))
-            {
-                window.jarData.modified[window.jarData.modified.findIndex(m => m.keys==keys)] = {origin: selectedFile.jarFile, keys, value}
-            }
-            else
-            {
-                window.jarData.modified.push({origin: selectedFile.jarFile, keys, value})
-            }
-        }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); }, async () =>
-        {
-            let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number);
-            return files[files.length-1].value;
-        }, async (keys) =>
-        {
-            let value = null;
-            if(!getProp(window.jarData.combined, keys))
-            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
-            else { value = getProp(window.jarData.combined, keys) }
-
-            return value;
-        }, async (keys) =>
-        {
-            console.log("Opening", keys)
-            console.log(window.jarData.combined)
-            let value = null;
-            if(!getProp(window.jarData.combined, keys))
-            { let files = await ipcInvoke("retrieveFileByKeys", window.instance.name, keys, window.instance.version.number); if(files.length==0){return null;} value = files[files.length-1].value; }
-            else { value = getProp(window.jarData.combined, keys) }
-
-            return value;
-        })
-    }, {name: path.slice(path.lastIndexOf("/")), icon: icon})
-
-
-    return;
-    
-    for(let [i, m] of data.mods.entries())
-    {
-        let b = document.createElement("button");
-        if(m.icon)
-        {
-            let i = document.createElement("img");
-            i.src = m.icon
-            b.appendChild(i);
-        }
-        let span = document.createElement("span");
-        span.innerText = m.name;
-        b.appendChild(span);
-        s.appendChild(b)
-
-        b.onclick = () =>
-        {
-            let o = {assets: data.mods[i].assets, data: data.mods[i].data, classes: data.mods[i].classes};
-            closeEditor();
-            explorer(o, (keys) =>
-            {
-                keys = lodash.clone(keys)
-                fileEditor(getProp(data.mods[i], keys), keys[keys.length-1], (value) => { console.log(keys, value); setProp(data.mods[i], keys, value) }, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.mods[i], keys)})
-            }, {name: m.name, icon: m.icon})
-        }
-    }
-    // Ressource Packs
-    {
-        let b = document.createElement("button");
-        b.innerText = "Ressource Packs";
-        s.appendChild(b)
-
-        b.onclick = () =>
-        {
-            closeEditor();
-            explorer(data.resourcepacks, (keys) =>
-            {
-                fileEditor(getProp(data.resourcepacks, keys), keys[keys.length-1], (value) => {setProp(data.resourcepacks, keys, value)}, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.resourcepacks, keys)})
-            }, {name: "Ressource Packs"})
-        }
-    }
-    // Other Data
-    {
-        let b = document.createElement("button");
-        b.innerText = "Other Files";
-        s.appendChild(b)
-
-        b.onclick = () =>
-        {
-            closeEditor();
-            explorer(data.data, (keys) =>
-            {
-                fileEditor(getProp(data.data, keys), keys[keys.length-1], (value) => {setProp(data.data, keys, value)}, () => { document.querySelector('#content-editor > .tab > button:first-of-type').click(); editors.codeEditor.style.display = "none"; }, () => {return getProp(data.data, keys)})
-            }, {name: "Other Files"})
-        }
-    }
-
-    modEditor.querySelector(":scope > button").onclick = async () =>
-    {
-        await ipcInvoke("writeModContent", "instances/"+window.instance.name +"/minecraft/"+path+".jar", data)
-    }
-}
-
-function setProp(obj, keys, value)
-{
-    let current = obj;
-    keys.slice(0, -1).forEach(k =>
-    {
-        if (!(k in current)) current[k] = {};
-        current = current[k];
-    });
-    current[keys[keys.length - 1]] = value;
-}
 function getProp(obj, keys)
 {
     let current = obj;
@@ -2335,4 +1891,14 @@ function getProp(obj, keys)
         current = current[k];
     });
     return current[keys[keys.length - 1]]
+}
+function setProp(obj, keys, value)
+{
+    let current = obj;
+    keys.slice(0, -1).forEach(k =>
+    {
+        if (!(k in current)) current[k] = {};
+        current = current[k];
+    });
+    current[keys[keys.length - 1]] = value;
 }

@@ -1,5 +1,5 @@
 const { spawn, exec, execSync } = require('child_process');
-const { promises: fs, existsSync, createWriteStream } = require('fs');
+const { promises: fs, existsSync, createWriteStream, createReadStream } = require('fs');
 const path = require('path');
 const os = require('os');
 const config = require("./config")
@@ -8,13 +8,14 @@ const { platform } = require('process');
 const { download } = require('grape-electron-dl');
 const tar = require("tar")
 const extract = require("extract-zip");
+const unzipper = require('unzipper');
 
 function run(cmd, args, opts = {})
 {
     return new Promise((resolve, reject) =>
     {
         const p = spawn(cmd, args, { stdio: opts.stdio || 'inherit', shell: false });
-        p.on('error', reject);
+        p.on('error', (err) => {console.error(err); reject(err)});
         p.on('message', (...args) => console.log)
         p.on('close', (code) =>
         {
@@ -195,6 +196,48 @@ async function deleteFolderRecursive(dirPath)
     }
 }
 
+async function decompileMinecraft(version)
+{
+    const dir = path.join(config.directories.unobfuscated, version+'.jar');
+    if(existsSync(dir)) { return dir; }
+    if(!existsSync(config.directories.unobfuscated)) { await fs.mkdir(config.directories.unobfuscated, {recursive: true}) }
+
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'vanilla-decompile'));
+    const outputTmp = path.normalize(path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'vanilla-decompile')), 'output.jar'))
+
+    const javaVersion = (await (await fetch((await (await fetch("https://piston-meta.mojang.com/mc/game/version_manifest.json")).json()).versions.find(v=>v.id==version).url)).json()).javaVersion.majorVersion
+    // await run(path.normalize(await getJava(javaVersion)), ['-jar', path.normalize(path.resolve(__dirname, 'minecraft-decompiler.jar')), '--version', version, '--side', 'CLIENT', '--decompile', '--decompiled-output', path.normalize(tmp), '--output', path.normalize(path.join(outputTmp, 'output.jar'))])
+    await run(path.normalize(await getJava(javaVersion)), ['-jar', path.normalize(path.resolve(__dirname, 'minecraft-decompiler.jar')), '--version', version, '--side', 'CLIENT', '--output', outputTmp])
+    fs.rm(path.resolve(__dirname, 'downloads'), { recursive: true, force: true })
+
+    fs.copyFile(outputTmp, dir)
+    return dir;
+
+    async function walk(dir)
+    {
+        var results = [];
+        const list = await fs.readdir(dir)
+
+        for(let file of list)
+        {
+            file = path.resolve(dir, file);
+            const stat = await fs.stat(file)
+            if (stat && stat.isDirectory())
+            {
+                results = results.concat(await walk(file));
+            }
+            else
+            {
+                results.push(file.slice(tmp.length+1));
+            }
+        }
+
+        return results;
+    };
+
+    return await walk(tmp)
+}
+
 module.exports = 
 {
     decompileClass: async function(buffer)
@@ -204,18 +247,160 @@ module.exports =
 
         const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'decompile-'));
 
-        const original = path.join(tmp, "original");
+        const original = path.join(tmp, "original.class");
         await fs.writeFile(original, buffer)
 
         const destinationOut = path.join(tmp, 'src');
         await fs.mkdir(destinationOut);
 
-        await run(await getJava('22'), ['-jar', path.resolve(__dirname, 'cfr.jar'), '--outputdir', destinationOut, original]);
+        // java -jar fernflower.jar -r /path/to/class_folder /path/to/output_src
+        if(true)
+        {
+            await run(await getJava('22'), ['-jar', path.resolve(__dirname, "fernflower.jar"), original, destinationOut]);
 
-        let result = await findSingleFileRecursive(destinationOut, '.java');
-        result.file = (await fs.readFile(result.file)).toString();
+            let result = {path: path.join(destinationOut, 'original.java'), file: null}
+            result.file = (await fs.readFile(result.path)).toString();
 
-        return result;
+            return result
+        }
+        else
+        {
+            await run(await getJava('22'), ['-jar', path.resolve(__dirname, "cfr.jar"), '--outputdir', destinationOut, original]);
+
+            let result = await findSingleFileRecursive(destinationOut, '.java');
+            result.file = (await fs.readFile(result.file)).toString();
+
+            return result;
+        }
+    },
+    decompileMinecraft: decompileMinecraft,
+    decompileInstance: async function(instance, version, includes = {minecraft: true, mods: true, packs: true, libraries: false, onlyJava: true})
+    {
+        // Paths
+        const instancePath = path.join(config.directories.instances, instance)
+        if(!existsSync(instancePath)){return}
+
+        const combinePath = path.join(config.directories.combinedInstances, instance)
+        if(existsSync(combinePath)){await fs.rm(combinePath, {recursive: true})}
+        await fs.mkdir(combinePath, {recursive: true})
+
+        const decompilePath = path.join(config.directories.decompiledInstances, instance)
+        if(existsSync(decompilePath)){await fs.rm(decompilePath, {recursive: true})}
+        await fs.mkdir(decompilePath, {recursive: true})
+
+        // Copy
+        if(includes.libraries)
+        {
+            await libraryWalk(path.join(instancePath, "minecraft", "libraries"))
+            async function libraryWalk(parent)
+            {
+                for(const c of await fs.readdir( parent ))
+                {
+                    const p = path.join(parent, c);
+
+                    if(p.endsWith("net"+path.sep+"minecraft")){continue}
+
+                    if((await fs.stat( p )).isDirectory())
+                    {
+                        await libraryWalk(p)
+                    }
+                    else if(p.endsWith(".jar"))
+                    {
+                        try
+                        {
+                            await createReadStream(p).pipe(unzipper.Parse()).on('entry', async entry =>
+                            {
+                                const type = entry.type;
+
+                                if(type === 'File' && (!includes.onlyJava || entry.path.endsWith('.class')))
+                                {
+                                    const dest = path.join(combinePath, entry.path);
+                                    await fs.mkdir(path.dirname(dest), { recursive: true });
+                                    await entry.pipe(createWriteStream(dest))
+                                }
+                                else
+                                {
+                                    entry.autodrain();
+                                }
+                            })
+                            .promise()
+                        }
+                        catch(err){console.warn(err)}
+                    }
+                }
+            }            
+        }
+        if(includes.minecraft)
+        {
+            const minecraftDecompiledPath = await decompileMinecraft(version);
+
+            await createReadStream(minecraftDecompiledPath).pipe(unzipper.Parse()).on('entry', async entry =>
+            {
+                const type = entry.type;
+
+                if(type === 'File' && (!includes.onlyJava || entry.path.endsWith('.class')))
+                {
+                    const dest = path.join(combinePath, entry.path);
+
+                    await fs.mkdir(path.dirname(dest), { recursive: true });
+                    await entry.pipe(createWriteStream(dest))
+                }
+                else
+                {
+                    entry.autodrain();
+                }
+            })
+            .promise()
+        }
+        if(includes.mods)
+        {
+            const modsPath = path.join(instancePath, "minecraft", "mods");
+            for(const mods of await fs.readdir( modsPath ))
+            {
+                if(!mods.endsWith(".jar")){continue}
+
+                await createReadStream(path.join(modsPath, mods)).pipe(unzipper.Parse()).on('entry', async entry =>
+                {
+                    const type = entry.type;
+
+                    if(type === 'File' && (!includes.onlyJava || entry.path.endsWith('.class')))
+                    {
+                        const dest = path.join(combinePath, entry.path);
+                        await fs.mkdir(path.dirname(dest), { recursive: true });
+                        await entry.pipe(createWriteStream(dest))
+                    }
+                    else
+                    {
+                        entry.autodrain();
+                    }
+                })
+                .promise()
+            }
+        }
+        if(includes.packs)
+        {
+            // TODO: Use actual hierarchy priority
+            const packsPath = path.join(combinePath, "packs");
+            if(!existsSync(packsPath)){fs.mkdir(packsPath, {recursive: true})}
+
+            const rpPath = path.join(instancePath, "minecraft", "resourcepacks");
+            for(const rp of await fs.readdir( rpPath ))
+            {
+                if(rp.endsWith(".zip"))
+                {
+                    await extract( path.join(rpPath, rp), { dir: path.join(packsPath, rp) } )
+                }
+                else if((await fs.stat( path.join(rpPath, rp) )).isDirectory())
+                {
+                    await fs.cp(path.join(rpPath, rp), packsPath, { recursive: true, force: false })
+                }
+            }
+        }
+
+        // Decompile
+        await run(await getJava('22'), ['-jar', path.resolve(__dirname, "fernflower.jar"), '-r', combinePath, decompilePath]);
+
+        return decompilePath
     },
     decompile: async function(jarPath)
     {

@@ -1,5 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
+ipcRenderer.setMaxListeners(0)
+
+try {
+  // this registers any renderer-side hooks (the package name may change in future releases)
+  require('@ghostery/adblocker-electron-preload');
+} catch (err) {
+  // not fatal, but print so you know if the preload failed to load
+  console.warn('Adblocker preload failed to load:', err && err.message);
+}
+
 window.onModUpdate = (i, m) => {}
 
 let sep = ipcRenderer.sendSync("sep");
@@ -126,9 +136,9 @@ contextBridge.exposeInMainWorld('importInstance', async (link, metadata) => { ip
 
 contextBridge.exposeInMainWorld('saveInstance', (i) => { return ipcRenderer.invoke('saveInstance', JSON.parse(JSON.stringify(i))); })
 
-contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, network, windowOpen}, world) =>
+contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, network, windowOpen}, world, w, h) =>
 {
-    let i = await ipcRenderer.invoke('launch', name, world);
+    let i = await ipcRenderer.invoke('launch', name, world, w, h);
 
     ipcRenderer.on(i+'log', (event, t, c) => listeners.log(t, c))
     ipcRenderer.on(i+'close', (event, c) => listeners.close(c))
@@ -143,6 +153,46 @@ contextBridge.exposeInMainWorld('launch', async (name, listeners = {log, close, 
     // })
     return i;
 })
+
+
+contextBridge.exposeInMainWorld('invokePacked', (name, ...args) => 
+{
+    // const msgpack = require('@msgpack/msgpack');
+
+    return new Promise((resolve) =>
+    {
+        let totalSize = 0;
+        let finalBuffer = null;
+        let receivedChunks = 0;
+
+        const startEvent = (event, { totalSize: ts }) =>
+        {
+            totalSize = ts;
+            finalBuffer = new Uint8Array(totalSize);
+        };
+        ipcRenderer.on('shared-buffer-start', startEvent);
+
+        const chunkEvent = (event, { chunk, offset }) =>
+        {
+            if (!finalBuffer) return;
+            finalBuffer.set(new Uint8Array(chunk), offset);
+            receivedChunks++;
+        }
+        ipcRenderer.on('shared-buffer-chunk', chunkEvent);
+
+        const endEvent = () =>
+        {
+            ipcRenderer.removeListener('shared-buffer-start', startEvent)
+            ipcRenderer.removeListener('shared-buffer-chunk', chunkEvent)
+            ipcRenderer.removeListener('shared-buffer-end', endEvent)
+            
+            resolve(finalBuffer)
+        };
+        ipcRenderer.on('shared-buffer-end', endEvent);
+
+        ipcRenderer.invoke(name, ...args)
+    })
+});
 
 contextBridge.exposeInMainWorld('getCombined', (name, version = null) => 
 {
@@ -259,8 +309,19 @@ contextBridge.exposeInMainWorld('readRegion', async (path) =>
     // catch(err) { console.error(err) }
 })
 
-
 contextBridge.exposeInMainWorld('setWindowPropertie', (k, v) => {ipcRenderer.send('windowPropertie', k, v)})
+contextBridge.exposeInMainWorld('fileFromInstance', async (name, location, resolver) =>
+{
+    let allFiles = []
+    ipcRenderer.once(`instanceFileSelection-${name}-${location}`, async (event, { callId, files }) =>
+    {
+        allFiles = files
+        ipcRenderer.send(`instanceFileSelection:${callId}`, await resolver(files));
+    })
+
+    const file = await ipcRenderer.invoke("fileFromInstance", name, location);
+    return {file, files: allFiles}
+})
 
 contextBridge.exposeInMainWorld('ipcSend', (channel, ...args) => {ipcRenderer.send(channel, ...args)})
 contextBridge.exposeInMainWorld('ipcInvoke', (channel, ...args) => { return ipcRenderer.invoke(channel, ...args)})

@@ -136,8 +136,9 @@ class Saves
     {
         for(let [i, e] of Saves.saved.entries())
         {
-            if(JSON.stringify(e) == JSON.stringify(data)) { Saves.saved.splice(i, 1); }
+            if(e.url == data.url) { Saves.saved.splice(i, 1); }
         }
+
         Saves.saved.push(data);
         fs.writeFileSync(path.join(config.directories.saves, 'saved.json'), JSON.stringify(Saves.saved));
     }
