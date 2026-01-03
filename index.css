@@ -1531,8 +1531,8 @@ label:has(#filter-version-browsing)
 #image-editor input[type="file"] { display: none;}
 #image-editor > canvas
 {
-    position: absolute;
-    top: 50%; left: 50%;
+    position: relative;
+    top: 0; left: 50%;
     translate: -50% -50%;
     text-align: center;
     height: calc(80% - 32px);
@@ -1541,8 +1541,8 @@ label:has(#filter-version-browsing)
 }
 #image-editor > img
 {
-    position: absolute;
-    top: 50%; left: 50%;
+    position: relative;
+    top: 0; left: 50%;
     translate: -50% -50%;
     text-align: center;
     height: calc(80% - 32px);

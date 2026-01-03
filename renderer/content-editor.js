@@ -704,7 +704,7 @@ async function instanceEditor(name)
                 else { canvas.style.width = "calc(80% - 32px)"; canvas.style.height = "unset"; }
                 ctx.drawImage(img, 0, 0);
 
-                canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`
+                canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${editors.imgEditor.getBoundingClientRect().height/2-canvas.getBoundingClientRect().height/2}px`
             }
             img.src = "data:image/png;base64,"+file.value;
 
@@ -860,13 +860,23 @@ async function instanceEditor(name)
             }                
 
             // Zoom
+            let onMoveCanvas = null
             document.getElementById("image-editor").onwheel = (event) =>
             {
                 const f = 1+event.deltaY/2500;
-                canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])*f) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)*f) + "px";
+                // canvas.style.scale = Number((isNaN(Number(canvas.style.scale)) || Number(canvas.style.scale) == 0)?1:canvas.style.scale)*f;
+                // if(Number(canvas.style.scale) <= 0.1) { canvas.style.scale = "0.1" }
 
-                canvas.style.scale = Number((isNaN(Number(canvas.style.scale)) || Number(canvas.style.scale) == 0)?1:canvas.style.scale)*f;
-                if(Number(canvas.style.scale) <= 0.1) { canvas.style.scale = "0.1" }
+                const oldRect = canvas.getBoundingClientRect()
+
+                const width = oldRect.width * f;
+                const height = oldRect.height * f;
+
+                canvas.style.width  = `${width}px`;
+                canvas.style.height = `${height}px`;
+                canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0]) - (width  - oldRect.width)  / 2) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0) - (height - oldRect.height) / 2) + "px";
+
+                if(onMoveCanvas) {onMoveCanvas()}
             }
             document.getElementById("image-editor").onmousedown = (event) => { if(event.button == 1){moving=true;} }
 
@@ -879,9 +889,11 @@ async function instanceEditor(name)
                 if(lastPos == null) { lastPos = {x: event.clientX, y: event.clientY} }
                 else
                 {
-                    if(!canvas.style.translate.replaceAll("px","").split(" ")[0] || !canvas.style.translate.replaceAll("px","").split(" ")[1]){canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${canvas.getBoundingClientRect().height/2}px`}
+                    if(!canvas.style.translate.replaceAll("px","").split(" ")[0] || !canvas.style.translate.replaceAll("px","").split(" ")[1]){canvas.style.translate = `-${canvas.getBoundingClientRect().width/2}px -${editors.imgEditor.getBoundingClientRect().height/2-canvas.getBoundingClientRect().height/2}px`}
                     canvas.style.translate = (Number(canvas.style.translate.replaceAll("px","").split(" ")[0])+(event.clientX-lastPos.x)*1.5) + "px " + ((Number(canvas.style.translate.replaceAll("px","").split(" ")[1])?Number(canvas.style.translate.replaceAll("px","").split(" ")[1]):0)+(event.clientY-lastPos.y)*1.5) + "px";
                     lastPos = {x: event.clientX, y: event.clientY}
+
+                    if(onMoveCanvas) {onMoveCanvas()}
                 }
             })
 
@@ -1107,17 +1119,20 @@ async function instanceEditor(name)
                 // Preview OG
                 const ogEl = document.createElement("img")
                 ogEl.src = "data:image/png;base64," + content.loaded[file.path][file.origin].value
-                ctx.canvas.parentElement.insertBefore(ogEl, ctx.canvas);
+                ctx.canvas.parentElement.insertBefore(ogEl, ctx.canvas.parentElement.querySelector("div"));
                 function resizeCopy()
                 {
-                    ogEl.style.width = ctx.canvas.style.width
-                    ogEl.style.height = ctx.canvas.style.height
+                    ctx.canvas.style.width = ogEl.style.width = ctx.canvas.getBoundingClientRect().width + 'px'
+                    ctx.canvas.style.height = ogEl.style.height = ctx.canvas.getBoundingClientRect().height + 'px'
                     ogEl.style.translate = ctx.canvas.style.translate
-                    ogEl.style.scale = ctx.canvas.style.scale
-                    ogEl.style.translate = `${Number(ogEl.style.translate.split(" ")[0].slice(0, ogEl.style.translate.split(" ")[0].length-2)) - ogEl.getBoundingClientRect().width}px ${ogEl.style.translate.split(" ")[1]}`
+                    ctx.canvas.style.scale = ogEl.style.scale = '1'
+
+                    // ogEl.style.translate = `${Number(ogEl.style.translate.split(" ")[0].slice(0, ogEl.style.translate.split(" ")[0].length-2)) - ogEl.getBoundingClientRect().width}px ${ogEl.style.translate.split(" ")[1]}`
                 }
                 const observer = new MutationObserver(() => resizeCopy)
                 observer.observe(ctx.canvas, {attributes: true})
+
+                onMoveCanvas = resizeCopy
 
                 ogEl.style.display = 'none'
                 fileOptButtons[2].onclick = () =>
