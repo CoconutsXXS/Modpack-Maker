@@ -192,7 +192,7 @@ function setup()
     let currentChapter;
     let links = [];
 
-    let lastScrappedChapter = null;
+    let lastScrappedChapter = [];
     let modButton = null;
     let modSaveButton = null;
     let gallery = null;
@@ -200,6 +200,8 @@ function setup()
 
     async function modify()
     {
+        console.log("Modify")
+
         // Clear
         if(modButton){modButton.remove();modButton=null;}
         if(modSaveButton){modSaveButton.remove();modSaveButton=null;}
@@ -210,48 +212,47 @@ function setup()
         // document.querySelector("#player-container.style-scope.ytd-watch-flexy").parentNode != document.querySelector("#player-full-bleed-container"))
         // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-right-controls > button.ytp-size-button.ytp-button").click(); }
 
-        // Chapter
-        if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
-        if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(7) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
-        {
-            // if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
-            // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
+        // // Chapter
+        // if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+        // if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(7) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+        // {
+        //     // if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility() && !scrappedChapter)
+        //     // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
 
-            if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") &&
-            document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
-            {
-                chapters = [];
+        //     if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+        //     {
+        //         chapters = [];
 
-                for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
-                {
-                    if(!c.querySelector("#endpoint")) { continue }
-                    let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
-                    chapters.push
-                    ({
-                        name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
-                        time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
-                    })
-                }
+        //         for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
+        //         {
+        //             if(!c.querySelector("#endpoint")) { continue }
+        //             let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
+        //             chapters.push
+        //             ({
+        //                 name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
+        //                 time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
+        //             })
+        //         }
 
-                console.log("Updated Chapters", chapters)
+        //         console.log("Updated Chapters", chapters)
 
-                if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters))
-                {
-                    lastScrappedChapter = chapters;
-                    // setTimeout(() => scrappedChapter = false, 3000);
+        //         if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters))
+        //         {
+        //             lastScrappedChapter = chapters;
+        //             // setTimeout(() => scrappedChapter = false, 3000);
 
-                    // if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
-                    // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
-                }
-            }
+        //             // if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").checkVisibility())
+        //             // { document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button").click(); }
+        //         }
+        //     }
 
-            document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(8) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
-        }
-        else
-        {
-            console.log("Failed to handle chapters");
-            return false;
-        }
+        //     document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(8) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
+        // }
+        // else
+        // {
+        //     console.log("Failed to handle chapters");
+        //     return false;
+        // }
 
         // New button
         if(document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > .ytIconWrapperHost") && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0] != undefined && document.querySelectorAll("#top-level-buttons-computed > yt-button-view-model")[0].children.length > 0)
@@ -277,7 +278,6 @@ function setup()
             console.log("Failed to create new buttons");
             return false;
         }
-
 
         if(document.querySelectorAll("#button-shape")[0])
         { document.querySelectorAll("#button-shape")[0].remove(); }
@@ -363,6 +363,7 @@ function setup()
             return false;
         }
 
+        console.log("modified successfully")
         return true;
     }
 
@@ -430,32 +431,35 @@ function setup()
                 let index2 = 0;
 
                 console.log("google doc linkText",linkText)
-                for(let l of linkText)
+                if(linkText)
                 {
-                    index2++;
-
-                    let before = null;
-                    let fullBefore = null;
-                    if(nolinkText.filter(p=>!urlRegex.test(p))[index2-1])
+                    for(let l of linkText)
                     {
-                        fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-1].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+                        index2++;
 
-                        let substract = 2
-                        while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > index2-substract && index2-substract >= 0)
+                        let before = null;
+                        let fullBefore = null;
+                        if(nolinkText.filter(p=>!urlRegex.test(p))[index2-1])
                         {
-                            fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-substract].split('\n').filter(p=>p.replaceAll(' ', '')!='');
-                            substract++;
-                        }
+                            fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-1].split('\n').filter(p=>p.replaceAll(' ', '')!='');
 
-                        before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
-                    }
-                    
-                    final.push
-                    ({
-                        url: l,
-                        before,
-                        fullBefore
-                    })
+                            let substract = 2
+                            while(fullBefore.length==0 && nolinkText.filter(p=>!urlRegex.test(p)).length > index2-substract && index2-substract >= 0)
+                            {
+                                fullBefore = nolinkText.filter(p=>!urlRegex.test(p))[index2-substract].split('\n').filter(p=>p.replaceAll(' ', '')!='');
+                                substract++;
+                            }
+
+                            before = fullBefore[fullBefore.length-1].replace(/^\d+\s*[\-\.]\s*/, '').replace(/[\-\:\s]*$/, '').trim();
+                        }
+                        
+                        final.push
+                        ({
+                            url: l,
+                            before,
+                            fullBefore
+                        })
+                    }                    
                 }
             }
             // MC-MOD.GG Scrapping
@@ -534,6 +538,7 @@ function setup()
 
     async function setCurrentMod(baseUrl)
     {
+        console.log("Mod:",baseUrl)
         let url = new URL(baseUrl);
         openFunction = function()
         {
@@ -631,7 +636,8 @@ function setup()
 
         // Save Button
         let saved = await externalFunctions.isSaved(url)
-        modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
+        if(modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path"))
+        { modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z"); }
 
         modButton.onclick = () => { externalFunctions.openMod(url); document.querySelector("#movie_player > div.html5-video-container > video").pause(); }
 
@@ -657,7 +663,8 @@ function setup()
                 saved = false;
             }
 
-            modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z");
+            if(modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path"))
+            { modSaveButton.querySelector("button-view-model > button > div.yt-spec-button-shape-next__icon > svg > path").setAttributeNS(null, "d", saved?"M5 3h14v18l-7-5-7 5V3z":"M18 4v15.06l-5.42-3.87-.58-.42-.58.42L6 19.06V4h12m1-1H5v18l7-5 7 5V3z"); }
         }
     }
 
@@ -668,6 +675,7 @@ function setup()
 
         // Chapter Mod Recognition
         // console.log(time, chapters)
+
         if(chapters.length > 0 && chapters.sort((a,b) => b.time-a.time).find(a => a.time < time) != currentChapter)
         {
             currentChapter = chapters.sort((a,b) => b.time-a.time).find(a => a.time < time);
@@ -702,21 +710,22 @@ function setup()
 
     let interval = null;
     let desc = '';
-    let intervalFunction = () =>
+    let chapterInterval = null
+    let resolvedChapter = ""
+    let intervalFunction = async () =>
     {
+        if(!window.location.pathname.startsWith("/watch")) { return; }
+
         let href = window.location.href;
 
-        let scapped = scrapDescription((d) =>
-        {
-            let hashtags = [...d.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
-            if((hashtags.includes("moddedminecraft") || hashtags.includes("minecraftmods") || (hashtags.includes("minecraft") && (hashtags.includes("mods") || hashtags.includes("modding")))) || (d.toLowerCase().includes("minecraft") && d.toLowerCase().includes(" mod")))
-            {
-                handleDescription()
-            }
-        });
-        if(description==null || !scapped || links.length==0){return;}
-        if(desc == description){return;}
+        let scapped = scrapDescription()
+        if(desc == description){ return; }
+        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div > ytd-engagement-panel-title-header-renderer ytd-button-renderer button")?.click()
         desc = description;
+
+        await handleDescription()
+
+        if(description==null || !scapped){ console.log(description==null, !scapped); return;}
 
         // Filter by #
         let hashtags = [...description.matchAll(/https?:\/\/(?:www\.)?youtube\.com\/hashtag\/([^\/?#\s]+)/gi)].map(m => decodeURIComponent(m[1]));
@@ -729,45 +738,97 @@ function setup()
             return;
         }
 
-        chapters = []
-        if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
-        if(document.querySelector("#movie_player > div.ytp-chrome-bottom > div.ytp-chrome-controls > div.ytp-left-controls > div:nth-child(6) > button") && document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+        let iterations = 0;
+        if(!chapterInterval && resolvedChapter != window.location.href)
         {
-            if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+            chapterInterval = setInterval(async () =>
             {
-                for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").childNodes)
+                if(window.location.href != href) { clearInterval(chapterInterval); chapterInterval=null; return; }
+
+                if(!document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)")){document.querySelector("div.ytp-chapter-container:nth-child(7) > button:nth-child(1)").click()}
+                if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
                 {
-                    if(!c.querySelector("#endpoint")) { continue }
-                    let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
-                    chapters.push
-                    ({
-                        name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
-                        time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
-                    })
+                    if(document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)"))
+                    {
+                        const oldChapter = Array.from(lastScrappedChapter)
+                        const uniqueOldChapter = [...new Set(oldChapter)].reduce((acc, item) => { if(!acc.find(i => i.time == item.time)){ acc.push(item) } return acc; }, []).sort((a,b) => b.time-a.time);
+
+                        const realOGChapter = Array.from(chapters)
+                        chapters = []
+                        for(let c of document.querySelector("ytd-macro-markers-list-renderer:nth-child(1) > div:nth-child(1)").querySelectorAll("ytd-macro-markers-list-item-renderer"))
+                        {
+                            if(!c.querySelector("#endpoint")) { console.log("destroy: no #endpoint");  return }
+                            let splited = c.querySelector("#endpoint > #details > #time").innerText.split(':');
+                            chapters.push
+                            ({
+                                name: c.querySelector("#endpoint > #details > h4.macro-markers.style-scope.ytd-macro-markers-list-item-renderer").innerText,
+                                time: (parseInt(splited[0], 10) * 60) + (parseInt(splited[1], 10))
+                            })
+                        }
+
+                        const uniqueChapter = [...new Set(chapters)].reduce((acc, item) => { if(!acc.find(i => i.time == item.time)){ acc.push(item) } return acc; }, []).sort((a,b) => b.time-a.time);
+
+                        if(JSON.stringify( uniqueOldChapter) != JSON.stringify( uniqueChapter ))
+                        {
+                            chapters = lastScrappedChapter = uniqueChapter;
+                        }
+                        else
+                        {
+                            chapters = realOGChapter;
+                            iterations = 0;
+                            await new Promise((resolve) => { setTimeout(resolve, 1000) })
+                            return
+                        }
+
+                        resolvedChapter = window.location.href
+                        document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div > ytd-engagement-panel-title-header-renderer ytd-button-renderer button")?.click()
+
+                        await scrapDescription()
+                        await handleDescription()
+                        clearInterval(chapterInterval); chapterInterval=null; return;
+                    }
                 }
-
-                if(JSON.stringify(lastScrappedChapter) != JSON.stringify(chapters)) {lastScrappedChapter = chapters;}
-            }
-
-            document.querySelector("ytd-engagement-panel-section-list-renderer.style-scope:nth-child(3) > div:nth-child(1) > ytd-engagement-panel-title-header-renderer:nth-child(1) > div:nth-child(3) > div:nth-child(7) > ytd-button-renderer:nth-child(1) > yt-button-shape:nth-child(1) > button:nth-child(1)").click();
+                else if(iterations < 10)
+                {
+                    console.warn("Failed to handle chapters, retrying in 500ms...");
+                    await new Promise((resolve) => { setTimeout(resolve, 500) })
+                    iterations++
+                }
+                else
+                {
+                    console.error("Failed to handle chapters after "+iterations+" attempts...");
+                    clearInterval(chapterInterval); return;
+                }
+            })
         }
-        else
-        {
-            console.log("Failed to handle chapters");
-        }
 
-        let setupInterval = setInterval(() =>
+
+        // if(chapters.length == 0) { console.log("No Chapters..."); return; }
+
+        let setupInterval = setInterval(async () =>
         {
-            modify();
-            if(description!=null && modButton!=null && links.length>0 && chapters.length > 0)
+            await modify();
+
+            if(description!=null && modButton!=null)
             {
                 window.scrollTo(0, 0);
                 clearInterval(setupInterval);
                 clearInterval(interval);
-                let subInterval = setInterval(() =>
+                let subInterval = setInterval(async () =>
                 {
-                    if(href != window.location.href || !document.body.contains(modButton))
+                    if(!document.body.contains(modButton))
                     {
+                        await modify();
+                        if(!document.body.contains(modButton))
+                        {
+                            console.error("Cannot setup mod button, modify() error...")
+                            return
+                        }
+                    }
+
+                    if(href != window.location.href)
+                    {
+                        console.log("RESET")
                         if(modButton){modButton.remove();}
                         if(modSaveButton){modSaveButton.remove();}
                         if(gallery){gallery.remove();}
@@ -777,17 +838,17 @@ function setup()
                         currentChapter;
                         links = [];
 
-                        lastScrappedChapter = null;
                         modButton = null;
                         modSaveButton = null;
                         gallery = null;
 
                         clearInterval(subInterval);
 
-                        if(!new URL(window.location.href).searchParams.has("v")){return;}
+                        if(!new URL(window.location.href).searchParams.has("v")){ return;}
 
                         if(interval){clearInterval(interval)}
                         interval = setInterval(intervalFunction, 200);
+
                         return;
                     }
                     update();
@@ -796,7 +857,7 @@ function setup()
             else
             {
                 console.log(chapters)
-                console.log("Cannot Setup:", description!=null, modButton!=null, links.length>0, chapters.length > 0)
+                console.log("Cannot Setup:", description!=null, modButton!=null)
                 if(interval){clearInterval(interval)}
                 interval = setInterval(intervalFunction, 200);
             }
@@ -814,7 +875,7 @@ function setup()
             for(let m of mutations)
             {
                 if(m.attributeName == "src" && lastAttr != document.querySelector(".video-stream").getAttribute("src"))
-                { desc = ''; update() }
+                { update() }
             }
         })
         o.observe(document.querySelector(".video-stream"), {childList: true, characterData: true, attributes: true, subtree: true})
@@ -837,11 +898,9 @@ function setup()
             currentChapter;
             links = [];
 
-            lastScrappedChapter = null;
             modButton = null;
             modSaveButton = null;
             gallery = null;
-
 
             if(interval){clearInterval(interval)}
             interval = setInterval(intervalFunction, 200);
@@ -854,8 +913,6 @@ function setup()
             document.querySelector(".video-stream").onloadeddata = null;
         }
     }, 100);
-
-    // window.electron.sendToHost('injected', null)
 
     isSetup=true;
     console.log("setup end");
